@@ -1,0 +1,7 @@
+domain: projectcontour.io
+repo: github.com/projectcontour/contour-operator
+resources:
+- group: operator
+  kind: Contour
+  version: v1alpha1
+version: "2"

@@ -1,0 +1,7 @@
+apiVersion: operator.projectcontour.io/v1alpha1
+kind: Contour
+metadata:
+  name: contour-sample
+spec:
+  # Add fields here
+  foo: bar
