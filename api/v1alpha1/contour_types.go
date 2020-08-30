@@ -20,27 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// ContourSpec defines the desired state of Contour
-type ContourSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of Contour. Edit Contour_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-}
-
-// ContourStatus defines the observed state of Contour
-type ContourStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
 
 // +kubebuilder:object:root=true
 
-// Contour is the Schema for the contours API
+// Contour is the Schema for the contours API.
 type Contour struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -56,6 +40,24 @@ type ContourList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Contour `json:"items"`
+}
+
+// ContourSpec defines the desired state of Contour.
+type ContourSpec struct {
+	// replicas is the desired number of Contour replicas. If unset,
+	// defaults to 2.
+	//
+	// +optional
+	// +kubebuilder:default=2
+	// +kubebuilder:validation:Minimum=0
+	Replicas int32 `json:"replicas,omitempty"`
+}
+
+// ContourStatus defines the observed state of Contour.
+type ContourStatus struct {
+	// availableReplicas is the number of observed available Contour replicas
+	// according to the deployment.
+	AvailableReplicas int32 `json:"availableReplicas"`
 }
 
 func init() {
