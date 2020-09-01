@@ -1,8 +1,10 @@
 
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
   name: contours.operator.projectcontour.io
 spec:
@@ -12,38 +14,48 @@ spec:
     listKind: ContourList
     plural: contours
     singular: contour
-  scope: ""
-  validation:
-    openAPIV3Schema:
-      description: Contour is the Schema for the contours API
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: ContourSpec defines the desired state of Contour
-          properties:
-            foo:
-              description: Foo is an example field of Contour. Edit Contour_types.go
-                to remove/update
-              type: string
-          type: object
-        status:
-          description: ContourStatus defines the observed state of Contour
-          type: object
-      type: object
-  version: v1alpha1
+  scope: Namespaced
   versions:
   - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Contour is the Schema for the contours API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ContourSpec defines the desired state of Contour.
+            properties:
+              replicas:
+                default: 2
+                description: replicas is the desired number of Contour replicas. If
+                  unset, defaults to 2.
+                format: int32
+                minimum: 0
+                type: integer
+            type: object
+          status:
+            description: ContourStatus defines the observed state of Contour.
+            properties:
+              availableReplicas:
+                description: availableReplicas is the number of observed available
+                  Contour replicas according to the deployment.
+                format: int32
+                type: integer
+            required:
+            - availableReplicas
+            type: object
+        type: object
     served: true
     storage: true
 status:
