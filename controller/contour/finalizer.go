@@ -35,7 +35,7 @@ func (r *Reconciler) ensureFinalizer(ctx context.Context, contour *operatorv1alp
 	if !slice.ContainsString(contour.Finalizers, contourFinalizer) {
 		updated := contour.DeepCopy()
 		updated.Finalizers = append(updated.Finalizers, contourFinalizer)
-		if err := r.Update(ctx, updated); err != nil {
+		if err := r.Client.Update(ctx, updated); err != nil {
 			return fmt.Errorf("failed to add finalizer %s: %v", contourFinalizer, err)
 		}
 		r.Log.Info("added finalizer to contour", "finalizer", contourFinalizer,
@@ -49,7 +49,7 @@ func (r *Reconciler) ensureFinalizerRemoved(ctx context.Context, contour *operat
 	if slice.ContainsString(contour.Finalizers, contourFinalizer) {
 		updated := contour.DeepCopy()
 		updated.Finalizers = slice.RemoveString(updated.Finalizers, contourFinalizer)
-		if err := r.Update(ctx, updated); err != nil {
+		if err := r.Client.Update(ctx, updated); err != nil {
 			return fmt.Errorf("failed to remove finalizer %s: %v", contourFinalizer, err)
 		}
 		r.Log.Info("removed finalizer from contour", "finalizer", contourFinalizer,
