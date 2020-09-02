@@ -20,14 +20,14 @@ import (
 	"flag"
 	"os"
 
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -43,9 +43,14 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+var (
+	image                string
+	metricsAddr          string
+	enableLeaderElection bool
+)
+
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
+	flag.StringVar(&image, "image", "docker.io/projectcontour/contour:latest", "The image used for the managed Contour.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -57,16 +62,18 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "0d879e31.projectcontour.io",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "unable to start contour-operator")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ContourReconciler{
+	if err = (&contourcontroller.Reconciler{
+		Config: contourcontroller.Config{
+			Image: image,
+		},
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),
 		Scheme: mgr.GetScheme(),
@@ -76,9 +83,9 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting contour-operator")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "failed to start contour-operator")
 		os.Exit(1)
 	}
 }
