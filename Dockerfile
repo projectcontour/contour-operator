@@ -13,6 +13,7 @@ RUN go mod download
 COPY cmd/contour-operator.go contour-operator.go
 COPY api/ api/
 COPY controller/ controller/
+COPY util/ util/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o contour-operator contour-operator.go
