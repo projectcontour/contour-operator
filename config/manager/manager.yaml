@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: system
+  name: contour-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - command:
-        - /manager
+        - /contour-operator
         args:
         - --enable-leader-election
         image: controller:latest
