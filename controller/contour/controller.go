@@ -39,7 +39,7 @@ type Config struct {
 // Reconciler reconciles a Contour object.
 type Reconciler struct {
 	Config Config
-	client.Client
+	Client client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
@@ -56,7 +56,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// Only proceed if we can get the state of contour.
 	contour := &operatorv1alpha1.Contour{}
-	if err := r.Get(ctx, req.NamespacedName, contour); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, contour); err != nil {
 		if errors.IsNotFound(err) {
 			// This means the contour was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related

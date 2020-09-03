@@ -35,13 +35,13 @@ const (
 // ensureNamespace ensures the namespace for the provided name exists.
 func (r *Reconciler) ensureNamespace(ctx context.Context, name string) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	err := r.Get(ctx, types.NamespacedName{Name: ns.Name}, ns)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, ns)
 	switch {
 	case err == nil:
 		r.Log.Info("namespace exists; skipped adding", "name", ns.Name)
 		return nil
 	case errors.IsNotFound(err):
-		if err := r.Create(context.TODO(), ns); err != nil {
+		if err := r.Client.Create(context.TODO(), ns); err != nil {
 			return fmt.Errorf("failed to create namespace %s: %v", ns.Name, err)
 		}
 		r.Log.Info("created namespace", "name", ns.Name)
@@ -54,10 +54,10 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, name string) error {
 // does not exist.
 func (r *Reconciler) ensureNamespaceRemoved(ctx context.Context, name string) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	err := r.Get(ctx, types.NamespacedName{Name: ns.Name}, ns)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, ns)
 	switch {
 	case err == nil:
-		if err := r.Delete(ctx, ns); err != nil {
+		if err := r.Client.Delete(ctx, ns); err != nil {
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
 		}
 		r.Log.Info("deleted namespace", "name", ns.Name)
