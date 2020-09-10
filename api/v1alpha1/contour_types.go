@@ -51,6 +51,33 @@ type ContourSpec struct {
 	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas,omitempty"`
+
+	// namespace defines the schema of a Contour namespace.
+	// See each field for additional details.
+	//
+	// +optional
+	Namespace *NamespaceSpec `json:"namespace,omitempty"`
+}
+
+// NamespaceSpec defines the schema of a Contour namespace.
+type NamespaceSpec struct {
+	// name is the name of the namespace to run Contour and dependant
+	// resources. If unset, defaults to "projectcontour".
+	//
+	// +kubebuilder:default=projectcontour
+	Name string `json:"name"`
+
+	// removeOnDeletion will remove the namespace when the Contour is
+	// deleted. If set to True, deletion will not occur if any of the
+	// following conditions exist:
+	//
+	// 1. The Contour namespace is "default" or the contour-operator's
+	// namespace.
+	//
+	// 2. Another Contour exists in the namespace.
+	//
+	// +kubebuilder:default=false
+	RemoveOnDeletion bool `json:"removeOnDeletion"`
 }
 
 // ContourStatus defines the observed state of Contour.
