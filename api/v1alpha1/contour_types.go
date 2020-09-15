@@ -47,10 +47,9 @@ type ContourSpec struct {
 	// replicas is the desired number of Contour replicas. If unset,
 	// defaults to 2.
 	//
-	// +optional
 	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=0
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas"`
 
 	// namespace defines the schema of a Contour namespace.
 	// See each field for additional details.

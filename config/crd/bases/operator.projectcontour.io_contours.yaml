@@ -64,6 +64,8 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+            required:
+            - replicas
             type: object
           status:
             description: ContourStatus defines the observed state of Contour.
