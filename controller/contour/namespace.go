@@ -42,12 +42,12 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, name string) error {
 		return nil
 	case errors.IsNotFound(err):
 		if err := r.Client.Create(context.TODO(), ns); err != nil {
-			return fmt.Errorf("failed to create namespace %s: %v", ns.Name, err)
+			return fmt.Errorf("failed to create namespace %s: %w", ns.Name, err)
 		}
 		r.Log.Info("created namespace", "name", ns.Name)
 		return nil
 	}
-	return fmt.Errorf("failed to get namespace %s: %v", ns.Name, err)
+	return fmt.Errorf("failed to get namespace %s: %w", ns.Name, err)
 }
 
 // ensureNamespaceRemoved ensures the namespace for the provided name
@@ -58,7 +58,7 @@ func (r *Reconciler) ensureNamespaceRemoved(ctx context.Context, name string) er
 	switch {
 	case err == nil:
 		if err := r.Client.Delete(ctx, ns); err != nil {
-			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
+			return fmt.Errorf("failed to delete namespace %s: %w", ns.Name, err)
 		}
 		r.Log.Info("deleted namespace", "name", ns.Name)
 		return nil
@@ -66,5 +66,5 @@ func (r *Reconciler) ensureNamespaceRemoved(ctx context.Context, name string) er
 		r.Log.Info("namespace does not exist; skipping removal", "name", ns.Name)
 		return nil
 	}
-	return fmt.Errorf("failed to get namespace %s: %v", ns.Name, err)
+	return fmt.Errorf("failed to get namespace %s: %w", ns.Name, err)
 }

@@ -65,7 +65,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object, so requeue the request.
-		return ctrl.Result{}, fmt.Errorf("failed to get contour %q: %v", req, err)
+		return ctrl.Result{}, fmt.Errorf("failed to get contour %q: %w", req, err)
 	}
 
 	// The contour is safe to process, so ensure current state matches desired state.
@@ -107,10 +107,10 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	// Before doing anything with the contour, ensure it has a finalizer
 	// so it can cleaned-up later.
 	if err := r.ensureFinalizer(ctx, contour); err != nil {
-		return fmt.Errorf("failed to finalize contour %s/%s: %v", contour.Namespace, contour.Name, err)
+		return fmt.Errorf("failed to finalize contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 	if err := r.ensureNamespace(ctx, ns); err != nil {
-		return fmt.Errorf("failed to ensure namespace %s: %v", ns, err)
+		return fmt.Errorf("failed to ensure namespace %s: %w", ns, err)
 	}
 	return nil
 }
@@ -119,10 +119,10 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 // in namespace ns.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour, ns string) error {
 	if err := r.ensureNamespaceRemoved(ctx, defaultContourNamespace); err != nil {
-		return fmt.Errorf("failed to remove namespace %s: %v", defaultContourNamespace, err)
+		return fmt.Errorf("failed to remove namespace %s: %w", defaultContourNamespace, err)
 	}
 	if err := r.ensureFinalizerRemoved(ctx, contour); err != nil {
-		return fmt.Errorf("failed to remove finalizer from contour %s/%s: %v", contour.Namespace, contour.Name, err)
+		return fmt.Errorf("failed to remove finalizer from contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 	return nil
 }

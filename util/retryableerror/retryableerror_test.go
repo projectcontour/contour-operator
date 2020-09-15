@@ -63,12 +63,12 @@ func TestRetryableError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := NewMaybeRetryableAggregate(test.errors)
 			if retryable, gotRetryable := err.(Error); gotRetryable != test.expectRetryable {
-				t.Errorf("expected retryable %T, got %T: %v", test.expectRetryable, gotRetryable, err)
+				t.Errorf("expected retryable %T, got %T: %w", test.expectRetryable, gotRetryable, err)
 			} else if gotRetryable && retryable.After() != test.expectAfter {
-				t.Errorf("expected after %v, got %v: %v", test.expectAfter, retryable.After(), err)
+				t.Errorf("expected after %v, got %v: %w", test.expectAfter, retryable.After(), err)
 			}
 			if _, gotAggregate := err.(utilerrors.Aggregate); gotAggregate != test.expectAggregate {
-				t.Errorf("expected aggregate %T, got %T: %v", test.expectAggregate, gotAggregate, err)
+				t.Errorf("expected aggregate %T, got %T: %w", test.expectAggregate, gotAggregate, err)
 			}
 		})
 	}
