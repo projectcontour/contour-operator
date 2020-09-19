@@ -70,8 +70,8 @@ type NamespaceSpec struct {
 	// deleted. If set to True, deletion will not occur if any of the
 	// following conditions exist:
 	//
-	// 1. The Contour namespace is "default" or the contour-operator's
-	// namespace.
+	// 1. The Contour namespace is "default", "kube-system" or the
+	//    contour-operator's namespace.
 	//
 	// 2. Another Contour exists in the namespace.
 	//
