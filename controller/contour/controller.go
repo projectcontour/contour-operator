@@ -46,7 +46,15 @@ type Reconciler struct {
 
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;delete;create
+// cert-gen needs create/update secrets.
+// +kubebuilder:rbac:groups="",resources=namespaces;secrets;serviceaccounts,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;update
+// +kubebuilder:rbac:groups="",resources=endpoints;services,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tcproutes;ingresses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations,verbs=get;list;watch
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -112,11 +120,17 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 		return fmt.Errorf("failed to ensure namespace %s for contour %s/%s: %w",
 			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureRBAC(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureRBACRemoved(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureNamespaceRemoved(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove namespace %s for contour %s/%s: %w",
 			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err)

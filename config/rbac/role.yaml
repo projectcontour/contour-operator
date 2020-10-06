@@ -9,13 +9,53 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - namespaces
+  - secrets
+  - serviceaccounts
   verbs:
   - create
   - delete
   - get
   - list
+  - update
   - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - gatewayclasses
+  - gateways
+  - httproutes
+  - ingresses
+  - tcproutes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses/status
+  verbs:
+  - create
+  - get
+  - update
 - apiGroups:
   - operator.projectcontour.io
   resources:
@@ -33,3 +73,34 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - projectcontour.io
+  resources:
+  - httpproxies
+  - tlscertificatedelegations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - projectcontour.io
+  resources:
+  - httpproxies/status
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
