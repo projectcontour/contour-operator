@@ -41,13 +41,17 @@ func init() {
 }
 
 var (
-	image                string
+	contourImage         string
+	envoyImage           string
 	metricsAddr          string
 	enableLeaderElection bool
 )
 
 func main() {
-	flag.StringVar(&image, "image", "docker.io/projectcontour/contour:main", "The image used for the managed Contour.")
+	flag.StringVar(&contourImage, "contour-image", "docker.io/projectcontour/contour:main",
+		"The container image used for the managed Contour.")
+	flag.StringVar(&envoyImage, "envoy-image", "docker.io/envoyproxy/envoy:v1.15.1",
+		"The container image used for the managed Envoy.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -69,7 +73,8 @@ func main() {
 
 	if err = (&contourcontroller.Reconciler{
 		Config: contourcontroller.Config{
-			Image: image,
+			ContourImage: contourImage,
+			EnvoyImage:   envoyImage,
 		},
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),

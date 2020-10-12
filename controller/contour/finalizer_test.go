@@ -34,8 +34,8 @@ var _ = Describe("Run controller", func() {
 			ctx := context.Background()
 
 			key := types.NamespacedName{
-				Name:      contourName + finalizerSuffix,
-				Namespace: operatorNamespace,
+				Name:      cntr.Name + finalizerSuffix,
+				Namespace: cntr.Namespace,
 			}
 
 			By("By creating a contour")

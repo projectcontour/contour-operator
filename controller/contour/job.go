@@ -41,7 +41,7 @@ const (
 // generating strategy.
 // ensureJob ensures that a Job exists for the given contour.
 func (r *Reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	desired, err := DesiredJob(contour, r.Config.Image)
+	desired, err := DesiredJob(contour, r.Config.ContourImage)
 	if err != nil {
 		return fmt.Errorf("failed to build job: %w", err)
 	}

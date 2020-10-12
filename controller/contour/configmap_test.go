@@ -15,20 +15,11 @@ package contour
 
 import (
 	"testing"
-
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const testContourName = "contour-test-cfgmap"
 
 func TestDesiredDNSConfigmap(t *testing.T) {
-	cntr := &operatorv1alpha1.Contour{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: testContourName,
-		},
-	}
 	expectedCfgfile := `#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.

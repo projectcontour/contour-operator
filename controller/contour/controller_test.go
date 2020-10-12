@@ -33,8 +33,8 @@ var _ = Describe("Run controller", func() {
 			ctx := context.Background()
 
 			key := types.NamespacedName{
-				Name:      contourName,
-				Namespace: operatorNamespace,
+				Name:      cntr.Name,
+				Namespace: cntr.Namespace,
 			}
 
 			By("By creating a contour with a nil spec")
@@ -122,5 +122,5 @@ func checkContainerHasImage(t *testing.T, container *corev1.Container, image str
 	if container.Image == image {
 		return
 	}
-	t.Errorf("container has invalid image %q", container.Image)
+	t.Errorf("container is missing image %q", image)
 }

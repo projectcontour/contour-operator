@@ -62,7 +62,7 @@ const (
 
 // ensureDeployment ensures a deployment exists for the given contour.
 func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	desired, err := DesiredDeployment(contour, r.Config.Image)
+	desired, err := DesiredDeployment(contour, r.Config.ContourImage)
 	if err != nil {
 		return fmt.Errorf("failed to build deployment: %w", err)
 	}
@@ -215,7 +215,6 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 		},
 	}
 
-	pointerTo := func(ios intstr.IntOrString) *intstr.IntOrString { return &ios }
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
