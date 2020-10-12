@@ -48,15 +48,6 @@ func checkJobHasContainer(t *testing.T, job *batchv1.Job, name string) *corev1.C
 	return nil
 }
 
-func checkContainerHasImage(t *testing.T, container *corev1.Container, image string) {
-	t.Helper()
-
-	if container.Image == image {
-		return
-	}
-	t.Errorf("job is missing image %q", image)
-}
-
 func TestDesiredJob(t *testing.T) {
 	ctr := &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{

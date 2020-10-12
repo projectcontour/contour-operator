@@ -47,7 +47,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&image, "image", "docker.io/projectcontour/contour:latest", "The image used for the managed Contour.")
+	flag.StringVar(&image, "image", "docker.io/projectcontour/contour:main", "The image used for the managed Contour.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+

@@ -55,6 +55,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete;create
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;delete;create;update
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -129,11 +130,17 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureJob(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure job for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureDeployment(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureDeploymentDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove deployment from contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureJobDeleted(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove job from contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
@@ -184,9 +191,23 @@ func (r *Reconciler) otherContoursExistInSpecNs(ctx context.Context, contour *op
 	return false, nil
 }
 
-// contourOwningSelector returns a label selector based on the provided contour.
+// contourOwningSelector returns a label selector using "contour.operator.projectcontour.io/owning-contour"
+// as the key and the contour name as the value.
 func contourOwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{operatorv1alpha1.OwningContourLabel: contour.Name},
+		MatchLabels: map[string]string{
+			operatorv1alpha1.OwningContourLabel: contour.Name,
+		},
+	}
+}
+
+// contourDeploymentPodSelector returns a label selector using
+// "contour.operator.projectcontour.io/deployment-contour" as the key
+// and the contour name as the value.
+func contourDeploymentPodSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			contourDeploymentLabel: contour.Name,
+		},
 	}
 }

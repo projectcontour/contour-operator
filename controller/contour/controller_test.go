@@ -15,11 +15,13 @@ package contour
 
 import (
 	"context"
+	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -113,3 +115,12 @@ var _ = Describe("Run controller", func() {
 		})
 	})
 })
+
+func checkContainerHasImage(t *testing.T, container *corev1.Container, image string) {
+	t.Helper()
+
+	if container.Image == image {
+		return
+	}
+	t.Errorf("container has invalid image %q", container.Image)
+}
