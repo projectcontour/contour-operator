@@ -30,6 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// owningContourLabel is the owner reference label used for objects
+	// created by the operator.
+	owningContourLabel = "contour.operator.projectcontour.io/owning-contour"
+)
+
 // Config holds all the things necessary for the controller to run.
 type Config struct {
 	// Image is the name of the Contour container image.
@@ -55,6 +61,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete;create
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -123,11 +130,18 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureRBAC(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureConfigMap(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureConfigMapDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove configmap for contour %s/%s: %w",
+			contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureRBACRemoved(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
