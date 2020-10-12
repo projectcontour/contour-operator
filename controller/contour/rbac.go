@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	projectcontourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	oputil "github.com/projectcontour/contour-operator/util"
+	projectcontourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
