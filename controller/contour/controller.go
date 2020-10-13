@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,6 +63,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete;create
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;create;update
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -133,11 +135,17 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureConfigMap(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureJob(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure job for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureJobDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove job from contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureConfigMapDeleted(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove configmap for contour %s/%s: %w",
 			contour.Namespace, contour.Name, err)
@@ -183,4 +191,11 @@ func (r *Reconciler) otherContoursExistInSpecNs(ctx context.Context, contour *op
 		}
 	}
 	return false, nil
+}
+
+// contourOwningSelector returns a label selector based on the provided contour.
+func contourOwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: map[string]string{owningContourLabel: contour.Name},
+	}
 }

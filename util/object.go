@@ -89,3 +89,16 @@ func NewServiceAccount(ns, name string) *corev1.ServiceAccount {
 		},
 	}
 }
+
+// NewUnprivilegedPodSecurity makes a a non-root PodSecurityContext object
+// using 65534 as the user and group ID.
+func NewUnprivilegedPodSecurity() *corev1.PodSecurityContext {
+	user := int64(65534)
+	group := int64(65534)
+	nonRoot := true
+	return &corev1.PodSecurityContext{
+		RunAsUser:    &user,
+		RunAsGroup:   &group,
+		RunAsNonRoot: &nonRoot,
+	}
+}
