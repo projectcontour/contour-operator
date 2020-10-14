@@ -133,16 +133,19 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, 
 			fmt.Sprintf("--namespace=$(%s)", jobNsEnvVar),
 		},
 		Env:                      []corev1.EnvVar{env},
-		Resources:                corev1.ResourceRequirements{},
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: "File",
 	}
 
 	spec := corev1.PodSpec{
-		Containers:         []corev1.Container{container},
-		ServiceAccountName: defaultCertGenRbacName,
-		SecurityContext:    oputil.NewUnprivilegedPodSecurity(),
-		RestartPolicy:      corev1.RestartPolicyNever,
+		Containers:                    []corev1.Container{container},
+		DeprecatedServiceAccount:      defaultCertGenRbacName,
+		ServiceAccountName:            defaultCertGenRbacName,
+		SecurityContext:               oputil.NewUnprivilegedPodSecurity(),
+		RestartPolicy:                 corev1.RestartPolicyNever,
+		DNSPolicy:                     corev1.DNSClusterFirst,
+		SchedulerName:                 "default-scheduler",
+		TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
 	}
 
 	// TODO [danehans] certgen needs to be updated to match these labels.
@@ -154,7 +157,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, 
 		"app.kubernetes.io/part-of":    "project-contour",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// associate the job with the provided contour.
-		owningContourLabel: contour.Name,
+		operatorv1alpha1.OwningContourLabel: contour.Name,
 	}
 
 	job := &batchv1.Job{
@@ -183,7 +186,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, 
 
 // recreateJobIfNeeded recreates a Job if current doesn't match desired.
 func (r *Reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *batchv1.Job) error {
-	changed, updated := utilequality.JobConfigChanged(current, desired)
+	updated, changed := utilequality.JobConfigChanged(current, desired)
 	if !changed {
 		r.Log.Info("current job matches desired state; skipped updating",
 			"namespace", current.Namespace, "name", current.Name)

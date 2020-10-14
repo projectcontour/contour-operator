@@ -31,12 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	// owningContourLabel is the owner reference label used for objects
-	// created by the operator.
-	owningContourLabel = "contour.operator.projectcontour.io/owning-contour"
-)
-
 // Config holds all the things necessary for the controller to run.
 type Config struct {
 	// Image is the name of the Contour container image.
@@ -196,6 +190,6 @@ func (r *Reconciler) otherContoursExistInSpecNs(ctx context.Context, contour *op
 // contourOwningSelector returns a label selector based on the provided contour.
 func contourOwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{owningContourLabel: contour.Name},
+		MatchLabels: map[string]string{operatorv1alpha1.OwningContourLabel: contour.Name},
 	}
 }

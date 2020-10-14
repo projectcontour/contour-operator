@@ -44,6 +44,20 @@ func TestJobConfigChanged(t *testing.T) {
 			expect:      false,
 		},
 		{
+			description: "if the job labels are removed",
+			mutate: func(job *batchv1.Job) {
+				job.Labels = map[string]string{}
+			},
+			expect: true,
+		},
+		{
+			description: "if the contour owning label is removed",
+			mutate: func(job *batchv1.Job) {
+				delete(job.Spec.Template.Labels, operatorv1alpha1.OwningContourLabel)
+			},
+			expect: true,
+		},
+		{
 			description: "if the container image is changed",
 			mutate: func(job *batchv1.Job) {
 				job.Spec.Template.Spec.Containers[0].Image = "foo:latest"
@@ -57,13 +71,7 @@ func TestJobConfigChanged(t *testing.T) {
 			},
 			expect: true,
 		},
-		{
-			description: "if completions is changed",
-			mutate: func(job *batchv1.Job) {
-				job.Spec.Completions = &zero
-			},
-			expect: true,
-		},
+		// Completions is immutable, so performing an equality comparison is unneeded.
 		{
 			description: "if backoffLimit is changed",
 			mutate: func(job *batchv1.Job) {
@@ -127,10 +135,10 @@ func TestJobConfigChanged(t *testing.T) {
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
-		if changed, updated := utilequality.JobConfigChanged(mutated, expected); changed != tc.expect {
+		if updated, changed := utilequality.JobConfigChanged(mutated, expected); changed != tc.expect {
 			t.Errorf("%s, expect jobConfigChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if changedAgain, _ := utilequality.JobConfigChanged(updated, expected); changedAgain {
+			if _, changedAgain := utilequality.JobConfigChanged(updated, expected); changedAgain {
 				t.Errorf("%s, jobConfigChanged does not behave as a fixed point function", tc.description)
 			}
 		}

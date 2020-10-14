@@ -17,39 +17,50 @@ limitations under the License.
 package equality
 
 import (
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 // JobConfigChanged checks if the current and expected Job match and if not,
 // returns true and the expected job.
-func JobConfigChanged(current, expected *batchv1.Job) (bool, *batchv1.Job) {
+func JobConfigChanged(current, expected *batchv1.Job) (*batchv1.Job, bool) {
 	changed := false
 	updated := current.DeepCopy()
-
-	if !apiequality.Semantic.DeepEqual(current.Name, expected.Name) {
-		updated = expected
-		changed = true
-	}
-
-	if !apiequality.Semantic.DeepEqual(current.Namespace, expected.Namespace) {
-		updated = expected
-		changed = true
-	}
 
 	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
 		updated = expected
 		changed = true
 	}
 
-	if !apiequality.Semantic.DeepEqual(current.Spec, expected.Spec) {
+	if !apiequality.Semantic.DeepEqual(current.Spec.Parallelism, expected.Spec.Parallelism) {
+		updated = expected
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.BackoffLimit, expected.Spec.BackoffLimit) {
+		updated = expected
+		changed = true
+	}
+
+	// The completions field is immutable, so no need to compare. Ignore job-generated
+	// labels and only check the presence of the contour owning label.
+	if current.Spec.Template.Labels != nil {
+		if _, ok := current.Spec.Template.Labels[operatorv1alpha1.OwningContourLabel]; !ok {
+			updated = expected
+			changed = true
+		}
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.Template.Spec, expected.Spec.Template.Spec) {
 		updated = expected
 		changed = true
 	}
 
 	if !changed {
-		return false, nil
+		return nil, false
 	}
 
-	return true, updated
+	return updated, true
 }
