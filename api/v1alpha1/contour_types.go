@@ -19,6 +19,12 @@ import (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// OwningContourLabel is the owner reference label used for a Contour
+	// created by the operator.
+	OwningContourLabel = "contour.operator.projectcontour.io/owning-contour"
+)
+
 // +kubebuilder:object:root=true
 
 // Contour is the Schema for the contours API.
