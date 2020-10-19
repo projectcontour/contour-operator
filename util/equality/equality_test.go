@@ -20,12 +20,17 @@ import (
 	"github.com/projectcontour/contour-operator/controller/contour"
 	utilequality "github.com/projectcontour/contour-operator/util/equality"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var testJobImageName = "test-job:main"
+var (
+	testName  = "test"
+	testNs    = testName + "-ns"
+	testImage = "test-image:main"
+)
 
 func TestJobConfigChanged(t *testing.T) {
 	zero := int32(0)
@@ -125,7 +130,7 @@ func TestJobConfigChanged(t *testing.T) {
 			},
 		}
 
-		expected, err := contour.DesiredJob(ctr, testJobImageName)
+		expected, err := contour.DesiredJob(ctr, testImage)
 		if err != nil {
 			t.Errorf("invalid job: %w", err)
 		}
@@ -137,6 +142,110 @@ func TestJobConfigChanged(t *testing.T) {
 		} else if changed {
 			if _, changedAgain := utilequality.JobConfigChanged(updated, expected); changedAgain {
 				t.Errorf("%s, jobConfigChanged does not behave as a fixed point function", tc.description)
+			}
+		}
+	}
+}
+
+func TestDeploymentConfigChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(deployment *appsv1.Deployment)
+		expect      bool
+	}{
+		{
+			description: "if nothing changes",
+			mutate:      func(_ *appsv1.Deployment) {},
+			expect:      false,
+		},
+		{
+			description: "if replicas is changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Replicas = nil
+			},
+			expect: true,
+		},
+		{
+			description: "if selector is changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Selector = &metav1.LabelSelector{}
+			},
+			expect: true,
+		},
+		{
+			description: "if the container image is changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Template.Spec.Containers[0].Image = "foo:latest"
+			},
+			expect: true,
+		},
+		{
+			description: "if a volume is changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Template.Spec.Volumes = []corev1.Volume{
+					{
+						Name: "foo",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/foo",
+							},
+						},
+					}}
+			},
+			expect: true,
+		},
+		{
+			description: "if container commands are changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Template.Spec.Containers[0].Command = []string{"foo"}
+			},
+			expect: true,
+		},
+		{
+			description: "if container args are changed",
+			mutate: func(deploy *appsv1.Deployment) {
+				deploy.Spec.Template.Spec.Containers[0].Args = []string{"foo", "bar", "baz"}
+			},
+			expect: true,
+		},
+		{
+			description: "if probe values are set to default values",
+			mutate: func(deployment *appsv1.Deployment) {
+				deployment.Spec.Template.Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
+				deployment.Spec.Template.Spec.Containers[0].LivenessProbe.TimeoutSeconds = int32(1)
+				deployment.Spec.Template.Spec.Containers[0].LivenessProbe.PeriodSeconds = int32(10)
+				deployment.Spec.Template.Spec.Containers[0].LivenessProbe.SuccessThreshold = int32(1)
+				deployment.Spec.Template.Spec.Containers[0].LivenessProbe.FailureThreshold = int32(3)
+				deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds = int32(1)
+				// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set at defaults,
+				// so they are omitted.
+				deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.SuccessThreshold = int32(1)
+				deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.FailureThreshold = int32(3)
+			},
+			expect: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		ctr := &operatorv1alpha1.Contour{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testName,
+				Namespace: testNs,
+			},
+		}
+
+		original, err := contour.DesiredDeployment(ctr, testImage)
+		if err != nil {
+			t.Errorf("invalid deployment: %w", err)
+		}
+
+		mutated := original.DeepCopy()
+		tc.mutate(mutated)
+		if updated, changed := utilequality.DeploymentConfigChanged(original, mutated); changed != tc.expect {
+			t.Errorf("%s, expect deploymentConfigChanged to be %t, got %t", tc.description, tc.expect, changed)
+		} else if changed {
+			if _, changedAgain := utilequality.DeploymentConfigChanged(updated, mutated); changedAgain {
+				t.Errorf("%s, deploymentConfigChanged does not behave as a fixed point function", tc.description)
 			}
 		}
 	}

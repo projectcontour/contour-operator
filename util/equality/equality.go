@@ -16,6 +16,7 @@ package equality
 import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
@@ -51,6 +52,29 @@ func JobConfigChanged(current, expected *batchv1.Job) (*batchv1.Job, bool) {
 	}
 
 	if !apiequality.Semantic.DeepEqual(current.Spec.Template.Spec, expected.Spec.Template.Spec) {
+		updated = expected
+		changed = true
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// DeploymentConfigChanged checks if the current and expected Deployment match
+// and if not, returns true and the expected Deployment.
+func DeploymentConfigChanged(current, expected *appsv1.Deployment) (*appsv1.Deployment, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		updated = expected
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec, expected.Spec) {
 		updated = expected
 		changed = true
 	}
