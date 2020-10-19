@@ -48,13 +48,22 @@ const (
 
 	timeout  = time.Second * 10
 	interval = time.Millisecond * 250
+
+	contourImage = "docker.io/projectcontour/contour:main"
+	envoyImage   = "docker.io/envoyproxy/envoy:v1.15.1"
 )
 
 var (
 	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
-	image     = "docker.io/projectcontour/contour:latest"
+
+	cntr = &operatorv1alpha1.Contour{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      contourName,
+			Namespace: operatorNamespace,
+		},
+	}
 )
 
 func TestAPIs(t *testing.T) {
@@ -95,7 +104,8 @@ var _ = BeforeSuite(func(done Done) {
 	By("Creating the reconciler")
 	err = (&Reconciler{
 		Config: Config{
-			Image: image,
+			ContourImage: contourImage,
+			EnvoyImage:   envoyImage,
 		},
 		Client: k8sClient,
 		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),

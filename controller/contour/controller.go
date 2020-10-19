@@ -24,14 +24,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var pointerTo = func(ios intstr.IntOrString) *intstr.IntOrString { return &ios }
+
 // Config holds all the things necessary for the controller to run.
 type Config struct {
-	// Image is the name of the Contour container image.
-	Image string
+	// ContourImage is the name of the Contour container image.
+	ContourImage string
+	// EnvoyImage is the name of the Envoy container image.
+	EnvoyImage string
 }
 
 // Reconciler reconciles a Contour object.
@@ -56,6 +61,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete;create
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;create;update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;delete;create;update
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -133,11 +139,17 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureDeployment(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureDaemonSet(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureDaemonSetDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove daemonset from contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureDeploymentDeleted(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove deployment from contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
@@ -208,6 +220,17 @@ func contourDeploymentPodSelector(contour *operatorv1alpha1.Contour) *metav1.Lab
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			contourDeploymentLabel: contour.Name,
+		},
+	}
+}
+
+// envoyDaemonSetPodSelector returns a label selector using
+// "contour.operator.projectcontour.io/daemonset-envoy" as the key and
+// contour name as the value.
+func envoyDaemonSetPodSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			envoyDaemonSetLabel: contour.Name,
 		},
 	}
 }

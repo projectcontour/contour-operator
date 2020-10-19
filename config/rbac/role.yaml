@@ -41,6 +41,16 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+- apiGroups:
+  - apps
+  resources:
   - deployments
   verbs:
   - create

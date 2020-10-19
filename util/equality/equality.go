@@ -21,6 +21,30 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
+// DaemonsetConfigChanged checks if current and expected DaemonSet match,
+// and if not, returns the updated DaemonSet resource.
+func DaemonsetConfigChanged(current, expected *appsv1.DaemonSet) (*appsv1.DaemonSet, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		changed = true
+		updated.Labels = expected.Labels
+
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec, expected.Spec) {
+		changed = true
+		updated.Spec = expected.Spec
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
 // JobConfigChanged checks if the current and expected Job match and if not,
 // returns true and the expected job.
 func JobConfigChanged(current, expected *batchv1.Job) (*batchv1.Job, bool) {

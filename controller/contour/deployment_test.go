@@ -3,18 +3,9 @@ package contour
 import (
 	"testing"
 
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-var (
-	testName  = "test-deploy"
-	testNs    = testName + "-ns"
-	testImage = "test-image:latest"
 )
 
 func checkDeploymentHasEnvVar(t *testing.T, deploy *appsv1.Deployment, name string) {
@@ -60,30 +51,14 @@ func checkDeploymentHasLabels(t *testing.T, deploy *appsv1.Deployment, expected 
 }
 
 func TestDesiredDeployment(t *testing.T) {
-	ctr := &operatorv1alpha1.Contour{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNs,
-		},
-	}
-
-	deploy, err := DesiredDeployment(ctr, testImage)
+	deploy, err := DesiredDeployment(cntr, contourImage)
 	if err != nil {
 		t.Errorf("invalid deployment: %w", err)
 	}
 
-	labels := map[string]string{
-		"app.kubernetes.io/name":            "contour",
-		"app.kubernetes.io/instance":        ctr.Name,
-		"app.kubernetes.io/version":         "latest",
-		"app.kubernetes.io/component":       "ingress-controller",
-		"app.kubernetes.io/managed-by":      "contour-operator",
-		operatorv1alpha1.OwningContourLabel: ctr.Name,
-	}
-
 	container := checkDeploymentHasContainer(t, deploy, contourContainerName, true)
-	checkContainerHasImage(t, container, testImage)
+	checkContainerHasImage(t, container, contourImage)
 	checkDeploymentHasEnvVar(t, deploy, contourNsEnvVar)
 	checkDeploymentHasEnvVar(t, deploy, contourPodEnvVar)
-	checkDeploymentHasLabels(t, deploy, labels)
+	checkDeploymentHasLabels(t, deploy, deploy.Labels)
 }

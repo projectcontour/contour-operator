@@ -30,7 +30,109 @@ var (
 	testName  = "test"
 	testNs    = testName + "-ns"
 	testImage = "test-image:main"
+	cntr      = &operatorv1alpha1.Contour{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testName,
+			Namespace: testNs,
+		},
+	}
 )
+
+func TestDaemonSetConfigChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(ds *appsv1.DaemonSet)
+		expect      bool
+	}{
+		{
+			description: "if nothing changes",
+			mutate:      func(_ *appsv1.DaemonSet) {},
+			expect:      false,
+		},
+		{
+			description: "if labels are changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Labels = map[string]string{}
+			},
+			expect: true,
+		},
+		{
+			description: "if selector is changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Selector = &metav1.LabelSelector{}
+			},
+			expect: true,
+		},
+		{
+			description: "if the container image is changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Image = "foo:latest"
+			},
+			expect: true,
+		},
+		{
+			description: "if a volume is changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Template.Spec.Volumes = []corev1.Volume{
+					{
+						Name: "foo",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/foo",
+							},
+						},
+					}}
+			},
+			expect: true,
+		},
+		{
+			description: "if container commands are changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Command = []string{"foo"}
+			},
+			expect: true,
+		},
+		{
+			description: "if container args are changed",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Args = []string{"foo", "bar", "baz"}
+			},
+			expect: true,
+		},
+		{
+			description: "if probe values are set to default values",
+			mutate: func(ds *appsv1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
+				ds.Spec.Template.Spec.Containers[0].LivenessProbe.TimeoutSeconds = int32(1)
+				ds.Spec.Template.Spec.Containers[0].LivenessProbe.PeriodSeconds = int32(10)
+				ds.Spec.Template.Spec.Containers[0].LivenessProbe.SuccessThreshold = int32(1)
+				ds.Spec.Template.Spec.Containers[0].LivenessProbe.FailureThreshold = int32(3)
+				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds = int32(1)
+				// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
+				// so they are omitted.
+				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.SuccessThreshold = int32(1)
+				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.FailureThreshold = int32(3)
+			},
+			expect: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			original := contour.DesiredDaemonSet(cntr, testImage, testImage)
+
+			mutated := original.DeepCopy()
+			tc.mutate(mutated)
+			if updated, changed := utilequality.DaemonsetConfigChanged(original, mutated); changed != tc.expect {
+				t.Errorf("expect daemonsetConfigChanged to be %t, got %t", tc.expect, changed)
+			} else if changed {
+				if _, changedAgain := utilequality.DaemonsetConfigChanged(mutated, updated); changedAgain {
+					t.Error("daemonsetConfigChanged does not behave as a fixed point function")
+				}
+			}
+		})
+	}
+}
 
 func TestJobConfigChanged(t *testing.T) {
 	zero := int32(0)
@@ -123,14 +225,7 @@ func TestJobConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctr := &operatorv1alpha1.Contour{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-job",
-				Namespace: "test-job-ns",
-			},
-		}
-
-		expected, err := contour.DesiredJob(ctr, testImage)
+		expected, err := contour.DesiredJob(cntr, testImage)
 		if err != nil {
 			t.Errorf("invalid job: %w", err)
 		}
@@ -227,14 +322,7 @@ func TestDeploymentConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctr := &operatorv1alpha1.Contour{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      testName,
-				Namespace: testNs,
-			},
-		}
-
-		original, err := contour.DesiredDeployment(ctr, testImage)
+		original, err := contour.DesiredDeployment(cntr, testImage)
 		if err != nil {
 			t.Errorf("invalid deployment: %w", err)
 		}

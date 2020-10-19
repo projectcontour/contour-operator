@@ -16,14 +16,9 @@ package contour
 import (
 	"testing"
 
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-var testJobImageName = "test-job:main"
 
 func checkJobHasEnvVar(t *testing.T, job *batchv1.Job, name string) {
 	t.Helper()
@@ -49,19 +44,12 @@ func checkJobHasContainer(t *testing.T, job *batchv1.Job, name string) *corev1.C
 }
 
 func TestDesiredJob(t *testing.T) {
-	ctr := &operatorv1alpha1.Contour{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-job",
-			Namespace: "test-job-ns",
-		},
-	}
-
-	job, err := DesiredJob(ctr, testJobImageName)
+	job, err := DesiredJob(cntr, contourImage)
 	if err != nil {
 		t.Errorf("invalid job: %w", err)
 	}
 
 	container := checkJobHasContainer(t, job, jobContainerName)
-	checkContainerHasImage(t, container, testJobImageName)
+	checkContainerHasImage(t, container, contourImage)
 	checkJobHasEnvVar(t, job, jobNsEnvVar)
 }
