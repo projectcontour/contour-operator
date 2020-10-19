@@ -28,6 +28,7 @@ const (
 // +kubebuilder:object:root=true
 
 // Contour is the Schema for the contours API.
+// +kubebuilder:subresource:status
 type Contour struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
