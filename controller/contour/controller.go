@@ -142,11 +142,23 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureDaemonSet(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
+	if err := r.ensureContourService(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
+	if err := r.ensureEnvoyService(ctx, contour); err != nil {
+		return fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	return nil
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
 func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	if err := r.ensureEnvoyServiceDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove service for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
+	if err := r.ensureContourServiceDeleted(ctx, contour); err != nil {
+		return fmt.Errorf("failed to remove service for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
 	if err := r.ensureDaemonSetDeleted(ctx, contour); err != nil {
 		return fmt.Errorf("failed to remove daemonset from contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}

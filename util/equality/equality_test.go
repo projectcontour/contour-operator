@@ -24,6 +24,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var (
@@ -102,16 +103,22 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 		{
 			description: "if probe values are set to default values",
 			mutate: func(ds *appsv1.DaemonSet) {
-				ds.Spec.Template.Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
-				ds.Spec.Template.Spec.Containers[0].LivenessProbe.TimeoutSeconds = int32(1)
-				ds.Spec.Template.Spec.Containers[0].LivenessProbe.PeriodSeconds = int32(10)
-				ds.Spec.Template.Spec.Containers[0].LivenessProbe.SuccessThreshold = int32(1)
-				ds.Spec.Template.Spec.Containers[0].LivenessProbe.FailureThreshold = int32(3)
-				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds = int32(1)
-				// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
-				// so they are omitted.
-				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.SuccessThreshold = int32(1)
-				ds.Spec.Template.Spec.Containers[0].ReadinessProbe.FailureThreshold = int32(3)
+				for i, c := range ds.Spec.Template.Spec.Containers {
+					if c.Name == contour.ShutdownContainerName {
+						ds.Spec.Template.Spec.Containers[i].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
+						ds.Spec.Template.Spec.Containers[i].LivenessProbe.TimeoutSeconds = int32(1)
+						ds.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = int32(10)
+						ds.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = int32(1)
+						ds.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = int32(3)
+					}
+					if c.Name == contour.EnvoyContainerName {
+						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.TimeoutSeconds = int32(1)
+						// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
+						// so they are omitted.
+						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.SuccessThreshold = int32(1)
+						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.FailureThreshold = int32(3)
+					}
+				}
 			},
 			expect: false,
 		},
@@ -331,6 +338,223 @@ func TestDeploymentConfigChanged(t *testing.T) {
 		} else if changed {
 			if _, changedAgain := utilequality.DeploymentConfigChanged(updated, mutated); changedAgain {
 				t.Errorf("%s, deploymentConfigChanged does not behave as a fixed point function", tc.description)
+			}
+		}
+	}
+}
+
+func TestClusterIpServiceChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(service *corev1.Service)
+		expect      bool
+	}{
+		{
+			description: "if nothing changed",
+			mutate:      func(_ *corev1.Service) {},
+			expect:      false,
+		},
+		{
+			description: "if the port number changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Port = int32(1234)
+			},
+			expect: true,
+		},
+		{
+			description: "if the target port number changed",
+			mutate: func(svc *corev1.Service) {
+				intStrPort := intstr.IntOrString{IntVal: int32(1234)}
+				svc.Spec.Ports[0].TargetPort = intStrPort
+			},
+			expect: true,
+		},
+		{
+			description: "if the port name changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Name = "foo"
+			},
+			expect: true,
+		},
+		{
+			description: "if the port protocol changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Protocol = corev1.ProtocolUDP
+			},
+			expect: true,
+		},
+		{
+			description: "if ports are added",
+			mutate: func(svc *corev1.Service) {
+				port := corev1.ServicePort{
+					Name:       "foo",
+					Protocol:   corev1.ProtocolUDP,
+					Port:       int32(1234),
+					TargetPort: intstr.IntOrString{IntVal: int32(1234)},
+				}
+				svc.Spec.Ports = append(svc.Spec.Ports, port)
+			},
+			expect: true,
+		},
+		{
+			description: "if ports are removed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports = []corev1.ServicePort{}
+			},
+			expect: true,
+		},
+		{
+			description: "if the cluster IP changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.ClusterIP = "1.2.3.4"
+			},
+			expect: false,
+		},
+		{
+			description: "if selector changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Selector = map[string]string{"foo": "bar"}
+			},
+			expect: true,
+		},
+		{
+			description: "if service type changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+			},
+			expect: true,
+		},
+		{
+			description: "if session affinity changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		expected := contour.DesiredContourService(cntr)
+
+		mutated := expected.DeepCopy()
+		tc.mutate(mutated)
+		if updated, changed := utilequality.ClusterIpServiceChanged(mutated, expected); changed != tc.expect {
+			t.Errorf("%s, expect ClusterIpServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+		} else if changed {
+			if _, changedAgain := utilequality.ClusterIpServiceChanged(updated, expected); changedAgain {
+				t.Errorf("%s, ClusterIpServiceChanged does not behave as a fixed point function", tc.description)
+			}
+		}
+	}
+}
+
+func TestLoadBalancerServiceChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(service *corev1.Service)
+		expect      bool
+	}{
+		{
+			description: "if nothing changed",
+			mutate:      func(_ *corev1.Service) {},
+			expect:      false,
+		},
+		{
+			description: "if the port number changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Port = int32(1234)
+			},
+			expect: true,
+		},
+		{
+			description: "if the target port number changed",
+			mutate: func(svc *corev1.Service) {
+				intStrPort := intstr.IntOrString{IntVal: int32(1234)}
+				svc.Spec.Ports[0].TargetPort = intStrPort
+			},
+			expect: true,
+		},
+		{
+			description: "if the port name changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Name = "foo"
+			},
+			expect: true,
+		},
+		{
+			description: "if the port protocol changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].Protocol = corev1.ProtocolUDP
+			},
+			expect: true,
+		},
+		{
+			description: "if ports are added",
+			mutate: func(svc *corev1.Service) {
+				port := corev1.ServicePort{
+					Name:       "foo",
+					Protocol:   corev1.ProtocolUDP,
+					Port:       int32(1234),
+					TargetPort: intstr.IntOrString{IntVal: int32(1234)},
+				}
+				svc.Spec.Ports = append(svc.Spec.Ports, port)
+			},
+			expect: true,
+		},
+		{
+			description: "if ports are removed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports = []corev1.ServicePort{}
+			},
+			expect: true,
+		},
+		{
+			description: "if the cluster IP changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.ClusterIP = "1.2.3.4"
+			},
+			expect: false,
+		},
+		{
+			description: "if selector changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Selector = map[string]string{"foo": "bar"}
+			},
+			expect: true,
+		},
+		{
+			description: "if service type changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Type = corev1.ServiceTypeClusterIP
+			},
+			expect: true,
+		},
+		{
+			description: "if session affinity changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			},
+			expect: true,
+		},
+		{
+			description: "if external traffic policy changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		expected := contour.DesiredEnvoyService(cntr)
+
+		mutated := expected.DeepCopy()
+		tc.mutate(mutated)
+		if updated, changed := utilequality.LoadBalancerServiceChanged(mutated, expected); changed != tc.expect {
+			t.Errorf("%s, expect LoadBalancerServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+		} else if changed {
+			if _, changedAgain := utilequality.LoadBalancerServiceChanged(updated, expected); changedAgain {
+				t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
 			}
 		}
 	}
