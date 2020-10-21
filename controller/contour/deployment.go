@@ -34,8 +34,6 @@ import (
 const (
 	// contourContainerName is the name of the Contour container.
 	contourContainerName = "contour"
-	// contourCfgMapName is the name of the Contour configmap.
-	contourCfgMapName = "contour"
 	// contourNsEnvVar is the name of the contour namespace environment variable.
 	contourNsEnvVar = "CONTOUR_NAMESPACE"
 	// contourPodEnvVar is the name of the contour pod name environment variable.

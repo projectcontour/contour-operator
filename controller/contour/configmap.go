@@ -28,6 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	// contourCfgMapName is the name of Contour's ConfigMap resource.
+	// [TODO] danehans: Remove and use contour.Name when
+	// https://github.com/projectcontour/contour/issues/2122 is fixed.
+	contourCfgMapName = "contour"
+)
+
 var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
@@ -115,11 +122,7 @@ func (r *Reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alp
 	current, err := r.currentConfigMap(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.Client.Create(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create configmap %s/%s: %w", desired.Namespace, desired.Name, err)
-			}
-			r.Log.Info("created configmap", "namespace", desired.Namespace, "name", desired.Name)
-			return nil
+			return r.createConfigMap(ctx, desired)
 		}
 		return fmt.Errorf("failed to get configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
@@ -137,7 +140,7 @@ func (r *Reconciler) ensureConfigMapDeleted(ctx context.Context, contour *operat
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
-			Name:      contour.Name,
+			Name:      contourCfgMapName,
 		},
 	}
 
@@ -157,7 +160,7 @@ func (r *Reconciler) currentConfigMap(ctx context.Context, contour *operatorv1al
 	current := &corev1.ConfigMap{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      contour.Name,
+		Name:      contourCfgMapName,
 	}
 	err := r.Client.Get(ctx, key, current)
 	if err != nil {
@@ -184,7 +187,7 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      contour.Name,
+			Name:      contourCfgMapName,
 			Namespace: contour.Spec.Namespace.Name,
 			Labels: map[string]string{
 				operatorv1alpha1.OwningContourLabel: contour.Name,
@@ -196,6 +199,16 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 	}
 
 	return cm, nil
+}
+
+// createConfigMap creates a ConfigMap resource for the provided cm.
+func (r *Reconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) error {
+	if err := r.Client.Create(ctx, cm); err != nil {
+		return fmt.Errorf("failed to create configmap %s/%s: %w", cm.Namespace, cm.Name, err)
+	}
+	r.Log.Info("created configmap", "namespace", cm.Namespace, "name", cm.Name)
+
+	return nil
 }
 
 // updateConfigMapIfNeeded updates a ConfigMap if current does not match desired.

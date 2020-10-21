@@ -17,8 +17,6 @@ import (
 	"testing"
 )
 
-const testContourName = "contour-test-cfgmap"
-
 func TestDesiredDNSConfigmap(t *testing.T) {
 	expectedCfgfile := `#
 # server:
