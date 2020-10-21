@@ -225,10 +225,7 @@ func TestJobConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected, err := contour.DesiredJob(cntr, testImage)
-		if err != nil {
-			t.Errorf("invalid job: %w", err)
-		}
+		expected := contour.DesiredJob(cntr, testImage)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
