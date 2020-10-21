@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,6 +117,7 @@ func (r *Reconciler) ensureClusterRole(ctx context.Context, name string) (*rbacv
 func desiredClusterRole(name string) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
 	groupNet := []string{networkingv1beta1.GroupName}
+	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{projectcontourv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
 	verbGLW := []string{"get", "list", "watch"}
@@ -140,6 +142,11 @@ func desiredClusterRole(name string) *rbacv1.ClusterRole {
 		APIGroups: groupAll,
 		Resources: []string{"services"},
 	}
+	crd := rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: groupExt,
+		Resources: []string{"customresourcedefinitions"},
+	}
 	svcAPI := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupNet,
@@ -159,16 +166,16 @@ func desiredClusterRole(name string) *rbacv1.ClusterRole {
 	cntr := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupContour,
-		Resources: []string{"httpproxies", "tlscertificatedelegations"},
+		Resources: []string{"httpproxies", "tlscertificatedelegations", "extensionservices"},
 	}
 	cntrStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
 		APIGroups: groupContour,
-		Resources: []string{"httpproxies/status"},
+		Resources: []string{"httpproxies/status", "extensionservices/status"},
 	}
 
 	cr := oputil.NewClusterRole(name)
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, svcAPI, ing, ingStatus, cntr, cntrStatus}
+	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, svcAPI, ing, ingStatus, cntr, cntrStatus, crd}
 	return cr
 }
 
