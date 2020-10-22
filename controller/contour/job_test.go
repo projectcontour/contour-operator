@@ -44,10 +44,7 @@ func checkJobHasContainer(t *testing.T, job *batchv1.Job, name string) *corev1.C
 }
 
 func TestDesiredJob(t *testing.T) {
-	job, err := DesiredJob(cntr, contourImage)
-	if err != nil {
-		t.Errorf("invalid job: %w", err)
-	}
+	job := DesiredJob(cntr, contourImage)
 
 	container := checkJobHasContainer(t, job, jobContainerName)
 	checkContainerHasImage(t, container, contourImage)

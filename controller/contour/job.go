@@ -32,6 +32,10 @@ import (
 )
 
 const (
+	// certgenJobName is the name of Certgen's Job resource.
+	// [TODO] danehans: Remove and use contour.Name + "-certgen" when
+	// https://github.com/projectcontour/contour/issues/2122 is fixed.
+	certgenJobName   = "contour-certgen"
 	jobContainerName = "contour"
 	jobNsEnvVar      = "CONTOUR_NAMESPACE"
 )
@@ -41,19 +45,12 @@ const (
 // generating strategy.
 // ensureJob ensures that a Job exists for the given contour.
 func (r *Reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	desired, err := DesiredJob(contour, r.Config.ContourImage)
-	if err != nil {
-		return fmt.Errorf("failed to build job: %w", err)
-	}
+	desired := DesiredJob(contour, r.Config.ContourImage)
 
 	current, err := r.currentJob(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.Client.Create(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create job %s/%s: %w", desired.Namespace, desired.Name, err)
-			}
-			r.Log.Info("created job", "namespace", desired.Namespace, "name", desired.Name)
-			return nil
+			return r.createJob(ctx, desired)
 		}
 		return fmt.Errorf("failed to get job %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
@@ -67,15 +64,10 @@ func (r *Reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Co
 
 // ensureJobDeleted ensures the Job for the provided contour is deleted.
 func (r *Reconciler) ensureJobDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
-		Name:      contour.Name + "-certgen",
-	}
-
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: key.Namespace,
-			Name:      key.Name,
+			Namespace: contour.Spec.Namespace.Name,
+			Name:      certgenJobName,
 		},
 	}
 
@@ -95,7 +87,7 @@ func (r *Reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.C
 	current := &batchv1.Job{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      contour.Name + "-certgen",
+		Name:      certgenJobName,
 	}
 	err := r.Client.Get(ctx, key, current)
 	if err != nil {
@@ -105,7 +97,7 @@ func (r *Reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.C
 }
 
 // DesiredJob generates the desired Job for the given contour.
-func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, error) {
+func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 	env := corev1.EnvVar{
 		Name: jobNsEnvVar,
 		ValueFrom: &corev1.EnvVarSource{
@@ -159,7 +151,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, 
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      contour.Name + "-certgen",
+			Name:      certgenJobName,
 			Namespace: contour.Spec.Namespace.Name,
 			Labels:    labels,
 		},
@@ -178,7 +170,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, 
 		},
 	}
 
-	return job, nil
+	return job
 }
 
 // recreateJobIfNeeded recreates a Job if current doesn't match desired.
@@ -201,6 +193,16 @@ func (r *Reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *
 		return err
 	}
 	r.Log.Info("recreated job", "namespace", updated.Namespace, "name", updated.Name)
+
+	return nil
+}
+
+// createJob creates a Job resource for the provided job.
+func (r *Reconciler) createJob(ctx context.Context, job *batchv1.Job) error {
+	if err := r.Client.Create(ctx, job); err != nil {
+		return fmt.Errorf("failed to create job %s/%s: %w", job.Namespace, job.Name, err)
+	}
+	r.Log.Info("created job", "namespace", job.Namespace, "name", job.Name)
 
 	return nil
 }
