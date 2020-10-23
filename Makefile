@@ -164,3 +164,6 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+local-cluster: # Create a local kind cluster
+	./hack/kind-dev-cluster.sh
