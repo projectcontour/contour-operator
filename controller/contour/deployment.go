@@ -32,6 +32,10 @@ import (
 )
 
 const (
+	// contourDeploymentName is the name of Contour's Deployment resource.
+	// [TODO] danehans: Remove and use contour.Name + "-contour" when
+	// https://github.com/projectcontour/contour/issues/2122 is fixed.
+	contourDeploymentName = "contour"
 	// contourContainerName is the name of the Contour container.
 	contourContainerName = "contour"
 	// contourNsEnvVar is the name of the contour namespace environment variable.
@@ -53,6 +57,14 @@ const (
 	// contourDeploymentLabel identifies a deployment as a contour deployment,
 	// and the value is the name of the owning contour.
 	contourDeploymentLabel = "contour.operator.projectcontour.io/deployment-contour"
+	// xdsPort is the network port number of xDS.
+	xdsPort = 8001
+	// debugPort is the network port number of the debug service.
+	debugPort = 8000
+	// httpPort is the network port number of HTTP.
+	httpPort = 80
+	// httpsPort is the network port number of HTTPS.
+	httpsPort = 443
 )
 
 // ensureDeployment ensures a deployment exists for the given contour.
@@ -65,10 +77,7 @@ func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 	current, err := r.currentDeployment(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.createDeployment(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create deployment %s/%s: %w", desired.Namespace, desired.Name, err)
-			}
-			return nil
+			return r.createDeployment(ctx, desired)
 		}
 		return fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
@@ -86,7 +95,7 @@ func (r *Reconciler) ensureDeploymentDeleted(ctx context.Context, contour *opera
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
-			Name:      contour.Name,
+			Name:      contourDeploymentName,
 		},
 	}
 
@@ -127,9 +136,9 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 			"serve",
 			"--incluster",
 			"--xds-address=0.0.0.0",
-			"--xds-port=8001",
-			"--envoy-service-http-port=80",
-			"--envoy-service-https-port=443",
+			fmt.Sprintf("--xds-port=%d", xdsPort),
+			fmt.Sprintf("--envoy-service-http-port=%d", httpPort),
+			fmt.Sprintf("--envoy-service-https-port=%d", httpsPort),
 			fmt.Sprintf("--contour-cafile=%s", filepath.Join("/", contourCertsVolMntDir, "ca.crt")),
 			fmt.Sprintf("--contour-cert-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.crt")),
 			fmt.Sprintf("--contour-key-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.key")),
@@ -158,12 +167,12 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "xds",
-				ContainerPort: 8001,
+				ContainerPort: xdsPort,
 				Protocol:      "TCP",
 			},
 			{
 				Name:          "debug",
-				ContainerPort: 8000,
+				ContainerPort: debugPort,
 				Protocol:      "TCP",
 			},
 		},
@@ -172,7 +181,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 				HTTPGet: &corev1.HTTPGetAction{
 					Scheme: corev1.URISchemeHTTP,
 					Path:   "/healthz",
-					Port:   intstr.IntOrString{IntVal: int32(8000)},
+					Port:   intstr.IntOrString{IntVal: int32(debugPort)},
 				},
 			},
 			TimeoutSeconds:   int32(1),
@@ -184,7 +193,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 			Handler: corev1.Handler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.IntOrString{
-						IntVal: int32(8001),
+						IntVal: int32(xdsPort),
 					},
 				},
 			},
@@ -213,7 +222,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
-			Name:      contour.Name,
+			Name:      contourDeploymentName,
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -235,7 +244,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 					// show how the Prometheus Operator is used to scrape Contour/Envoy metrics.
 					Annotations: map[string]string{
 						"prometheus.io/scrape": "true",
-						"prometheus.io/port":   "8000",
+						"prometheus.io/port":   fmt.Sprintf("%d", debugPort),
 					},
 					Labels: contourDeploymentPodSelector(contour).MatchLabels,
 				},
@@ -243,14 +252,14 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 					// TODO [danehans]: Readdress anti-affinity when https://github.com/projectcontour/contour/issues/2997
 					// is resolved.
 					Affinity: &corev1.Affinity{
-						PodAffinity: &corev1.PodAffinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 								{
 									Weight: int32(100),
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										TopologyKey: "kubernetes.io/hostname",
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: labels,
+											MatchLabels: contourDeploymentPodSelector(contour).MatchLabels,
 										},
 									},
 								},
@@ -273,6 +282,8 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
 									LocalObjectReference: corev1.LocalObjectReference{
+										// [TODO] danehans: Update to contour.Name when
+										// projectcontour/contour/issues/2122 is fixed.
 										Name: contourCfgMapName,
 									},
 									Items: []corev1.KeyToPath{
@@ -286,9 +297,11 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 							},
 						},
 					},
-					DNSPolicy:     corev1.DNSClusterFirst,
-					RestartPolicy: corev1.RestartPolicyAlways,
-					SchedulerName: "default-scheduler",
+					DNSPolicy:                corev1.DNSClusterFirst,
+					DeprecatedServiceAccount: contourRbacName,
+					ServiceAccountName:       contourRbacName,
+					RestartPolicy:            corev1.RestartPolicyAlways,
+					SchedulerName:            "default-scheduler",
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser:    pointer.Int64Ptr(int64(65534)),
 						RunAsGroup:   pointer.Int64Ptr(int64(65534)),
@@ -308,7 +321,7 @@ func (r *Reconciler) currentDeployment(ctx context.Context, contour *operatorv1a
 	deploy := &appsv1.Deployment{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      contour.Name,
+		Name:      contourDeploymentName,
 	}
 
 	if err := r.Client.Get(ctx, key, deploy); err != nil {

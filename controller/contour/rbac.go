@@ -33,23 +33,22 @@ import (
 )
 
 const (
-	// defaultContourRbacName is the default name used for Contour
-	// RBAC resources.
-	defaultContourRbacName = "contour"
-	// defaultEnvoyRbacName is the default name used for Envoy RBAC resources.
-	defaultEnvoyRbacName = "envoy"
-	// defaultCertGenRbacName is the default name used for Contour
-	// certificate generation RBAC resources.
-	defaultCertGenRbacName = "contour-certgen"
+	// contourRbacName is the name used for Contour RBAC resources.
+	contourRbacName = "contour"
+	// envoyRbacName is the name used for Envoy RBAC resources.
+	envoyRbacName = "envoy"
+	// certGenRbacName is the name used for Contour certificate
+	// generation RBAC resources.
+	certGenRbacName = "contour-certgen"
 )
 
 // ensureRBAC ensures all the necessary RBAC resources exist for the
 // provided contour.
 func (r *Reconciler) ensureRBAC(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	ns := contour.Spec.Namespace.Name
-	ctr := types.NamespacedName{Namespace: ns, Name: defaultContourRbacName}
-	envoy := types.NamespacedName{Namespace: ns, Name: defaultEnvoyRbacName}
-	certGen := types.NamespacedName{Namespace: ns, Name: defaultCertGenRbacName}
+	ctr := types.NamespacedName{Namespace: ns, Name: contourRbacName}
+	envoy := types.NamespacedName{Namespace: ns, Name: envoyRbacName}
+	certGen := types.NamespacedName{Namespace: ns, Name: certGenRbacName}
 	names := []types.NamespacedName{ctr, envoy, certGen}
 	certSvcAct := &corev1.ServiceAccount{}
 	for _, name := range names {
@@ -57,16 +56,16 @@ func (r *Reconciler) ensureRBAC(ctx context.Context, contour *operatorv1alpha1.C
 		if err != nil {
 			return fmt.Errorf("failed to ensure service account for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 		}
-		if svcAct.Name == defaultCertGenRbacName {
+		if svcAct.Name == certGenRbacName {
 			certSvcAct = svcAct
 		}
 	}
-	cr, err := r.ensureClusterRole(ctx, defaultContourRbacName)
+	cr, err := r.ensureClusterRole(ctx, contourRbacName)
 	if err != nil {
 		return fmt.Errorf("failed to ensure cluster role for contour %s/%s: %w", contour.Namespace,
 			contour.Name, err)
 	}
-	if err := r.ensureClusterRoleBinding(ctx, defaultContourRbacName, cr.Name, ctr); err != nil {
+	if err := r.ensureClusterRoleBinding(ctx, contourRbacName, cr.Name, ctr); err != nil {
 		return fmt.Errorf("failed to ensure cluster role binding for contour %s/%s: %w", contour.Namespace,
 			contour.Name, err)
 	}
@@ -277,11 +276,11 @@ func (r *Reconciler) ensureRBACRemoved(ctx context.Context, contour *operatorv1a
 			contour.Spec.Namespace.Name, err)
 	}
 	if !exist {
-		cntrRoleBind := oputil.NewRoleBinding(ns, defaultContourRbacName)
-		cntrRole := oputil.NewRole(ns, defaultContourRbacName)
-		certRole := oputil.NewRole(ns, defaultCertGenRbacName)
+		cntrRoleBind := oputil.NewRoleBinding(ns, contourRbacName)
+		cntrRole := oputil.NewRole(ns, contourRbacName)
+		certRole := oputil.NewRole(ns, certGenRbacName)
 		objectsToDelete = append(objectsToDelete, cntrRoleBind, cntrRole, certRole)
-		names := []string{defaultContourRbacName, defaultEnvoyRbacName, defaultCertGenRbacName}
+		names := []string{contourRbacName, envoyRbacName, certGenRbacName}
 		for _, name := range names {
 			svcAct := oputil.NewServiceAccount(ns, name)
 			objectsToDelete = append(objectsToDelete, svcAct)
@@ -292,8 +291,8 @@ func (r *Reconciler) ensureRBACRemoved(ctx context.Context, contour *operatorv1a
 		return fmt.Errorf("failed to verify if contours exist in any namespace: %w", err)
 	}
 	if !exist {
-		crb := oputil.NewClusterRoleBinding(defaultContourRbacName)
-		cr := oputil.NewClusterRole(defaultContourRbacName)
+		crb := oputil.NewClusterRoleBinding(contourRbacName)
+		cr := oputil.NewClusterRole(contourRbacName)
 		objectsToDelete = append(objectsToDelete, crb, cr)
 	}
 	for _, object := range objectsToDelete {

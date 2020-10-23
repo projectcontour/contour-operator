@@ -104,19 +104,19 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 			description: "if probe values are set to default values",
 			mutate: func(ds *appsv1.DaemonSet) {
 				for i, c := range ds.Spec.Template.Spec.Containers {
-					if c.Name == contour.ShutdownContainerName {
+					// TODO [danehans]: Update to contour.ShutdownContainerName when
+					// https://github.com/projectcontour/contour-operator/pull/64/files merges
+					if c.Name == "shutdown-manager" {
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.TimeoutSeconds = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = int32(10)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = int32(3)
-					}
-					if c.Name == contour.EnvoyContainerName {
-						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.TimeoutSeconds = int32(1)
+						ds.Spec.Template.Spec.Containers[i].ReadinessProbe.TimeoutSeconds = int32(1)
 						// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
 						// so they are omitted.
-						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.SuccessThreshold = int32(1)
-						ds.Spec.Template.Spec.Containers[1].ReadinessProbe.FailureThreshold = int32(3)
+						ds.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = int32(1)
+						ds.Spec.Template.Spec.Containers[i].ReadinessProbe.FailureThreshold = int32(3)
 					}
 				}
 			},

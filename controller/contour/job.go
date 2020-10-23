@@ -128,8 +128,8 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 
 	spec := corev1.PodSpec{
 		Containers:                    []corev1.Container{container},
-		DeprecatedServiceAccount:      defaultCertGenRbacName,
-		ServiceAccountName:            defaultCertGenRbacName,
+		DeprecatedServiceAccount:      certGenRbacName,
+		ServiceAccountName:            certGenRbacName,
 		SecurityContext:               oputil.NewUnprivilegedPodSecurity(),
 		RestartPolicy:                 corev1.RestartPolicyNever,
 		DNSPolicy:                     corev1.DNSClusterFirst,

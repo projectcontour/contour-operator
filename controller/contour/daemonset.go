@@ -333,7 +333,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 							},
 						},
 					},
-					ServiceAccountName:            defaultEnvoyRbacName,
+					ServiceAccountName:            envoyRbacName,
 					DeprecatedServiceAccount:      envoyContainerName,
 					AutomountServiceAccountToken:  pointer.BoolPtr(false),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(300)),
