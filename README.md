@@ -15,7 +15,7 @@ make manager
 
 * [Deploy](https://projectcontour.io/docs/v1.9.0/deploy-options/#kind) a [kind](https://kind.sigs.k8s.io/) cluster.
 
-Install the Contour CRD:
+Install the Contour Operator & Contour CRDs:
 ```
 make install
 ```
@@ -44,4 +44,14 @@ contour-operator-controller-manager   1/1     1            1           1m
 Install an instance of the `Contour` custom resource:
 ```
 kubectl apply -f config/samples/
+```
+
+[Test with Ingress](https://projectcontour.io/docs/v1.9.0/deploy-options/#test-with-ingress):
+```
+kubectl apply -f https://projectcontour.io/examples/kuard.yaml
+```
+
+[Test with HTTPProxy](https://projectcontour.io/docs/v1.9.0/deploy-options/#test-with-httpproxy):
+```
+kubectl apply -f https://projectcontour.io/examples/kuard-httpproxy.yaml
 ```
