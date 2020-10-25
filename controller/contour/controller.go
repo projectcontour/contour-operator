@@ -51,17 +51,18 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours/status,verbs=get;update;patch
 // cert-gen needs create/update secrets.
 // +kubebuilder:rbac:groups="",resources=namespaces;secrets;serviceaccounts,verbs=get;list;watch;delete;create;update
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;update
-// +kubebuilder:rbac:groups="",resources=endpoints;services,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups="",resources=endpoints;services,verbs=get;list;watch;delete;create
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tcproutes;ingresses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
-// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations,verbs=get;list;watch
-// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations;extensionservices,verbs=get;list;watch
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status;extensionservices/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete;create
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;create;update
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;delete;create;update
-// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;delete;create;update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
