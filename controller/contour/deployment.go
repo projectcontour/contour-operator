@@ -57,10 +57,12 @@ const (
 	// contourDeploymentLabel identifies a deployment as a contour deployment,
 	// and the value is the name of the owning contour.
 	contourDeploymentLabel = "contour.operator.projectcontour.io/deployment-contour"
-	// xdsPort is the network port number of xDS.
+	// xdsPort is the network port number of Contour's xDS service.
 	xdsPort = 8001
-	// debugPort is the network port number of the debug service.
-	debugPort = 8000
+	// metricsPort is the network port number of Contour's metrics service.
+	metricsPort = 8000
+	// debugPort is the network port number of Contour's debug service.
+	debugPort = 6060
 	// httpPort is the network port number of HTTP.
 	httpPort = 80
 	// httpsPort is the network port number of HTTPS.
@@ -171,6 +173,11 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 				Protocol:      "TCP",
 			},
 			{
+				Name:          "metrics",
+				ContainerPort: metricsPort,
+				Protocol:      "TCP",
+			},
+			{
 				Name:          "debug",
 				ContainerPort: debugPort,
 				Protocol:      "TCP",
@@ -181,7 +188,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 				HTTPGet: &corev1.HTTPGetAction{
 					Scheme: corev1.URISchemeHTTP,
 					Path:   "/healthz",
-					Port:   intstr.IntOrString{IntVal: int32(debugPort)},
+					Port:   intstr.IntOrString{IntVal: int32(metricsPort)},
 				},
 			},
 			TimeoutSeconds:   int32(1),
@@ -244,7 +251,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 					// show how the Prometheus Operator is used to scrape Contour/Envoy metrics.
 					Annotations: map[string]string{
 						"prometheus.io/scrape": "true",
-						"prometheus.io/port":   fmt.Sprintf("%d", debugPort),
+						"prometheus.io/port":   fmt.Sprintf("%d", metricsPort),
 					},
 					Labels: contourDeploymentPodSelector(contour).MatchLabels,
 				},
