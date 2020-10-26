@@ -94,14 +94,14 @@ func checkDaemonSetHasLabels(t *testing.T, deploy *appsv1.DaemonSet, expected ma
 func TestDesiredDaemonSet(t *testing.T) {
 	ds := DesiredDaemonSet(cntr, contourImage, envoyImage)
 
-	container := checkDaemonSetHasContainer(t, ds, envoyContainerName, true)
+	container := checkDaemonSetHasContainer(t, ds, EnvoyContainerName, true)
 	checkContainerHasImage(t, container, envoyImage)
-	container = checkDaemonSetHasContainer(t, ds, shutdownContainerName, true)
+	container = checkDaemonSetHasContainer(t, ds, ShutdownContainerName, true)
 	checkContainerHasImage(t, container, contourImage)
 	container = checkDaemonSetHasContainer(t, ds, envoyInitContainerName, true)
 	checkContainerHasImage(t, container, contourImage)
-	checkDaemonSetHasEnvVar(t, ds, envoyContainerName, envoyNsEnvVar)
-	checkDaemonSetHasEnvVar(t, ds, envoyContainerName, envoyPodEnvVar)
+	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyNsEnvVar)
+	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyPodEnvVar)
 	checkDaemonSetHasEnvVar(t, ds, envoyInitContainerName, envoyNsEnvVar)
 	checkDaemonSetHasLabels(t, ds, ds.Labels)
 }

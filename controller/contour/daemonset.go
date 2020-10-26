@@ -32,10 +32,14 @@ import (
 )
 
 const (
-	// envoyContainerName is the name of the Envoy container.
-	envoyContainerName = "envoy"
-	// shutdownContainerName is the name of the Shutdown Manager container.
-	shutdownContainerName = "shutdown-manager"
+	// envoyDaemonSetName is the name of Envoy's DaemonSet resource.
+	// [TODO] danehans: Remove and use contour.Name + "-envoy" when
+	// https://github.com/projectcontour/contour/issues/2122 is fixed.
+	envoyDaemonSetName = "envoy"
+	// EnvoyContainerName is the name of the Envoy container.
+	EnvoyContainerName = "envoy"
+	// ShutdownContainerName is the name of the Shutdown Manager container.
+	ShutdownContainerName = "shutdown-manager"
 	// envoyInitContainerName is the name of the Envoy init container.
 	envoyInitContainerName = "envoy-initconfig"
 	// envoyNsEnvVar is the name of the contour namespace environment variable.
@@ -66,10 +70,7 @@ func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 	current, err := r.currentDaemonSet(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.createDaemonSet(ctx, desired); err != nil {
-				return fmt.Errorf("failed to create daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
-			}
-			return nil
+			return r.createDaemonSet(ctx, desired)
 		}
 		return fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
@@ -86,7 +87,7 @@ func (r *Reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operat
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
-			Name:      contour.Name,
+			Name:      envoyDaemonSetName,
 		},
 	}
 
@@ -120,7 +121,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 
 	containers := []corev1.Container{
 		{
-			Name:            shutdownContainerName,
+			Name:            ShutdownContainerName,
 			Image:           contourImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
@@ -144,20 +145,6 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				SuccessThreshold:    int32(1),
 				TimeoutSeconds:      int32(1),
 			},
-			ReadinessProbe: &corev1.Probe{
-				FailureThreshold: int32(3),
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Scheme: corev1.URISchemeHTTP,
-						Path:   "/ready",
-						Port:   intstr.IntOrString{IntVal: int32(8002)},
-					},
-				},
-				InitialDelaySeconds: int32(3),
-				PeriodSeconds:       int32(4),
-				SuccessThreshold:    int32(1),
-				TimeoutSeconds:      int32(1),
-			},
 			Lifecycle: &corev1.Lifecycle{
 				PreStop: &corev1.Handler{
 					Exec: &corev1.ExecAction{
@@ -169,7 +156,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			TerminationMessagePath:   "/dev/termination-log",
 		},
 		{
-			Name:            envoyContainerName,
+			Name:            EnvoyContainerName,
 			Image:           envoyImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
@@ -202,16 +189,36 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					},
 				},
 			},
+			ReadinessProbe: &corev1.Probe{
+				FailureThreshold: int32(3),
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Scheme: corev1.URISchemeHTTP,
+						Path:   "/ready",
+						Port:   intstr.IntOrString{IntVal: int32(8002)},
+					},
+				},
+				InitialDelaySeconds: int32(3),
+				PeriodSeconds:       int32(4),
+				SuccessThreshold:    int32(1),
+				TimeoutSeconds:      int32(1),
+			},
 			Ports: []corev1.ContainerPort{
 				{
 					Name:          "http",
-					ContainerPort: 80,
-					Protocol:      "TCP",
+					ContainerPort: int32(httpPort),
+					// Required for kind/bare-metal deployments but unneeded otherwise.
+					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.
+					HostPort: int32(httpPort),
+					Protocol: "TCP",
 				},
 				{
 					Name:          "https",
-					ContainerPort: 443,
-					Protocol:      "TCP",
+					ContainerPort: int32(httpsPort),
+					// Required for kind/bare-metal deployments but unneeded otherwise.
+					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.
+					HostPort: int32(httpsPort),
+					Protocol: "TCP",
 				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
@@ -252,7 +259,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				"bootstrap",
 				filepath.Join("/", envoyCfgVolMntDir, envoyCfgFileName),
 				"--xds-address=contour",
-				"--xds-port=8001",
+				fmt.Sprintf("--xds-port=%d", xdsPort),
 				fmt.Sprintf("--resources-dir=%s", filepath.Join("/", envoyCfgVolMntDir, "resources")),
 				fmt.Sprintf("--envoy-cafile=%s", filepath.Join("/", envoyCertsVolMntDir, "ca.crt")),
 				fmt.Sprintf("--envoy-cert-file=%s", filepath.Join("/", envoyCertsVolMntDir, "tls.crt")),
@@ -267,7 +274,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				{
 					Name:      envoyCfgVolName,
 					MountPath: filepath.Join("/", envoyCfgVolMntDir),
-					ReadOnly:  true,
+					ReadOnly:  false,
 				},
 			},
 			Env: []corev1.EnvVar{
@@ -289,7 +296,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
-			Name:      contour.Name,
+			Name:      envoyDaemonSetName,
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
@@ -334,7 +341,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 						},
 					},
 					ServiceAccountName:            envoyRbacName,
-					DeprecatedServiceAccount:      envoyContainerName,
+					DeprecatedServiceAccount:      EnvoyContainerName,
 					AutomountServiceAccountToken:  pointer.BoolPtr(false),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(300)),
 					SecurityContext:               &corev1.PodSecurityContext{},
@@ -354,7 +361,7 @@ func (r *Reconciler) currentDaemonSet(ctx context.Context, contour *operatorv1al
 	ds := &appsv1.DaemonSet{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      contour.Name,
+		Name:      envoyDaemonSetName,
 	}
 
 	if err := r.Client.Get(ctx, key, ds); err != nil {
