@@ -30,11 +30,10 @@ make run
 
 To run the operator in a cluster:
 ```
-make docker-build docker-push IMG=docker.io/<YOU_GITHUB_ID>/contour-operator:latest
-make deploy IMG=docker.io/<YOU_GITHUB_ID>/contour-operator:latest
+make deploy
 ```
 
-Verify the deployment is available:
+Verify the deployment is available (not needed if running the operator locally):
 ```
 $ kubectl get deploy -n contour-operator
 NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
@@ -44,6 +43,16 @@ contour-operator-controller-manager   1/1     1            1           1m
 Install an instance of the `Contour` custom resource:
 ```
 kubectl apply -f config/samples/
+```
+
+Verify the Contour and Envoy pods are running/completed:
+```
+$ kubectl get po -n projectcontour
+NAME                       READY   STATUS      RESTARTS   AGE
+contour-7649c6f6cc-ct5rz   1/1     Running     0          116s
+contour-7649c6f6cc-dmbrc   1/1     Running     0          116s
+contour-certgen-rmz86      0/1     Completed   0          116s
+envoy-jrhsp                2/2     Running     0          116s
 ```
 
 [Test with Ingress](https://projectcontour.io/docs/v1.9.0/deploy-options/#test-with-ingress):

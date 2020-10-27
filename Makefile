@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= docker.io/projectcontour/contour-operator:latest
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
