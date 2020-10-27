@@ -1,6 +1,8 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= docker.io/projectcontour/contour-operator:latest
+IMAGE ?= docker.io/projectcontour/contour-operator
+VERSION ?= main
+
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
@@ -9,6 +11,55 @@ ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
+endif
+
+# Platforms to build the multi-arch image for.
+IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+
+# Sets GIT_REF to a tag if it's present, otherwise the short git sha will be used.
+GIT_REF = $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short=8 --verify HEAD)
+VERSION ?= $(GIT_REF)
+
+# Stash the ISO 8601 date. Note that the GMT offset is missing the :
+# separator, but there doesn't seem to be a way to do that without
+# depending on GNU date.
+ISO_8601_DATE = $(shell TZ=GMT date '+%Y-%m-%dT%R:%S%z')
+
+# Sets the current Git sha.
+BUILD_SHA = $(shell git rev-parse --verify HEAD)
+# Sets the current branch. If we are on a detached header, filter it out so the
+# branch will be empty. This is similar to --show-current.
+BUILD_BRANCH = $(shell git branch | grep -v detached | awk '$$1=="*"{print $$2}')
+# Sets the current tagged git version.
+BUILD_VERSION = $(VERSION)
+
+# Docker labels to be applied to the contour-operator image. We don't transform
+# this with make because it's not worth pulling the tricks needed to handle
+# the embedded whitespace.
+#
+# See https://github.com/opencontainers/image-spec/blob/master/annotations.md
+DOCKER_BUILD_LABELS = \
+	--label "org.opencontainers.image.created=${ISO_8601_DATE}" \
+	--label "org.opencontainers.image.url=https://github.com/projectcontour/contour-operator/" \
+	--label "org.opencontainers.image.documentation=https://github.com/projectcontour/contour-operator/" \
+	--label "org.opencontainers.image.source=https://github.com/projectcontour/contour-operator/archive/${BUILD_VERSION}.tar.gz" \
+	--label "org.opencontainers.image.version=${BUILD_VERSION}" \
+	--label "org.opencontainers.image.revision=${BUILD_SHA}" \
+	--label "org.opencontainers.image.vendor=Project Contour" \
+	--label "org.opencontainers.image.licenses=Apache-2.0" \
+	--label "org.opencontainers.image.title=contour-operator" \
+	--label "org.opencontainers.image.description=Deploy and manage Contour using an operator."
+
+
+TAG_LATEST ?= false
+
+ifeq ($(TAG_LATEST), true)
+	IMAGE_TAGS = \
+		--tag $(IMAGE):$(VERSION) \
+		--tag $(IMAGE):latest
+else
+	IMAGE_TAGS = \
+		--tag $(IMAGE):$(VERSION)
 endif
 
 all: manager
@@ -56,13 +107,46 @@ vet:
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+
+multiarch-build-push: ## Build and push a multi-arch contour-operator container image to the Docker registry
+	docker buildx build \
+		--platform $(IMAGE_PLATFORMS) \
+		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
+		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
+		--build-arg "BUILD_SHA=$(BUILD_SHA)" \
+		$(DOCKER_BUILD_LABELS) \
+		$(IMAGE_TAGS) \
+		--push \
+		.
+
+container: ## Build the contour-operator container image
+	docker build \
+		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
+		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
+		--build-arg "BUILD_SHA=$(BUILD_SHA)" \
+		$(DOCKER_BUILD_LABELS) \
+		$(shell pwd) \
+		--tag $(IMAGE):$(VERSION)
+
+push: ## Push the contour-operator container image to the Docker registry
+push: container
+	docker push $(IMAGE):$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	docker push $(IMAGE):latest
+endif
+
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}
+	docker build . ${IMAGE_TAGS}
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	docker push $(IMAGE):$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	docker push $(IMAGE):latest
+endif
 
 # find or download controller-gen
 # download controller-gen if necessary
