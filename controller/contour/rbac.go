@@ -211,13 +211,12 @@ func desiredRole(name types.NamespacedName) *rbacv1.Role {
 // The RoleBinding will use svcAct for the subject and role for the role reference.
 func (r *Reconciler) ensureRoleBinding(ctx context.Context, name types.NamespacedName, svcAct *corev1.ServiceAccount, role *rbacv1.Role) error {
 	rb := oputil.NewRoleBinding(name.Namespace, name.Name)
-	rb.Subjects = []rbacv1.Subject{
-		rbacv1.Subject{
-			Kind:      "ServiceAccount",
-			APIGroup:  corev1.GroupName,
-			Name:      svcAct.Name,
-			Namespace: svcAct.Namespace,
-		}}
+	rb.Subjects = []rbacv1.Subject{{
+		Kind:      "ServiceAccount",
+		APIGroup:  corev1.GroupName,
+		Name:      svcAct.Name,
+		Namespace: svcAct.Namespace,
+	}}
 	rb.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
 		Kind:     "Role",
@@ -239,13 +238,12 @@ func (r *Reconciler) ensureRoleBinding(ctx context.Context, name types.Namespace
 // name exists, using roleName for the role reference and svcAct for the subject.
 func (r *Reconciler) ensureClusterRoleBinding(ctx context.Context, name, roleName string, svcAct types.NamespacedName) error {
 	crb := oputil.NewClusterRoleBinding(name)
-	crb.Subjects = []rbacv1.Subject{
-		rbacv1.Subject{
-			Kind:      "ServiceAccount",
-			APIGroup:  corev1.GroupName,
-			Name:      svcAct.Name,
-			Namespace: svcAct.Namespace,
-		},
+	crb.Subjects = []rbacv1.Subject{{
+		Kind:      "ServiceAccount",
+		APIGroup:  corev1.GroupName,
+		Name:      svcAct.Name,
+		Namespace: svcAct.Namespace,
+	},
 	}
 	crb.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,

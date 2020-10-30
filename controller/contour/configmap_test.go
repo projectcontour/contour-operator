@@ -50,7 +50,7 @@ accesslog-format: envoy
 # To enable JSON logging in Envoy
 # accesslog-format: json
 # The default fields that will be logged are specified below.
-# To customise this list, just add or remove entries.
+# To customize this list, just add or remove entries.
 # The canonical list is available at
 # https://godoc.org/github.com/projectcontour/contour/internal/envoy#JSONFields
 # json-fields:

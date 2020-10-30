@@ -56,7 +56,7 @@ var _ = Describe("Run controller", func() {
 			By("Expecting the contour finalizer")
 			Eventually(func() []string {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Finalizers
 			}, timeout, interval).Should(ContainElement(contourFinalizer))
 
@@ -69,14 +69,14 @@ var _ = Describe("Run controller", func() {
 			By("Expecting the contour to be re-finalized")
 			Eventually(func() []string {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Finalizers
 			}, timeout, interval).Should(ContainElement(contourFinalizer))
 
 			By("Expecting to delete contour successfully")
 			Eventually(func() error {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return k8sClient.Delete(ctx, f)
 			}, timeout, interval).Should(Succeed())
 

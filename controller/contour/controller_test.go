@@ -49,21 +49,21 @@ var _ = Describe("Run controller", func() {
 			By("Expecting default replicas")
 			Eventually(func() int32 {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(defaultReplicas)))
+			}, timeout, interval).Should(Equal(defaultReplicas))
 
 			By("Expecting default namespace")
 			Eventually(func() string {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.Name
 			}, timeout, interval).Should(Equal(defaultNamespace))
 
 			By("Expecting default remove namespace on deletion")
 			Eventually(func() bool {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.RemoveOnDeletion
 			}, timeout, interval).Should(Equal(false))
 
@@ -82,28 +82,28 @@ var _ = Describe("Run controller", func() {
 			By("Expecting replicas to be updated")
 			Eventually(func() int32 {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Replicas
 			}, timeout, interval).Should(Equal(updatedReplicas))
 
 			By("Expecting namespace to be updated")
 			Eventually(func() string {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.Name
 			}, timeout, interval).Should(Equal(updatedNs))
 
 			By("Expecting remove namespace on deletion to be updated")
 			Eventually(func() bool {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.RemoveOnDeletion
 			}, timeout, interval).Should(Equal(updatedRemoveNs))
 
 			By("Expecting to delete contour successfully")
 			Eventually(func() error {
 				f := &operatorv1alpha1.Contour{}
-				k8sClient.Get(ctx, key, f)
+				Expect(k8sClient.Get(ctx, key, f)).Should(Succeed())
 				return k8sClient.Delete(ctx, f)
 			}, timeout, interval).Should(Succeed())
 
