@@ -61,6 +61,8 @@ const (
 	// envoyDaemonSetLabel identifies a daemonset as a contour daemonset,
 	// and the value is the name of the owning contour.
 	envoyDaemonSetLabel = "contour.operator.projectcontour.io/daemonset-envoy"
+	// xdsResourceVersion is the version of the Envoy xdS resource types.
+	xdsResourceVersion = "v3"
 )
 
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
@@ -260,6 +262,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				filepath.Join("/", envoyCfgVolMntDir, envoyCfgFileName),
 				"--xds-address=contour",
 				fmt.Sprintf("--xds-port=%d", xdsPort),
+				fmt.Sprintf("--xds-resource-version=%s", xdsResourceVersion),
 				fmt.Sprintf("--resources-dir=%s", filepath.Join("/", envoyCfgVolMntDir, "resources")),
 				fmt.Sprintf("--envoy-cafile=%s", filepath.Join("/", envoyCertsVolMntDir, "ca.crt")),
 				fmt.Sprintf("--envoy-cert-file=%s", filepath.Join("/", envoyCertsVolMntDir, "tls.crt")),
