@@ -16,8 +16,8 @@ jobs:
       - name: deps
         run: |
           ./hack/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
-          echo "::add-path::$GITHUB_WORKSPACE/bin"
-          echo "::add-path::/usr/local/kubebuilder/bin"
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+          echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test
         run: |
           go mod vendor
