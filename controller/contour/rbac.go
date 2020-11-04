@@ -85,7 +85,7 @@ func (r *Reconciler) ensureRBAC(ctx context.Context, contour *operatorv1alpha1.C
 // ensureServiceAccount ensures a ServiceAccount resource exists with the provided name.
 func (r *Reconciler) ensureServiceAccount(ctx context.Context, name types.NamespacedName) (*corev1.ServiceAccount, error) {
 	sa := oputil.NewServiceAccount(name.Namespace, name.Name)
-	if err := r.Client.Create(context.TODO(), sa); err != nil {
+	if err := r.Client.Create(ctx, sa); err != nil {
 		if errors.IsAlreadyExists(err) {
 			r.Log.Info("service account exists; skipped adding", "namespace", sa.Namespace, "name", sa.Name)
 			return sa, nil
@@ -310,81 +310,4 @@ func (r *Reconciler) ensureRBACRemoved(ctx context.Context, contour *operatorv1a
 		r.Log.Info("deleted object", "kind", kind, "namespace", namespace, "name", name)
 	}
 	return utilerrors.NewAggregate(errs)
-}
-
-// ensureRoleRemoved ensures the Role resource with the provided name
-// does not exist.
-func (r *Reconciler) ensureRoleRemoved(ctx context.Context, name types.NamespacedName) error {
-	role := oputil.NewRole(name.Namespace, name.Name)
-	if err := r.Client.Delete(ctx, role); err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("role does not exist; skipping removal", "namespace", role.Namespace,
-				"name", role.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to remove role %s/%s: %w", role.Namespace, role.Name, err)
-	}
-	r.Log.Info("removed role", "namespace", role.Namespace, "name", role.Name)
-	return nil
-}
-
-// ensureRoleBindingRemoved ensures the RoleBinding resource with the provided
-// name does not exist.
-func (r *Reconciler) ensureRoleBindingRemoved(ctx context.Context, name types.NamespacedName) error {
-	rb := oputil.NewRoleBinding(name.Namespace, name.Name)
-	if err := r.Client.Delete(ctx, rb); err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("role binding does not exist; skipping removal", "name", rb.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to delete role binding %s: %w", rb.Name, err)
-	}
-	r.Log.Info("deleted role binding", "name", rb.Name)
-	return nil
-}
-
-// ensureClusterRoleBindingRemoved ensures the ClusterRoleBinding resource with the
-// provided name does not exist.
-func (r *Reconciler) ensureClusterRoleBindingRemoved(ctx context.Context, name types.NamespacedName) error {
-	crb := oputil.NewClusterRoleBinding(name.Name)
-	if err := r.Client.Delete(ctx, crb); err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("cluster role binding does not exist; skipping removal", "name", crb.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to delete cluster role binding %s: %w", crb.Name, err)
-	}
-	r.Log.Info("deleted cluster role binding", "name", crb.Name)
-	return nil
-}
-
-// ensureClusterRoleRemoved ensures the ClusterRole resource with the provided
-// name does not exist.
-func (r *Reconciler) ensureClusterRoleRemoved(ctx context.Context, name types.NamespacedName) error {
-	cr := oputil.NewClusterRole(name.Name)
-	if err := r.Client.Delete(ctx, cr); err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("cluster role does not exist; skipping removal", "name", cr.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to get cluster role %s: %w", cr.Name, err)
-	}
-	r.Log.Info("deleted cluster role", "name", cr.Name)
-	return nil
-}
-
-// ensureServiceAccountRemoved ensures the ServiceAccount resource with the provided
-// name does not exist.
-func (r *Reconciler) ensureServiceAccountRemoved(ctx context.Context, name types.NamespacedName) error {
-	sa := oputil.NewServiceAccount(name.Namespace, name.Name)
-	if err := r.Client.Delete(ctx, sa); err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("service account doesn't exist; skipping removal", "namespace", sa.Namespace,
-				"name", sa.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to get service account %s/%s: %w", sa.Namespace, sa.Name, err)
-	}
-	r.Log.Info("deleted service account", "namespace", sa.Namespace, "name", sa.Name)
-	return nil
 }
