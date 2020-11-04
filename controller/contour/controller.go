@@ -87,12 +87,21 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// The contour is safe to process, so ensure current state matches desired state.
 	desired := contour.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
-		if err := r.ensureContour(ctx, contour); err != nil {
-			switch e := err.(type) {
-			case retryable.Error:
-				r.Log.Error(e, "got retryable error; requeueing", "after", e.After())
-				return ctrl.Result{RequeueAfter: e.After()}, nil
-			default:
+		switch {
+		case contourFinalized(contour):
+			if err := r.ensureContour(ctx, contour); err != nil {
+				switch e := err.(type) {
+				case retryable.Error:
+					r.Log.Error(e, "got retryable error; requeueing", "after", e.After())
+					return ctrl.Result{RequeueAfter: e.After()}, nil
+				default:
+					return ctrl.Result{}, err
+				}
+			}
+		default:
+			// Before doing anything with the contour, ensure it has a finalizer
+			// so it can cleaned-up later.
+			if err := r.ensureFinalizer(ctx, contour); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -119,11 +128,6 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // ensureContour ensures all necessary resources exist for the given contour.
 func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	// Before doing anything with the contour, ensure it has a finalizer
-	// so it can cleaned-up later.
-	if err := r.ensureFinalizer(ctx, contour); err != nil {
-		return fmt.Errorf("failed to finalize contour %s/%s: %w", contour.Namespace, contour.Name, err)
-	}
 	if err := r.ensureNamespace(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure namespace %s for contour %s/%s: %w",
 			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err)
@@ -246,4 +250,15 @@ func envoyDaemonSetPodSelector(contour *operatorv1alpha1.Contour) *metav1.LabelS
 			envoyDaemonSetLabel: contour.Name,
 		},
 	}
+}
+
+// contourFinalized returns true if contour is finalized.
+func contourFinalized(contour *operatorv1alpha1.Contour) bool {
+	for _, f := range contour.Finalizers {
+		if f == contourFinalizer {
+			return true
+		}
+	}
+
+	return false
 }
