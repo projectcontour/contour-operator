@@ -20,9 +20,13 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// OwningContourLabel is the owner reference label used for a Contour
-	// created by the operator.
-	OwningContourLabel = "contour.operator.projectcontour.io/owning-contour"
+	// OwningContourNameLabel is the owner reference label used for a Contour
+	// created by the operator. The value should be the name of the contour.
+	OwningContourNameLabel = "contour.operator.projectcontour.io/owning-contour-name"
+
+	// OwningContourNsLabel is the owner reference label used for a Contour
+	// created by the operator. The value should be the namespace of the contour.
+	OwningContourNsLabel = "contour.operator.projectcontour.io/owning-contour-namespace"
 )
 
 // +kubebuilder:object:root=true
@@ -83,11 +87,36 @@ type NamespaceSpec struct {
 	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }
 
+const (
+	// Available indicates that the contour is running and available.
+	ContourAvailableConditionType = "Available"
+)
+
 // ContourStatus defines the observed state of Contour.
 type ContourStatus struct {
-	// availableReplicas is the number of observed available Contour replicas
-	// according to the deployment.
-	AvailableReplicas int32 `json:"availableReplicas"`
+	// AvailableContours is the number of observed available replicas
+	// according to the Contour deployment. The deployment and its pods
+	// will reside in the namespace specified by spec.namespace.name of
+	// the contour.
+	AvailableContours int32 `json:"availableContours"`
+
+	// AvailableEnvoys is the number of observed available pods from
+	// the Envoy daemonset. The daemonset and its pods will reside in the
+	// namespace specified by spec.namespace.name of the contour.
+	AvailableEnvoys int32 `json:"availableEnvoys"`
+
+	// Conditions represent the observations of a contour's current state.
+	// Known condition types are "Available". Reference the condition type
+	// for additional details.
+	//
+	// TODO [danehans]: Add support for "Progressing" and "Degraded"
+	// condition types.
+	//
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 func init() {

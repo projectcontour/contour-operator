@@ -68,9 +68,11 @@ func JobConfigChanged(current, expected *batchv1.Job) (*batchv1.Job, bool) {
 	}
 
 	// The completions field is immutable, so no need to compare. Ignore job-generated
-	// labels and only check the presence of the contour owning label.
+	// labels and only check the presence of the contour owning labels.
 	if current.Spec.Template.Labels != nil {
-		if _, ok := current.Spec.Template.Labels[operatorv1alpha1.OwningContourLabel]; !ok {
+		_, nameFound := current.Spec.Template.Labels[operatorv1alpha1.OwningContourNameLabel]
+		_, nsFound := current.Spec.Template.Labels[operatorv1alpha1.OwningContourNsLabel]
+		if !nameFound || !nsFound {
 			updated = expected
 			changed = true
 		}
@@ -208,4 +210,22 @@ func LoadBalancerServiceChanged(current, expected *corev1.Service) (*corev1.Serv
 	}
 
 	return updated, true
+}
+
+// ContourStatusChanged checks if current and expected match and if not,
+// returns true.
+func ContourStatusChanged(current, expected operatorv1alpha1.ContourStatus) bool {
+	if current.AvailableContours != expected.AvailableContours {
+		return true
+	}
+
+	if current.AvailableEnvoys != expected.AvailableEnvoys {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions) {
+		return true
+	}
+
+	return false
 }

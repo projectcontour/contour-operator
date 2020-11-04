@@ -190,7 +190,8 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 			Name:      contourCfgMapName,
 			Namespace: contour.Spec.Namespace.Name,
 			Labels: map[string]string{
-				operatorv1alpha1.OwningContourLabel: contour.Name,
+				operatorv1alpha1.OwningContourNameLabel: contour.Name,
+				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 			},
 		},
 		Data: map[string]string{

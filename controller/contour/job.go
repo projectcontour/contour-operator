@@ -146,7 +146,8 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 		"app.kubernetes.io/part-of":    "project-contour",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// associate the job with the provided contour.
-		operatorv1alpha1.OwningContourLabel: contour.Name,
+		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
 
 	job := &batchv1.Job{
