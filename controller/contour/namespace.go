@@ -31,7 +31,7 @@ var namespaceCoreList = []string{"contour-operator", "default", "kube-system"}
 func (r *Reconciler) ensureNamespace(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	name := contour.Spec.Namespace.Name
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if err := r.Client.Create(context.TODO(), ns); err != nil {
+	if err := r.Client.Create(ctx, ns); err != nil {
 		if errors.IsAlreadyExists(err) {
 			r.Log.Info("namespace exists", "name", ns.Name)
 			return nil
