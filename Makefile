@@ -120,6 +120,7 @@ multiarch-build-push: ## Build and push a multi-arch contour-operator container 
 		.
 
 container: ## Build the contour-operator container image
+container: test
 	docker build \
 		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
 		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
@@ -130,18 +131,6 @@ container: ## Build the contour-operator container image
 
 push: ## Push the contour-operator container image to the Docker registry
 push: container
-	docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
-
-# Build the docker image
-docker-build: test
-	docker build . ${IMAGE_TAGS}
-
-# Push the docker image
-docker-push:
 	docker push $(IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
 	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
