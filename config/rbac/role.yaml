@@ -21,10 +21,7 @@ rules:
   - ""
   resources:
   - endpoints
-  - services
   verbs:
-  - create
-  - delete
   - get
   - list
   - watch
@@ -34,6 +31,7 @@ rules:
   - namespaces
   - secrets
   - serviceaccounts
+  - services
   verbs:
   - create
   - delete
