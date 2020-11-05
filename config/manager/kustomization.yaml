@@ -5,3 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: docker.io/projectcontour/contour-operator
+  newTag: main
