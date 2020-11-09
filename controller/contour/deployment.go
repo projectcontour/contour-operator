@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	oputil "github.com/projectcontour/contour-operator/util"
 	utilequality "github.com/projectcontour/contour-operator/util/equality"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -304,16 +305,12 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 							},
 						},
 					},
-					DNSPolicy:                corev1.DNSClusterFirst,
-					DeprecatedServiceAccount: contourRbacName,
-					ServiceAccountName:       contourRbacName,
-					RestartPolicy:            corev1.RestartPolicyAlways,
-					SchedulerName:            "default-scheduler",
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:    pointer.Int64Ptr(int64(65534)),
-						RunAsGroup:   pointer.Int64Ptr(int64(65534)),
-						RunAsNonRoot: pointer.BoolPtr(true),
-					},
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					DeprecatedServiceAccount:      contourRbacName,
+					ServiceAccountName:            contourRbacName,
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					SchedulerName:                 "default-scheduler",
+					SecurityContext:               oputil.NewUnprivilegedPodSecurity(),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
 				},
 			},
