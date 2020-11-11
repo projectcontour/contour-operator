@@ -64,9 +64,17 @@ endif
 
 all: manager
 
+# Run tests & validate against linters
+.PHONY: check
+check: test lint-golint
+
 # Run tests
 test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
+
+lint-golint:
+	@echo Running Go linter ...
+	@./hack/golangci-lint.sh run
 
 # Build manager binary
 manager: generate fmt vet

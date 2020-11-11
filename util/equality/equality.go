@@ -111,10 +111,10 @@ func DeploymentConfigChanged(current, expected *appsv1.Deployment) (*appsv1.Depl
 	return updated, true
 }
 
-// ClusterIpServiceChanged checks if the spec of current and expected match and if not,
+// ClusterIPServiceChanged checks if the spec of current and expected match and if not,
 // returns true and the expected Service resource. The cluster IP is not compared
 // as it's assumed to be dynamically assigned.
-func ClusterIpServiceChanged(current, expected *corev1.Service) (*corev1.Service, bool) {
+func ClusterIPServiceChanged(current, expected *corev1.Service) (*corev1.Service, bool) {
 	changed := false
 	updated := current.DeepCopy()
 

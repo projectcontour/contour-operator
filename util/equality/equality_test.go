@@ -438,10 +438,10 @@ func TestClusterIpServiceChanged(t *testing.T) {
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
-		if updated, changed := utilequality.ClusterIpServiceChanged(mutated, expected); changed != tc.expect {
+		if updated, changed := utilequality.ClusterIPServiceChanged(mutated, expected); changed != tc.expect {
 			t.Errorf("%s, expect ClusterIpServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if _, changedAgain := utilequality.ClusterIpServiceChanged(updated, expected); changedAgain {
+			if _, changedAgain := utilequality.ClusterIPServiceChanged(updated, expected); changedAgain {
 				t.Errorf("%s, ClusterIpServiceChanged does not behave as a fixed point function", tc.description)
 			}
 		}

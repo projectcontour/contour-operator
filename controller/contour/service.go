@@ -223,7 +223,7 @@ func (r *Reconciler) createService(ctx context.Context, svc *corev1.Service) err
 
 // updateContourServiceIfNeeded updates a Contour Service if current does not match desired.
 func (r *Reconciler) updateContourServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
-	svc, updated := utilequality.ClusterIpServiceChanged(current, desired)
+	svc, updated := utilequality.ClusterIPServiceChanged(current, desired)
 	if updated {
 		if err := r.Client.Update(ctx, svc); err != nil {
 			return fmt.Errorf("failed to update service %s/%s: %w", svc.Namespace, svc.Name, err)

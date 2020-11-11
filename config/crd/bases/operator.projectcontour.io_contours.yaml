@@ -22,10 +22,14 @@ spec:
         description: Contour is the Schema for the contours API.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
             type: string
           metadata:
             type: object
@@ -36,20 +40,27 @@ spec:
                 default:
                   name: projectcontour
                   removeOnDeletion: false
-                description: namespace defines the schema of a Contour namespace. See each field for additional details.
+                description: namespace defines the schema of a Contour namespace.
+                  See each field for additional details.
                 properties:
                   name:
                     default: projectcontour
-                    description: name is the name of the namespace to run Contour and dependant resources. If unset, defaults to "projectcontour".
+                    description: name is the name of the namespace to run Contour
+                      and dependant resources. If unset, defaults to "projectcontour".
                     type: string
                   removeOnDeletion:
                     default: false
-                    description: "removeOnDeletion will remove the namespace when the Contour is deleted. If set to True, deletion will not occur if any of the following conditions exist: \n 1. The Contour namespace is \"default\", \"kube-system\" or the    contour-operator's namespace. \n 2. Another Contour exists in the namespace."
+                    description: "removeOnDeletion will remove the namespace when
+                      the Contour is deleted. If set to True, deletion will not occur
+                      if any of the following conditions exist: \n 1. The Contour
+                      namespace is \"default\", \"kube-system\" or the    contour-operator's
+                      namespace. \n 2. Another Contour exists in the namespace."
                     type: boolean
                 type: object
               replicas:
                 default: 2
-                description: replicas is the desired number of Contour replicas. If unset, defaults to 2.
+                description: replicas is the desired number of Contour replicas. If
+                  unset, defaults to 2.
                 format: int32
                 minimum: 0
                 type: integer
@@ -58,7 +69,8 @@ spec:
             description: ContourStatus defines the observed state of Contour.
             properties:
               availableReplicas:
-                description: availableReplicas is the number of observed available Contour replicas according to the deployment.
+                description: availableReplicas is the number of observed available
+                  Contour replicas according to the deployment.
                 format: int32
                 type: integer
             required:
