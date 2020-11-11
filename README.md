@@ -1,19 +1,16 @@
 # contour-operator
-Deploy and manage Contour using an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/). 
+Welcome to the Contour Operator project. Contour Operator deploys and manages Contour using an
+[operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/). 
 
-## Building
-
-To build the operator, run:
-
-```
-make manager
-```
-
-## Developing
+## Get Started
 
 ### Prerequisites
 
-* [Deploy](https://projectcontour.io/docs/v1.9.0/deploy-options/#kind) a [kind](https://kind.sigs.k8s.io/) cluster.
+* A [Kubernetes](https://kubernetes.io/) cluster
+* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) installed
+* [Kustomize](https://kustomize.io/) installed
+* [Make](https://www.gnu.org/software/make/) installed
+* Clone [this](https://github.com/projectcontour/contour-operator.git) repo
 
 Install the Contour Operator & Contour CRDs:
 ```
@@ -64,3 +61,15 @@ kubectl apply -f https://projectcontour.io/examples/kuard.yaml
 ```
 kubectl apply -f https://projectcontour.io/examples/kuard-httpproxy.yaml
 ```
+
+## Contributing
+
+Thanks for taking the time to join our community and start contributing!
+
+- Please familiarize yourself with the
+[Code of Conduct](https://github.com/projectcontour/contour/blob/main/CODE_OF_CONDUCT.md) before contributing.
+- See the [contributing guide](docs/CONTRIBUTING.md) for information about setting up your environment, the expected
+workflow and instructions on the developer certificate of origin that is required.
+- Check out the [open issues](https://github.com/projectcontour/contour-operator/issues).
+- Join the Contour Slack channel: [#contour](https://kubernetes.slack.com/messages/contour/)
+- Join the **Contour Community Meetings** - [details can be found here](https://projectcontour.io/community)
