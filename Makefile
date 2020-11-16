@@ -2,6 +2,7 @@
 # Image URL to use all building/pushing image targets
 IMAGE ?= docker.io/projectcontour/contour-operator
 VERSION ?= main
+NEW_VERSION ?= VERSION
 
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
 CRD_OPTIONS ?= "crd:crdVersions=v1"
@@ -164,3 +165,8 @@ endif
 
 local-cluster: # Create a local kind cluster
 	./hack/kind-dev-cluster.sh
+
+release: ## Prepares a tagged release of the operator.
+.PHONY: release
+release:
+	./hack/release/make-release-tag.sh $(VERSION) $(NEW_VERSION)
