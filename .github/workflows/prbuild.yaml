@@ -22,6 +22,19 @@ jobs:
         run: |
           go mod vendor
           make local-cluster install test
+  codespell:
+    name: Codespell
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v2
+      - name: Codespell
+        uses: codespell-project/actions-codespell@master
+        with:
+          skip: .git,./vendor,go.*
+          ignore_words_file: './.codespell.ignorewords'
+          check_filenames: true
+          check_hidden: true
   lint:
     runs-on: ubuntu-latest
     steps:

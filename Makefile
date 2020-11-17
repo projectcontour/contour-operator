@@ -67,7 +67,7 @@ all: manager
 
 # Run tests & validate against linters
 .PHONY: check
-check: test lint-golint
+check: test lint-golint lint-codespell
 
 # Run tests
 test: generate fmt vet manifests
@@ -76,6 +76,12 @@ test: generate fmt vet manifests
 lint-golint:
 	@echo Running Go linter ...
 	@./hack/golangci-lint.sh run
+
+.PHONY: lint-codespell
+lint-codespell: CODESPELL_SKIP := $(shell cat .codespell.skip | tr \\n ',')
+lint-codespell:
+	@echo Running Codespell ...
+	@./hack/codespell.sh --skip $(CODESPELL_SKIP) --ignore-words .codespell.ignorewords --check-filenames --check-hidden -q2
 
 # Build manager binary
 manager: generate fmt vet
@@ -115,7 +121,6 @@ vet:
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
 
 multiarch-build-push: ## Build and push a multi-arch contour-operator container image to the Docker registry
 	docker buildx build \

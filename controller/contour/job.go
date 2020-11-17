@@ -159,7 +159,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 			Parallelism:  pointer.Int32Ptr(int32(1)),
 			Completions:  pointer.Int32Ptr(int32(1)),
 			BackoffLimit: pointer.Int32Ptr(int32(1)),
-			// Make job eligible to for immediate deletion (feature gate dependant).
+			// Make job eligible to for immediate deletion (feature gate dependent).
 			TTLSecondsAfterFinished: pointer.Int32Ptr(int32(0)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
