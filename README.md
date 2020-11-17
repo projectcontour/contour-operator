@@ -8,29 +8,13 @@ Welcome to the Contour Operator project. Contour Operator deploys and manages Co
 
 * A [Kubernetes](https://kubernetes.io/) cluster
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) installed
-* [Kustomize](https://kustomize.io/) installed
-* [Make](https://www.gnu.org/software/make/) installed
-* Clone [this](https://github.com/projectcontour/contour-operator.git) repo
 
 Install the Contour Operator & Contour CRDs:
 ```
-make install
+$ kubectl apply -f https://github.com/projectcontour/contour-operator/tree/main/examples/operator/operator.yaml
 ```
 
-Run the operator locally or in the cluster .
-
-To run the operator locally. __Note:__ This will run in the foreground, so switch to a new terminal if you want to leave
-it running:
-```
-make run
-```
-
-To run the operator in a cluster:
-```
-make deploy
-```
-
-Verify the deployment is available (not needed if running the operator locally):
+Verify the deployment is available:
 ```
 $ kubectl get deploy -n contour-operator
 NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
@@ -39,7 +23,7 @@ contour-operator-controller-manager   1/1     1            1           1m
 
 Install an instance of the `Contour` custom resource:
 ```
-kubectl apply -f config/samples/
+$ kubectl apply -f https://github.com/projectcontour/contour-operator/tree/main/examples/contour/contour.yaml
 ```
 
 Verify the Contour and Envoy pods are running/completed:
@@ -52,15 +36,29 @@ contour-certgen-rmz86      0/1     Completed   0          116s
 envoy-jrhsp                2/2     Running     0          116s
 ```
 
-[Test with Ingress](https://projectcontour.io/docs/v1.9.0/deploy-options/#test-with-ingress):
+[Test with Ingress](https://projectcontour.io/docs/main/deploy-options/#test-with-ingress):
 ```
-kubectl apply -f https://projectcontour.io/examples/kuard.yaml
+$ kubectl apply -f https://projectcontour.io/examples/kuard.yaml
 ```
 
-[Test with HTTPProxy](https://projectcontour.io/docs/v1.9.0/deploy-options/#test-with-httpproxy):
+Verify the example app deployment is available:
 ```
-kubectl apply -f https://projectcontour.io/examples/kuard-httpproxy.yaml
+$ kubectl get deploy/kuard
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+kuard   3/3     3            3           1m50s
 ```
+
+Test the example app:
+```
+$ curl -o /dev/null -s -w "%{http_code}\n" http://local.projectcontour.io/
+200
+```
+
+**Note:** A public DNS record exists for "local.projectcontour.io" which is
+configured to resolve to `127.0.0.1`. This allows you to use a real domain name
+when testing in a [kind](https://kind.sigs.k8s.io/) cluster. If testing on a
+standard Kubernetes cluster, replace "local.projectcontour.io" with the
+hostname of `kubectl get deploy/kuard`.
 
 ## Contributing
 

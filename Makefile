@@ -94,22 +94,34 @@ run: generate fmt vet manifests
 # Install CRDs into a cluster
 install: manifests
 	kustomize build config/crd | kubectl apply -f -
-	# Remove the following when https://github.com/projectcontour/contour-operator/issues/42 merges.
-	kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml
 
 # Uninstall CRDs from a cluster
 uninstall: manifests
 	kustomize build config/crd | kubectl delete -f -
-	# Remove the following when https://github.com/projectcontour/contour-operator/issues/42 merges.
-	kubectl delete -f https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+# Deploy the operator to a Kubernetes cluster. This assumes a kubeconfig in ~/.kube/config
 deploy: manifests
 	cd config/manager && kustomize edit set image controller=${IMAGE}:${VERSION}
 	kustomize build config/default | kubectl apply -f -
 
+# Remove the operator deployment. This assumes a kubeconfig in ~/.kube/config
+undeploy:
+	cd config/manager
+	kustomize build config/default | kubectl delete -f -
+
+# Generate the example operator manifest
+example:
+	cd config/manager
+	kustomize build config/default > examples/operator/operator.yaml
+
+# Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
+# Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
+.PHONY: generate-contour-crds
+generate-contour-crds:
+	@./hack/generate-contour-crds.sh $(VERSION)
+
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests: controller-gen generate-contour-crds example
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
