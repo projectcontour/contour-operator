@@ -44,7 +44,7 @@ This produces a `contour-operator` binary in your `$GOPATH/bin` directory and ru
 You can run all the unit tests for the project:
 
 ```
-make test
+make check
 ```
 
 To run the tests for a single package, change to package directory and run:
