@@ -25,9 +25,13 @@ spec:
       containers:
       - command:
         - /contour-operator
+        - --contour-image
+        - docker.io/projectcontour/contour-operator:main
+        - --envoy-image
+        - docker.io/envoyproxy/envoy:v1.16.0
         args:
         - --enable-leader-election
-        image: controller:latest
+        image: docker.io/projectcontour/contour:main
         name: manager
         resources:
           limits:
