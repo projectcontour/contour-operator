@@ -39,7 +39,7 @@ type Contour struct {
 
 // +kubebuilder:object:root=true
 
-// ContourList contains a list of Contour
+// ContourList contains a list of Contour.
 type ContourList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -48,14 +48,14 @@ type ContourList struct {
 
 // ContourSpec defines the desired state of Contour.
 type ContourSpec struct {
-	// replicas is the desired number of Contour replicas. If unset,
+	// Replicas is the desired number of Contour replicas. If unset,
 	// defaults to 2.
 	//
 	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// namespace defines the schema of a Contour namespace.
+	// Namespace defines the schema of a Contour namespace.
 	// See each field for additional details.
 	//
 	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
@@ -64,13 +64,13 @@ type ContourSpec struct {
 
 // NamespaceSpec defines the schema of a Contour namespace.
 type NamespaceSpec struct {
-	// name is the name of the namespace to run Contour and dependant
+	// Name is the name of the namespace to run Contour and dependant
 	// resources. If unset, defaults to "projectcontour".
 	//
 	// +kubebuilder:default=projectcontour
 	Name string `json:"name,omitempty"`
 
-	// removeOnDeletion will remove the namespace when the Contour is
+	// RemoveOnDeletion will remove the namespace when the Contour is
 	// deleted. If set to True, deletion will not occur if any of the
 	// following conditions exist:
 	//
