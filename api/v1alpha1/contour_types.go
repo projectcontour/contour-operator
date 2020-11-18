@@ -33,7 +33,9 @@ type Contour struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ContourSpec   `json:"spec,omitempty"`
+	// Spec defines the desired state of Contour.
+	Spec ContourSpec `json:"spec,omitempty"`
+	// Status defines the observed state of Contour.
 	Status ContourStatus `json:"status,omitempty"`
 }
 
