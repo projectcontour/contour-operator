@@ -88,11 +88,13 @@ run: generate fmt vet manifests
 install: manifests
 	kustomize build config/crd | kubectl apply -f -
 	# Remove the following when https://github.com/projectcontour/contour-operator/issues/42 merges.
-	kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour/main/examples/contour/01-crds.yaml
+	kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml
 
 # Uninstall CRDs from a cluster
 uninstall: manifests
 	kustomize build config/crd | kubectl delete -f -
+	# Remove the following when https://github.com/projectcontour/contour-operator/issues/42 merges.
+	kubectl delete -f https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
