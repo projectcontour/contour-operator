@@ -73,3 +73,8 @@ workflow and instructions on the developer certificate of origin that is require
 - Check out the [open issues](https://github.com/projectcontour/contour-operator/issues).
 - Join the Contour Slack channel: [#contour](https://kubernetes.slack.com/messages/contour/)
 - Join the **Contour Community Meetings** - [details can be found here](https://projectcontour.io/community)
+
+## Changelog
+
+See [the list of releases](https://github.com/projectcontour/contour-operator/releases)
+to find out about feature changes.
