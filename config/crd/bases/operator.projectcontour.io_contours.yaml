@@ -40,7 +40,7 @@ spec:
                 properties:
                   name:
                     default: projectcontour
-                    description: Name is the name of the namespace to run Contour and dependant resources. If unset, defaults to "projectcontour".
+                    description: Name is the name of the namespace to run Contour and dependent resources. If unset, defaults to "projectcontour".
                     type: string
                   removeOnDeletion:
                     default: false

@@ -70,7 +70,7 @@ type ContourSpec struct {
 
 // NamespaceSpec defines the schema of a Contour namespace.
 type NamespaceSpec struct {
-	// Name is the name of the namespace to run Contour and dependant
+	// Name is the name of the namespace to run Contour and dependent
 	// resources. If unset, defaults to "projectcontour".
 	//
 	// +kubebuilder:default=projectcontour
