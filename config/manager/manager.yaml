@@ -26,12 +26,12 @@ spec:
       - command:
         - /contour-operator
         - --contour-image
-        - docker.io/projectcontour/contour-operator:main
+        - docker.io/projectcontour/contour:main
         - --envoy-image
         - docker.io/envoyproxy/envoy:v1.16.0
         args:
         - --enable-leader-election
-        image: docker.io/projectcontour/contour:main
+        image: docker.io/projectcontour/contour-operator:main
         name: manager
         resources:
           limits:
