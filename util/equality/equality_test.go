@@ -162,9 +162,10 @@ func TestJobConfigChanged(t *testing.T) {
 			expect: true,
 		},
 		{
-			description: "if the contour owning label is removed",
+			description: "if the contour owning labels are removed",
 			mutate: func(job *batchv1.Job) {
-				delete(job.Spec.Template.Labels, operatorv1alpha1.OwningContourLabel)
+				delete(job.Spec.Template.Labels, operatorv1alpha1.OwningContourNameLabel)
+				delete(job.Spec.Template.Labels, operatorv1alpha1.OwningContourNsLabel)
 			},
 			expect: true,
 		},
@@ -556,6 +557,85 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 			if _, changedAgain := utilequality.LoadBalancerServiceChanged(updated, expected); changedAgain {
 				t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
 			}
+		}
+	}
+}
+
+func TestContourStatusChangedChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		current     operatorv1alpha1.ContourStatus
+		mutate      func(status *operatorv1alpha1.ContourStatus)
+		expect      bool
+	}{
+		{
+			description: "if nothing changed",
+			current:     operatorv1alpha1.ContourStatus{},
+			mutate:      func(_ *operatorv1alpha1.ContourStatus) {},
+			expect:      false,
+		},
+		{
+			description: "if available contours changed",
+			current:     operatorv1alpha1.ContourStatus{},
+			mutate: func(status *operatorv1alpha1.ContourStatus) {
+				status.AvailableContours = int32(1)
+			},
+			expect: true,
+		},
+		{
+			description: "if available envoys changed",
+			current:     operatorv1alpha1.ContourStatus{},
+			mutate: func(status *operatorv1alpha1.ContourStatus) {
+				status.AvailableEnvoys = int32(1)
+			},
+			expect: true,
+		},
+		{
+			description: "if a condition is added",
+			current:     operatorv1alpha1.ContourStatus{},
+			mutate: func(status *operatorv1alpha1.ContourStatus) {
+				status.Conditions = []metav1.Condition{
+					{
+						Type:    "Available",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Foo",
+						Message: "Bar",
+					},
+				}
+			},
+			expect: true,
+		},
+		{
+			description: "if a condition reason changes",
+			current: operatorv1alpha1.ContourStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:    "Available",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Foo",
+						Message: "Bar",
+					},
+				},
+			},
+			mutate: func(status *operatorv1alpha1.ContourStatus) {
+				status.Conditions = []metav1.Condition{
+					{
+						Type:    "Available",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Foo",
+						Message: "Changed",
+					},
+				}
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		expected := tc.current.DeepCopy()
+		tc.mutate(expected)
+		if changed := utilequality.ContourStatusChanged(tc.current, *expected); changed != tc.expect {
+			t.Errorf("%s, expect ContourStatusChanged to be %t, got %t", tc.description, tc.expect, changed)
 		}
 	}
 }

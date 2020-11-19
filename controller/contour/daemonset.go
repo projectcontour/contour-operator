@@ -66,22 +66,28 @@ const (
 )
 
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
-func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
 	desired := DesiredDaemonSet(contour, r.Config.ContourImage, r.Config.EnvoyImage)
 
 	current, err := r.currentDaemonSet(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return r.createDaemonSet(ctx, desired)
+			updated, err := r.createDaemonSet(ctx, desired)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create daemonset for contour %s/%s: %w", contour.Namespace,
+					contour.Name, err)
+			}
+			return updated, nil
 		}
-		return fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+		return nil, fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 
-	if err := r.updateDaemonSetIfNeeded(ctx, current, desired); err != nil {
-		return fmt.Errorf("failed to update daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	updated, err := r.updateDaemonSetIfNeeded(ctx, current, desired)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 
-	return nil
+	return updated, nil
 }
 
 // ensureDaemonSetDeleted ensures the DaemonSet for the provided contour is deleted.
@@ -118,7 +124,8 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// Associate the daemonset with the provided contour.
-		operatorv1alpha1.OwningContourLabel: contour.Name,
+		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 	}
 
 	containers := []corev1.Container{
@@ -375,27 +382,27 @@ func (r *Reconciler) currentDaemonSet(ctx context.Context, contour *operatorv1al
 }
 
 // createDaemonSet creates a DaemonSet resource for the provided ds.
-func (r *Reconciler) createDaemonSet(ctx context.Context, ds *appsv1.DaemonSet) error {
+func (r *Reconciler) createDaemonSet(ctx context.Context, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 	if err := r.Client.Create(ctx, ds); err != nil {
-		return fmt.Errorf("failed to create daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
+		return nil, fmt.Errorf("failed to create daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 	}
 	r.Log.Info("created daemonset", "namespace", ds.Namespace, "name", ds.Name)
 
-	return nil
+	return ds, nil
 }
 
 // updateDaemonSetIfNeeded updates a DaemonSet if current does not match desired.
-func (r *Reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desired *appsv1.DaemonSet) error {
+func (r *Reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 	ds, updated := utilequality.DaemonsetConfigChanged(current, desired)
 	if updated {
 		if err := r.Client.Update(ctx, ds); err != nil {
-			return fmt.Errorf("failed to update daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
+			return nil, fmt.Errorf("failed to update daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 		}
 		r.Log.Info("updated daemonset", "namespace", ds.Namespace, "name", ds.Name)
-		return nil
+		return ds, nil
 	}
 	r.Log.Info("daemonset unchanged; skipped updating daemonset",
 		"namespace", current.Namespace, "name", current.Name)
 
-	return nil
+	return current, nil
 }

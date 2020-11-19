@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
+	"github.com/projectcontour/contour-operator/controller/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -60,29 +61,24 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgrOpts := ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "0d879e31.projectcontour.io",
-	})
+	}
+
+	cntrCfg := contourcontroller.Config{
+		ContourImage: contourImage,
+		EnvoyImage:   envoyImage,
+	}
+
+	mgr, err := manager.NewContourManager(mgrOpts, cntrCfg)
 	if err != nil {
-		setupLog.Error(err, "unable to start contour-operator")
+		setupLog.Error(err, "failed to create a manager")
 		os.Exit(1)
 	}
 
-	if err = (&contourcontroller.Reconciler{
-		Config: contourcontroller.Config{
-			ContourImage: contourImage,
-			EnvoyImage:   envoyImage,
-		},
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Contour")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting contour-operator")
