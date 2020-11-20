@@ -11,7 +11,7 @@ Welcome to the Contour Operator project. Contour Operator deploys and manages Co
 
 Install the Contour Operator & Contour CRDs:
 ```
-$ kubectl apply -f https://github.com/projectcontour/contour-operator/tree/main/examples/operator/operator.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/operator/operator.yaml
 ```
 
 Verify the deployment is available:
@@ -23,7 +23,7 @@ contour-operator-controller-manager   1/1     1            1           1m
 
 Install an instance of the `Contour` custom resource:
 ```
-$ kubectl apply -f https://github.com/projectcontour/contour-operator/tree/main/examples/contour/contour.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml
 ```
 
 Verify the Contour and Envoy pods are running/completed:
