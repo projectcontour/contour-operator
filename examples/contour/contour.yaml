@@ -3,4 +3,3 @@ kind: Contour
 metadata:
   name: contour-sample
 spec: {}
-  # Add required fields here

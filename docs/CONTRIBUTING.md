@@ -13,10 +13,11 @@ This section describes how to build Contour Operator from source.
 
 ### Prerequisites
 
-1. *Install Go*
-
-    Contour Operator requires [Go 1.15][1] or later. We also assume that you're familiar with
-    Go's [`GOPATH` workspace][3] convention and have the appropriate environment variables set.
+1. [Go 1.15][1] or later. We also assume that you're familiar with Go's
+   [`GOPATH` workspace][3] convention and have the appropriate environment variables set.
+2. [Kustomize](https://kustomize.io/)
+3. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+4. [Make](https://www.gnu.org/software/make/)
 
 ### Fetch the source
 
@@ -153,6 +154,7 @@ IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 #### Prerequisites
 
 1. *[Deploy](https://projectcontour.io/docs/v1.9.0/deploy-options/#kind) a [kind](https://kind.sigs.k8s.io/) cluster.*
+2. A [Kind](https://kind.sigs.k8s.io/) cluster
 
 Verify your changes by deploying the image you built to your kind cluster. First install the Contour and
 Contour Operator CRDs.

@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/operator.projectcontour.io_contours.yaml
+- contour/01-crds.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
