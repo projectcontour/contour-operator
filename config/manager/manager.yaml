@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: contour-operator
   namespace: system
   labels:
-    control-plane: controller-manager
+    control-plane: contour-operator
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: contour-operator
   replicas: 1
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        control-plane: contour-operator
     spec:
       containers:
       - command:
@@ -25,7 +25,7 @@ spec:
         args:
         - --enable-leader-election
         image: docker.io/projectcontour/contour-operator:main
-        name: manager
+        name: contour-operator
         resources:
           limits:
             cpu: 100m
