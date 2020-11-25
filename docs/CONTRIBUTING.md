@@ -137,14 +137,9 @@ The Contour Operator image follows Contour's [tagging][7] policy.
 
 ### Build an image
 
-To build a Contour Operator container image that includes your changes, run these commands
+Build and push a Contour Operator container image that includes your changes
 (replacing <MY_DOCKER_USERNAME> with your own Docker Hub username):
 
-```
-IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make container
-```
-
-The image can now be pushed to your repository:
 ```
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 ```
@@ -156,23 +151,19 @@ IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 1. *[Deploy](https://projectcontour.io/docs/v1.9.0/deploy-options/#kind) a [kind](https://kind.sigs.k8s.io/) cluster.*
 2. A [Kind](https://kind.sigs.k8s.io/) cluster
 
-Verify your changes by deploying the image you built to your kind cluster. First install the Contour and
-Contour Operator CRDs.
-
-```
-make install
-```
-
-Then deploy the operator to your kind cluster:
+Verify your changes by deploying the image you built to your kind cluster. The following command
+installs the Contour and Contour Operator CRDs and deploys the operator to your kind cluster:
 
 ```
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make deploy
 ```
 
+Follow the steps in the [README][8] to run an instance of the `Contour` custom resource and example application.
+
 ### Run the Operator Locally
 
-The easiest way to test your changes is to run the operator locally. __Note:__ This will run in the foreground,
-so switch to a new terminal if you want to leave it running:
+The easiest way to test your changes is to run the operator locally. This will install the Contour and Contour
+Operator CRDs and run the operator in the foreground:
 
 ```
 make run
@@ -249,3 +240,4 @@ By making a contribution to this project, I certify that:
 [6]: https://github.com/projectcontour/contour-operator/issues/new/choose
 [6]: https://projectcontour.io/resources/tagging/
 [7]: https://projectcontour.io/docs/main/deploy-options/
+[8]: https://github.com/projectcontour/contour-operator/blob/main/README.md

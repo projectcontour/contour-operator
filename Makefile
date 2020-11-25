@@ -1,8 +1,13 @@
+# Sets GIT_REF to a tag if it's present, otherwise the short git sha will be used.
+GIT_REF = $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short=8 --verify HEAD)
+VERSION ?= $(GIT_REF)
+
+# Used as an argument to prepare a tagged release of the operator.
+OLD_VERSION ?= main
+NEW_VERSION ?= $(OLD_VERSION)
 
 # Image URL to use all building/pushing image targets
 IMAGE ?= docker.io/projectcontour/contour-operator
-VERSION ?= main
-NEW_VERSION ?= VERSION
 
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
 CRD_OPTIONS ?= "crd:crdVersions=v1"
@@ -16,10 +21,6 @@ endif
 
 # Platforms to build the multi-arch image for.
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
-
-# Sets GIT_REF to a tag if it's present, otherwise the short git sha will be used.
-GIT_REF = $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short=8 --verify HEAD)
-VERSION ?= $(GIT_REF)
 
 # Stash the ISO 8601 date. Note that the GMT offset is missing the :
 # separator, but there doesn't seem to be a way to do that without
@@ -88,7 +89,7 @@ manager: generate fmt vet
 	go build -o bin/contour-operator cmd/contour-operator.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+run: generate fmt vet manifests install
 	go run ./cmd/contour-operator.go
 
 # Install CRDs into a cluster
@@ -118,7 +119,7 @@ example:
 # Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
 .PHONY: generate-contour-crds
 generate-contour-crds:
-	@./hack/generate-contour-crds.sh $(VERSION)
+	@./hack/generate-contour-crds.sh $(NEW_VERSION)
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen generate-contour-crds example
@@ -188,4 +189,4 @@ local-cluster: # Create a local kind cluster
 release: ## Prepares a tagged release of the operator.
 .PHONY: release
 release:
-	./hack/release/make-release-tag.sh $(VERSION) $(NEW_VERSION)
+	./hack/release/make-release-tag.sh $(OLD_VERSION) $(NEW_VERSION)
