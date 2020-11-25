@@ -17,8 +17,8 @@ $ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-oper
 Verify the deployment is available:
 ```
 $ kubectl get deploy -n contour-operator
-NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
-contour-operator-controller-manager   1/1     1            1           1m
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+contour-operator   1/1     1            1           1m
 ```
 
 Install an instance of the `Contour` custom resource:
