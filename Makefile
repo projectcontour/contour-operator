@@ -122,7 +122,7 @@ generate-contour-crds:
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen generate-contour-crds example
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=contour-operator webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt:
