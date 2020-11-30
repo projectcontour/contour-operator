@@ -6,6 +6,9 @@ VERSION ?= $(GIT_REF)
 OLD_VERSION ?= main
 NEW_VERSION ?= $(OLD_VERSION)
 
+# Used as a go test argument for running e2e tests.
+TEST ?= .*
+
 # Image URL to use all building/pushing image targets
 IMAGE ?= docker.io/projectcontour/contour-operator
 
@@ -190,3 +193,8 @@ release: ## Prepares a tagged release of the operator.
 .PHONY: release
 release:
 	./hack/release/make-release-tag.sh $(OLD_VERSION) $(NEW_VERSION)
+
+test-e2e: ## Runs e2e tests.
+.PHONY: test-e2e
+test-e2e: deploy
+	go test -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e
