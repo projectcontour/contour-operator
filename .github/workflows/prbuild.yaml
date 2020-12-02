@@ -21,7 +21,7 @@ jobs:
       - name: test
         run: |
           go mod vendor
-          make local-cluster install deploy test
+          make local-cluster test test-e2e
   codespell:
     name: Codespell
     runs-on: ubuntu-latest

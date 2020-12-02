@@ -1,0 +1,123 @@
+// Copyright Project Contour Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// +build e2e
+
+package e2e
+
+import (
+	"context"
+	"os"
+	"testing"
+	"time"
+
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	// kclient is the Kubernetes client used for e2e tests.
+	kclient client.Client
+	// ctx is an empty context used for client calls.
+	ctx = context.TODO()
+	// operatorName is the name of the operator.
+	operatorName = "contour-operator"
+	// operatorNs is the name of the operator's namespace.
+	operatorNs = "contour-operator"
+	// defaultContourNs is the default spec.namespace.name of a Contour.
+	defaultContourNs = "projectcontour"
+	// testUrl is the url used to test e2e functionality.
+	testUrl = "http://local.projectcontour.io/"
+	// expectedDeploymentConditions are the expected status conditions of a
+	// deployment.
+	expectedDeploymentConditions = []appsv1.DeploymentCondition{
+		{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
+	}
+)
+
+func TestMain(m *testing.M) {
+	cl, err := newClient()
+	if err != nil {
+		os.Exit(1)
+	}
+	kclient = cl
+
+	os.Exit(m.Run())
+}
+
+func TestOperatorDeploymentAvailable(t *testing.T) {
+	t.Helper()
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, operatorName, operatorNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected conditions for deployment %s/%s: %v", operatorNs, operatorName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", operatorNs, operatorName)
+}
+
+func TestDefaultContour(t *testing.T) {
+	testName := "test-default-contour"
+	if err := newContour(ctx, kclient, testName, operatorNs); err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("created contour %s/%s", operatorNs, testName)
+
+	expectedContourConditions := []metav1.Condition{
+		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
+		// TODO [danehans]: Update when additional status conditions are added to Contour.
+	}
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+
+	// Create a sample workload for e2e testing.
+	appName := "kuard"
+	if err:= newDeployment(ctx, kclient, appName, defaultContourNs, "gcr.io/kuar-demo/kuard-amd64:1", 3); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", defaultContourNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", defaultContourNs, appName)
+
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, defaultContourNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", defaultContourNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", defaultContourNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, defaultContourNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", defaultContourNs, appName, err)
+	}
+	t.Logf("created service %s/%s", defaultContourNs, appName)
+
+	if err := newIngress(ctx, kclient, appName, defaultContourNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", defaultContourNs, appName, err)
+	}
+	t.Logf("created ingress %s/%s", defaultContourNs, appName)
+
+	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	}
+	t.Logf("received http response for %q", testUrl)
+
+	// Ensure the default contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
+	}
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, defaultContourNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", defaultContourNs, err)
+	}
+}

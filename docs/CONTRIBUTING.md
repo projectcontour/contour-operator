@@ -40,9 +40,9 @@ make manager
 
 This produces a `contour-operator` binary in your `$GOPATH/bin` directory and runs go fmt and go vet against the code.
 
-### Running the unit tests
+### Running the tests
 
-You can run all the unit tests for the project:
+To run all the unit tests for the project:
 
 ```
 make check
@@ -54,7 +54,20 @@ To run the tests for a single package, change to package directory and run:
 go test .
 ```
 
-__Note:__ Unit tests must pass for your PR to get merged.
+The e2e tests require a Kubernetes cluster and uses your current cluster context.
+To create a [kind](https://kind.sigs.k8s.io/) Kubernetes cluster:
+
+```
+make local-cluster
+```
+
+To run the e2e tests for the project:
+
+```
+make test-e2e
+```
+
+__Note:__ Unit and e2e tests must pass for your PR to get merged.
 
 ## Contribution workflow
 
@@ -169,8 +182,7 @@ Operator CRDs and run the operator in the foreground:
 make run
 ```
 
-Before submitting your changes, follow the image-based deployment instructions to ensure the operator works as
-expected within a Kubernetes cluster.
+Before submitting your changes, run the [required tests](#Running-the-tests).
 
 ## DCO Sign off
 
