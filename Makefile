@@ -118,6 +118,11 @@ example:
 	cd config/manager
 	kustomize build config/default > examples/operator/operator.yaml
 
+test-examples: ## Test deployment of manifests in examples directory.
+.PHONY: test-examples
+test-examples:
+	./hack/test-examples.sh
+
 # Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
 # Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
 .PHONY: generate-contour-crds
