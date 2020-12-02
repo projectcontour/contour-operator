@@ -2342,7 +2342,7 @@ spec:
         - --contour-image
         - docker.io/projectcontour/contour:main
         - --envoy-image
-        - docker.io/envoyproxy/envoy:v1.16.0
+        - docker.io/envoyproxy/envoy:v1.16.1
         image: docker.io/projectcontour/contour-operator:main
         name: contour-operator
         resources:
