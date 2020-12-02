@@ -72,6 +72,8 @@ func main() {
 		ContourImage: contourImage,
 		EnvoyImage:   envoyImage,
 	}
+	setupLog.Info("using contour", "image", cntrCfg.ContourImage)
+	setupLog.Info("using envoy", "image", cntrCfg.EnvoyImage)
 
 	mgr, err := manager.NewContourManager(mgrOpts, cntrCfg)
 	if err != nil {
