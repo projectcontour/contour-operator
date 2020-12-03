@@ -363,9 +363,9 @@ func TestClusterIpServiceChanged(t *testing.T) {
 			expect: true,
 		},
 		{
-			description: "if the target port number changed",
+			description: "if the target port name changed",
 			mutate: func(svc *corev1.Service) {
-				intStrPort := intstr.IntOrString{IntVal: int32(1234)}
+				intStrPort := intstr.FromString("test-port")
 				svc.Spec.Ports[0].TargetPort = intStrPort
 			},
 			expect: true,
@@ -391,7 +391,7 @@ func TestClusterIpServiceChanged(t *testing.T) {
 					Name:       "foo",
 					Protocol:   corev1.ProtocolUDP,
 					Port:       int32(1234),
-					TargetPort: intstr.IntOrString{IntVal: int32(1234)},
+					TargetPort: intstr.FromInt(1234),
 				}
 				svc.Spec.Ports = append(svc.Spec.Ports, port)
 			},
@@ -468,17 +468,25 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 			expect: true,
 		},
 		{
-			description: "if the target port number changed",
+			description: "if the port name changed",
 			mutate: func(svc *corev1.Service) {
-				intStrPort := intstr.IntOrString{IntVal: int32(1234)}
+				svc.Spec.Ports[0].Name = "foo"
+			},
+			expect: true,
+		},
+		{
+			description: "if the target port name changed",
+			mutate: func(svc *corev1.Service) {
+				intStrPort := intstr.FromString("test-port")
 				svc.Spec.Ports[0].TargetPort = intStrPort
 			},
 			expect: true,
 		},
 		{
-			description: "if the port name changed",
+			description: "if the target port changed to a port number",
 			mutate: func(svc *corev1.Service) {
-				svc.Spec.Ports[0].Name = "foo"
+				intStrPort := intstr.FromInt(80)
+				svc.Spec.Ports[0].TargetPort = intStrPort
 			},
 			expect: true,
 		},
@@ -496,7 +504,7 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 					Name:       "foo",
 					Protocol:   corev1.ProtocolUDP,
 					Port:       int32(1234),
-					TargetPort: intstr.IntOrString{IntVal: int32(1234)},
+					TargetPort: intstr.FromString("test-port"),
 				}
 				svc.Spec.Ports = append(svc.Spec.Ports, port)
 			},

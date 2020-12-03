@@ -135,10 +135,10 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "xds",
+					Name:       xdsPortName,
 					Port:       int32(xdsPort),
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{IntVal: int32(xdsPort)},
+					TargetPort: intstr.FromString(xdsPortName),
 				},
 			},
 			Selector:        contourDeploymentPodSelector(contour).MatchLabels,
@@ -162,16 +162,16 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
+					Name:       httpPortName,
 					Port:       int32(httpPort),
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{IntVal: int32(httpPort)},
+					TargetPort: intstr.FromString(httpPortName),
 				},
 				{
-					Name:       "https",
+					Name:       httpsPortName,
 					Port:       int32(httpsPort),
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{IntVal: int32(httpsPort)},
+					TargetPort: intstr.FromString(httpsPortName),
 				},
 			},
 			Selector:        envoyDaemonSetPodSelector(contour).MatchLabels,

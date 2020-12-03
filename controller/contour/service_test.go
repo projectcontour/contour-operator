@@ -39,16 +39,16 @@ func checkServiceHasPort(t *testing.T, svc *corev1.Service, port int) {
 	t.Errorf("service is missing port %q", port)
 }
 
-func checkServiceHasTargetPort(t *testing.T, svc *corev1.Service, port int) {
+func checkServiceHasTargetPortName(t *testing.T, svc *corev1.Service, name string) {
 	t.Helper()
 
-	intStrPort := intstr.IntOrString{IntVal: int32(port)}
+	portName := intstr.FromString(name)
 	for _, p := range svc.Spec.Ports {
-		if p.TargetPort == intStrPort {
+		if p.TargetPort == portName {
 			return
 		}
 	}
-	t.Errorf("service is missing targetPort %q", port)
+	t.Errorf("service is missing targetPort %q", name)
 }
 
 func checkServiceHasPortName(t *testing.T, svc *corev1.Service, name string) {
@@ -84,7 +84,7 @@ func TestDesiredContourService(t *testing.T) {
 	svc := DesiredContourService(ctr)
 
 	checkServiceHasPort(t, svc, xdsPort)
-	checkServiceHasTargetPort(t, svc, xdsPort)
+	checkServiceHasTargetPortName(t, svc, xdsPortName)
 	checkServiceHasPortName(t, svc, "xds")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
 }
@@ -101,8 +101,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 
 	checkServiceHasPort(t, svc, httpPort)
 	checkServiceHasPort(t, svc, httpsPort)
-	checkServiceHasTargetPort(t, svc, httpPort)
-	checkServiceHasTargetPort(t, svc, httpsPort)
+	checkServiceHasTargetPortName(t, svc, httpPortName)
+	checkServiceHasTargetPortName(t, svc, httpsPortName)
 	checkServiceHasPortName(t, svc, "http")
 	checkServiceHasPortName(t, svc, "https")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)

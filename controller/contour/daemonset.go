@@ -63,6 +63,10 @@ const (
 	envoyDaemonSetLabel = "contour.operator.projectcontour.io/daemonset-envoy"
 	// xdsResourceVersion is the version of the Envoy xdS resource types.
 	xdsResourceVersion = "v3"
+	// httpPortName is the name of an http container port.
+	httpPortName = "http"
+	// httpsPortName is the name of an https container port.
+	httpsPortName = "https"
 )
 
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
@@ -214,7 +218,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			},
 			Ports: []corev1.ContainerPort{
 				{
-					Name:          "http",
+					Name:          httpPortName,
 					ContainerPort: int32(httpPort),
 					// Required for kind/bare-metal deployments but unneeded otherwise.
 					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.
@@ -222,7 +226,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					Protocol: "TCP",
 				},
 				{
-					Name:          "https",
+					Name:          httpsPortName,
 					ContainerPort: int32(httpsPort),
 					// Required for kind/bare-metal deployments but unneeded otherwise.
 					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.

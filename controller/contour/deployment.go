@@ -68,6 +68,8 @@ const (
 	httpPort = 80
 	// httpsPort is the network port number of HTTPS.
 	httpsPort = 443
+	// xdsPortName is the name of an xds container port.
+	xdsPortName = "xds"
 )
 
 // ensureDeployment ensures a deployment exists for the given contour.
@@ -175,7 +177,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 		},
 		Ports: []corev1.ContainerPort{
 			{
-				Name:          "xds",
+				Name:          xdsPortName,
 				ContainerPort: xdsPort,
 				Protocol:      "TCP",
 			},
