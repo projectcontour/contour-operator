@@ -68,6 +68,13 @@ type ContourSpec struct {
 	//
 	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
 	Namespace NamespaceSpec `json:"namespace,omitempty"`
+
+	// EndpointPublishing is used to publish the network endpoints of Envoy.
+	//
+	// If unset, defaults to LoadBalancerService.
+	//
+	// +kubebuilder:default={type: "LoadBalancerService"}
+	EndpointPublishing EndpointPublishing `json:"endpointPublishing,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.
@@ -90,6 +97,49 @@ type NamespaceSpec struct {
 	// +kubebuilder:default=false
 	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }
+
+// EndpointPublishing defines the schema to publish network endpoints and represents
+// the publishing type.
+type EndpointPublishing struct {
+	// Type is the type of publishing strategy to use. Valid values are:
+	//
+	// * LoadBalancerService
+	//
+	// Publishes endpoints using a Kubernetes LoadBalancer Service.
+	//
+	// In this configuration, the endpoints use container networking and a Kubernetes
+	// LoadBalancer Service is created.
+	//
+	// See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+	//
+	// * NodePortService
+	//
+	// Publishes the endpoints using a Kubernetes NodePort Service.
+	//
+	// In this configuration, the endpoints use container networking. A Kubernetes
+	// NodePort Service is created to publish the endpoints. The specific node ports
+	// are dynamically allocated by Kubernetes. To support static port allocations,
+	// user changes to the node port field of the managed NodePort Service will be
+	// preserved.
+	//
+	// See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	//
+	// +kubebuilder:default=LoadBalancerService
+	Type EndpointPublishingType `json:"type,omitempty"`
+}
+
+// EndpointPublishingType is a way to publish network endpoints.
+// +kubebuilder:validation:Enum=LoadBalancerService;NodePortService
+type EndpointPublishingType string
+
+const (
+	// LoadBalancerService publishes an endpoint using a Kubernetes LoadBalancer
+	// Service.
+	LoadBalancerServiceStrategyType EndpointPublishingType = "LoadBalancerService"
+
+	// NodePortService publishes an endpoint using a Kubernetes NodePort Service.
+	NodePortServiceStrategyType EndpointPublishingType = "NodePortService"
+)
 
 const (
 	// Available indicates that the contour is running and available.

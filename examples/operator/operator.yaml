@@ -48,6 +48,29 @@ spec:
           spec:
             description: Spec defines the desired state of Contour.
             properties:
+              endpointPublishing:
+                description: "EndpointPublishing is used to publish the network endpoints
+                  of Envoy. \n If unset, defaults to LoadBalancerService."
+                properties:
+                  type:
+                    default: LoadBalancerService
+                    description: "Type is the type of publishing strategy to use.
+                      Valid values are: \n * LoadBalancerService \n Publishes endpoints
+                      using a Kubernetes LoadBalancer Service. \n In this configuration,
+                      the endpoints use container networking and a Kubernetes LoadBalancer
+                      Service is created. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+                      \n * NodePortService \n Publishes the endpoints using a Kubernetes
+                      NodePort Service. \n In this configuration, the endpoints use
+                      container networking. A Kubernetes NodePort Service is created
+                      to publish the endpoints. The specific node ports are dynamically
+                      allocated by Kubernetes. To support static port allocations,
+                      user changes to the node port field of the managed NodePort
+                      Service will be preserved. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
+                    enum:
+                    - LoadBalancerService
+                    - NodePortService
+                    type: string
+                type: object
               namespace:
                 default:
                   name: projectcontour
