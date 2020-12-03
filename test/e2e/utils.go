@@ -57,12 +57,22 @@ func newClient() (client.Client, error) {
 	return kubeClient, nil
 }
 
-func newContour(ctx context.Context, cl client.Client, name, ns string) error {
+func newDefaultContour(ctx context.Context, cl client.Client, name, ns string) (*operatorv1alpha1.Contour, error) {
 	cntr := oputil.NewContour(name, ns)
 	if err := cl.Create(ctx, cntr); err != nil {
-		return fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
+		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
-	return nil
+	return cntr, nil
+}
+
+func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool) (*operatorv1alpha1.Contour, error) {
+	cntr := oputil.NewContour(name, ns)
+	cntr.Spec.Namespace.Name = specNs
+	cntr.Spec.Namespace.RemoveOnDeletion = remove
+	if err := cl.Create(ctx, cntr); err != nil {
+		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
+	}
+	return cntr, nil
 }
 
 func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
@@ -212,6 +222,28 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
 		}
 	}
+
+	key := types.NamespacedName{
+		Name: ns.Name,
+	}
+
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.Get(ctx, key, ns); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
+	}
+	return nil
+}
+
+func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
+	ns := oputil.NewNamespace(name)
 
 	key := types.NamespacedName{
 		Name: ns.Name,
