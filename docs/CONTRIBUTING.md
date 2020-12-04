@@ -157,6 +157,38 @@ Build and push a Contour Operator container image that includes your changes
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 ```
 
+Run the e2e tests for the project using your image:
+
+```
+IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make test-e2e
+```
+
+__Note:__ The e2e tests require a Kubernetes cluster and uses your current cluster context.
+To create a [kind](https://kind.sigs.k8s.io/) Kubernetes cluster:
+
+```
+make local-cluster
+```
+
+You must reset your custom operator image references before submitting your changes:
+
+```
+make reset-image-refs
+```
+
+If you're working on a release branch, set the `NEW_VERSION` variable to the release tag.
+The following example resets operator image references for branch release-1.10 tagged as v1.10.0:
+
+```
+make reset-image-refs NEW_VERSION=v1.10.0
+```
+
+Run tests & validate against linters:
+
+```
+make check
+```
+
 ### Verify your changes
 
 #### Prerequisites
