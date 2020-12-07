@@ -117,6 +117,13 @@ spec:
             - availableEnvoys
             type: object
         type: object
+    additionalPrinterColumns:
+    - name: Ready
+      type: string
+      jsonPath: ".status.conditions[?(@.type==\"Available\")].status"
+    - name: Reason
+      type: string
+      jsonPath: ".status.conditions[?(@.type==\"Available\")].reason"
     served: true
     storage: true
     subresources:

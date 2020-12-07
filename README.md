@@ -36,6 +36,13 @@ contour-certgen-rmz86      0/1     Completed   0          116s
 envoy-jrhsp                2/2     Running     0          116s
 ```
 
+Verify the `Contour` custom resource is healthy:
+```
+$ kubectl get contours.operator.projectcontour.io
+NAME             READY   REASON
+contour-sample   True    ContourAvailable
+```
+
 [Test with Ingress](https://projectcontour.io/docs/main/deploy-options/#test-with-ingress):
 ```
 $ kubectl apply -f https://projectcontour.io/examples/kuard.yaml
