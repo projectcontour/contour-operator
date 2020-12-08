@@ -3,6 +3,6 @@ kind: Kustomization
 resources:
 - manager.yaml
 images:
-- name: controller
+- name: contour-operator
   newName: docker.io/projectcontour/contour-operator
   newTag: main

@@ -24,7 +24,7 @@ spec:
         - docker.io/envoyproxy/envoy:v1.16.1
         args:
         - --enable-leader-election
-        image: docker.io/projectcontour/contour-operator:main
+        image: contour-operator
         name: contour-operator
         resources:
           limits:

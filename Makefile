@@ -74,7 +74,7 @@ all: manager
 check: test lint-golint lint-codespell
 
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet manifests verify-image-refs
 	go test ./... -coverprofile cover.out
 
 lint-golint:
@@ -105,8 +105,7 @@ uninstall: manifests
 
 # Deploy the operator to a Kubernetes cluster. This assumes a kubeconfig in ~/.kube/config
 deploy: manifests
-	cd config/manager && kustomize edit set image controller=${IMAGE}:${VERSION}
-	kustomize build config/default | kubectl apply -f -
+	./hack/deploy-operator.sh $(IMAGE) $(VERSION)
 
 # Remove the operator deployment. This assumes a kubeconfig in ~/.kube/config
 undeploy:
@@ -122,6 +121,16 @@ test-examples: ## Test deployment of manifests in examples directory.
 .PHONY: test-examples
 test-examples:
 	./hack/test-examples.sh
+
+verify-image-refs: ## Verifies operator image references.
+.PHONY: verify-image-refs
+verify-image-refs:
+	./hack/verify-image-refs.sh $(NEW_VERSION)
+
+reset-image-refs: ## Resets operator image references.
+.PHONY: reset-image-refs
+reset-image-refs:
+	./hack/reset-image-refs.sh $(NEW_VERSION)
 
 # Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
 # Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
