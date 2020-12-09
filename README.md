@@ -26,22 +26,14 @@ Install an instance of the `Contour` custom resource:
 $ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml
 ```
 
-Verify the Contour and Envoy pods are running/completed:
+Verify the `Contour` custom resource is available:
 ```
-$ kubectl get po -n projectcontour
-NAME                       READY   STATUS      RESTARTS   AGE
-contour-7649c6f6cc-ct5rz   1/1     Running     0          116s
-contour-7649c6f6cc-dmbrc   1/1     Running     0          116s
-contour-certgen-rmz86      0/1     Completed   0          116s
-envoy-jrhsp                2/2     Running     0          116s
-```
-
-Verify the `Contour` custom resource is healthy:
-```
-$ kubectl get contours.operator.projectcontour.io
+$ kubectl get contour/contour-sample
 NAME             READY   REASON
 contour-sample   True    ContourAvailable
 ```
+
+__Note:__ It may take several minutes for the `Contour` custom resource to become available.
 
 [Test with Ingress](https://projectcontour.io/docs/main/deploy-options/#test-with-ingress):
 ```
