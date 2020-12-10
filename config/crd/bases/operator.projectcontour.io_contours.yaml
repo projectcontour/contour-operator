@@ -39,19 +39,6 @@ spec:
           spec:
             description: Spec defines the desired state of Contour.
             properties:
-              endpointPublishing:
-                default:
-                  type: LoadBalancerService
-                description: "EndpointPublishing is used to publish the network endpoints of Envoy. \n If unset, defaults to LoadBalancerService."
-                properties:
-                  type:
-                    default: LoadBalancerService
-                    description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n Publishes endpoints using a Kubernetes LoadBalancer Service. \n In this configuration, the endpoints use container networking and a Kubernetes LoadBalancer Service is created. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes the endpoints using a Kubernetes NodePort Service. \n In this configuration, the endpoints use container networking. A Kubernetes NodePort Service is created to publish the endpoints. The specific node ports are dynamically allocated by Kubernetes. To support static port allocations, user changes to the node port field of the managed NodePort Service will be preserved. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
-                    enum:
-                    - LoadBalancerService
-                    - NodePortService
-                    type: string
-                type: object
               namespace:
                 default:
                   name: projectcontour
@@ -66,6 +53,33 @@ spec:
                     default: false
                     description: "RemoveOnDeletion will remove the namespace when the Contour is deleted. If set to True, deletion will not occur if any of the following conditions exist: \n 1. The Contour namespace is \"default\", \"kube-system\" or the    contour-operator's namespace. \n 2. Another Contour exists in the namespace."
                     type: boolean
+                type: object
+              networkPublishing:
+                description: "NetworkPublishing defines the schema for publishing Contour to a network. \n See each field for additional details."
+                properties:
+                  envoy:
+                    description: "Envoy provides the schema for publishing the network endpoints of Envoy. \n If unset, defaults to:   type:               LoadBalancerService   httpContainerPort:  80   httpsContainerPort: 443"
+                    properties:
+                      httpContainerPort:
+                        default: 80
+                        description: "HTTPContainerPort is the HTTP port number to expose on the Envoy container. This must be a valid port number, 1 < x < 65536 and differ from HttpsContainerPort. \n If unset, defaults to 80."
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                      httpsContainerPort:
+                        default: 443
+                        description: "HTTPSContainerPort is the HTTPS port number to expose on the Envoy container. This must be a valid port number, 1 < x < 65536 and differ from HttpContainerPort. \n If unset, defaults to 443."
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                      type:
+                        default: LoadBalancerService
+                        description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n In this configuration, network endpoints for Envoy use container networking. A Kubernetes LoadBalancer Service is created to publish Envoy network endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint and port 443 to publish Envoy's HTTPS network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes Envoy network endpoints using a Kubernetes NodePort Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes NodePort Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
+                        enum:
+                        - LoadBalancerService
+                        - NodePortService
+                        type: string
+                    type: object
                 type: object
               replicas:
                 default: 2

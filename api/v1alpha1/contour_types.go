@@ -27,6 +27,10 @@ const (
 	// OwningContourNsLabel is the owner reference label used for a Contour
 	// created by the operator. The value should be the namespace of the contour.
 	OwningContourNsLabel = "contour.operator.projectcontour.io/owning-contour-namespace"
+
+	// DefaultContourSpecNs is the default name when spec.Namespace.Name of a Contour
+	// is unspecified.
+	DefaultContourSpecNs = "projectcontour"
 )
 
 // +kubebuilder:object:root=true
@@ -69,12 +73,11 @@ type ContourSpec struct {
 	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
 	Namespace NamespaceSpec `json:"namespace,omitempty"`
 
-	// EndpointPublishing is used to publish the network endpoints of Envoy.
+	// NetworkPublishing defines the schema for publishing Contour to a network.
 	//
-	// If unset, defaults to LoadBalancerService.
+	// See each field for additional details.
 	//
-	// +kubebuilder:default={type: "LoadBalancerService"}
-	EndpointPublishing EndpointPublishing `json:"endpointPublishing,omitempty"`
+	NetworkPublishing NetworkPublishing `json:"networkPublishing,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.
@@ -98,47 +101,79 @@ type NamespaceSpec struct {
 	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }
 
-// EndpointPublishing defines the schema to publish network endpoints and represents
-// the publishing type.
-type EndpointPublishing struct {
+// NetworkPublishing defines the schema for publishing Contour to a network.
+type NetworkPublishing struct {
+	// Envoy provides the schema for publishing the network endpoints of Envoy.
+	//
+	// If unset, defaults to:
+	//   type:               LoadBalancerService
+	//   httpContainerPort:  80
+	//   httpsContainerPort: 443
+	//
+	Envoy EnvoyNetworkPublishing `json:"envoy,omitempty"`
+}
+
+// EnvoyNetworkPublishing defines the schema to publish Envoy to a network.
+// +union
+type EnvoyNetworkPublishing struct {
 	// Type is the type of publishing strategy to use. Valid values are:
 	//
 	// * LoadBalancerService
 	//
-	// Publishes endpoints using a Kubernetes LoadBalancer Service.
-	//
-	// In this configuration, the endpoints use container networking and a Kubernetes
-	// LoadBalancer Service is created.
+	// In this configuration, network endpoints for Envoy use container networking.
+	// A Kubernetes LoadBalancer Service is created to publish Envoy network
+	// endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint
+	// and port 443 to publish Envoy's HTTPS network endpoint.
 	//
 	// See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	//
 	// * NodePortService
 	//
-	// Publishes the endpoints using a Kubernetes NodePort Service.
+	// Publishes Envoy network endpoints using a Kubernetes NodePort Service.
 	//
-	// In this configuration, the endpoints use container networking. A Kubernetes
-	// NodePort Service is created to publish the endpoints. The specific node ports
-	// are dynamically allocated by Kubernetes. To support static port allocations,
-	// user changes to the node port field of the managed NodePort Service will be
-	// preserved.
+	// In this configuration, Envoy network endpoints use container networking. A Kubernetes
+	// NodePort Service is created to publish the network endpoints.
 	//
 	// See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
 	//
+	// +unionDiscriminator
 	// +kubebuilder:default=LoadBalancerService
-	Type EndpointPublishingType `json:"type,omitempty"`
+	Type NetworkPublishingType `json:"type,omitempty"`
+
+	// HTTPContainerPort is the HTTP port number to expose on the Envoy container.
+	// This must be a valid port number, 1 < x < 65536 and differ from
+	// HttpsContainerPort.
+	//
+	// If unset, defaults to 80.
+	//
+	// +kubebuilder:default=80
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	HTTPContainerPort int `json:"httpContainerPort,omitempty"`
+
+	// HTTPSContainerPort is the HTTPS port number to expose on the Envoy container.
+	// This must be a valid port number, 1 < x < 65536 and differ from
+	// HttpContainerPort.
+	//
+	// If unset, defaults to 443.
+	//
+	// +kubebuilder:default=443
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	HTTPSContainerPort int `json:"httpsContainerPort,omitempty"`
 }
 
 // EndpointPublishingType is a way to publish network endpoints.
 // +kubebuilder:validation:Enum=LoadBalancerService;NodePortService
-type EndpointPublishingType string
+type NetworkPublishingType string
 
 const (
-	// LoadBalancerService publishes an endpoint using a Kubernetes LoadBalancer
+	// LoadBalancerService publishes a network endpoint using a Kubernetes LoadBalancer
 	// Service.
-	LoadBalancerServiceStrategyType EndpointPublishingType = "LoadBalancerService"
+	LoadBalancerServicePublishingType NetworkPublishingType = "LoadBalancerService"
 
-	// NodePortService publishes an endpoint using a Kubernetes NodePort Service.
-	NodePortServiceStrategyType EndpointPublishingType = "NodePortService"
+	// NodePortService publishes a network endpoint using a Kubernetes NodePort Service.
+	NodePortServicePublishingType NetworkPublishingType = "NodePortService"
 )
 
 const (
