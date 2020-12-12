@@ -18,7 +18,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -180,17 +180,21 @@ func NewClusterIPService(ns, name string, port, targetPort int) *corev1.Service 
 // NewIngress makes an Ingress using the provided ns/name for the
 // object's namespace/name and backendName/backendPort as the name
 // and port of the backend Service.
-func NewIngress(name, ns, backendName string, backendPort int) *networkingv1beta1.Ingress {
-	return &networkingv1beta1.Ingress{
+func NewIngress(name, ns, backendName string, backendPort int) *networkingv1.Ingress {
+	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 			Labels:    map[string]string{"app": name},
 		},
-		Spec: networkingv1beta1.IngressSpec{
-			Backend: &networkingv1beta1.IngressBackend{
-				ServiceName: backendName,
-				ServicePort: intstr.IntOrString{IntVal: int32(backendPort)},
+		Spec: networkingv1.IngressSpec{
+			DefaultBackend: &networkingv1.IngressBackend{
+				Service: &networkingv1.IngressServiceBackend{
+					Name: backendName,
+					Port: networkingv1.ServiceBackendPort{
+						Number: int32(backendPort),
+					},
+				},
 			},
 		},
 	}

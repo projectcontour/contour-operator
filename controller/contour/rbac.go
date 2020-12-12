@@ -22,7 +22,7 @@ import (
 	projectcontourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 
 	corev1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -115,7 +115,7 @@ func (r *Reconciler) ensureClusterRole(ctx context.Context, name string) (*rbacv
 // with the provided name.
 func desiredClusterRole(name string) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
-	groupNet := []string{networkingv1beta1.GroupName}
+	groupNet := []string{networkingv1.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{projectcontourv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
