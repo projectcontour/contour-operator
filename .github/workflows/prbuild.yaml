@@ -22,7 +22,7 @@ jobs:
         run: |
           go mod vendor
           make test
-  test-examples-linux:
+  test-example-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -34,10 +34,10 @@ jobs:
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
-      - name: test-examples
+      - name: test-example
         run: |
           go mod vendor
-          make local-cluster test-examples
+          make local-cluster load-image example test-example
   test-e2e-linux:
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +53,7 @@ jobs:
       - name: test-e2e
         run: |
           go mod vendor
-          make local-cluster test-e2e
+          make local-cluster load-image test-e2e
   codespell:
     name: Codespell
     runs-on: ubuntu-latest

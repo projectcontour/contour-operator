@@ -39,7 +39,8 @@ run::sed() {
     esac
 }
 
-# Update the Docker image tags in the operator's deployment manifests.
+# Update the Docker image tags for Contour and the operator in the operator's
+# deployment manifests.
 for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   # The version might be main or OLDVERS depending on whether we are
   # tagging from the release branch or from main.
@@ -51,6 +52,14 @@ for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
     "$file"
 done
 
+# Update the Docker image tags for the operator in the operator's kustomization
+# file. The version might be main or OLDVERS depending on whether we are tagging
+# from the release branch or from main.
+run::sed \
+  "-es|newTag: main|newTag: $NEWVERS|" \
+  "-es|newTag: $OLDVERS|newTag: $NEWVERS|" \
+  "config/manager/kustomization.yaml"
+
 # If pushing the tag failed, then we might have already committed the
 # YAML updates. The "git commit" will fail if there are no changes, so
 # make sure that there are changes to commit before we do it.
@@ -59,7 +68,8 @@ example_changed=$(git status -s examples/operator 2>&1 | grep -E -q '^\s+[MADRCU
 if $cfg_changed  || $example_changed ; then
   git commit -s -m "Update Contour Docker image to $NEWVERS." \
     config/manager/manager.yaml \
-    examples/operator/operator.yaml
+    examples/operator/operator.yaml \
+    config/manager/kustomization.yaml
 fi
 
 git tag -F - "$NEWVERS" <<EOF
