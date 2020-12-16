@@ -22,6 +22,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+CONTROLLER_GEN := go run sigs.k8s.io/controller-tools/cmd/controller-gen
+
 # Platforms to build the multi-arch image for.
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
 
@@ -54,7 +56,6 @@ DOCKER_BUILD_LABELS = \
 	--label "org.opencontainers.image.licenses=Apache-2.0" \
 	--label "org.opencontainers.image.title=contour-operator" \
 	--label "org.opencontainers.image.description=Deploy and manage Contour using an operator."
-
 
 TAG_LATEST ?= false
 
@@ -144,7 +145,7 @@ generate-contour-crds:
 	@./hack/generate-contour-crds.sh $(NEW_VERSION)
 
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen generate-contour-crds
+manifests: generate-contour-crds
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=contour-operator webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
@@ -156,7 +157,7 @@ vet:
 	go vet ./...
 
 # Generate code
-generate: controller-gen
+generate:
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 multiarch-build-push: ## Build and push a multi-arch contour-operator container image to the Docker registry
@@ -186,23 +187,6 @@ push: container
 ifeq ($(TAG_LATEST), true)
 	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
 	docker push $(IMAGE):latest
-endif
-
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 local-cluster: # Create a local kind cluster
