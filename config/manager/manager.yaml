@@ -27,10 +27,7 @@ spec:
         image: contour-operator
         name: contour-operator
         resources:
-          limits:
-            cpu: 100m
-            memory: 50Mi
           requests:
             cpu: 100m
-            memory: 40Mi
+            memory: 70Mi
       terminationGracePeriodSeconds: 10
