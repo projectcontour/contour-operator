@@ -157,6 +157,13 @@ Build and push a Contour Operator container image that includes your changes
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 ```
 
+If you're running a local kind cluster with `make local-cluster`, you can load
+the image directly to nodes instead of pushing it to a remote repository:
+
+```
+make load-image
+```
+
 Run the e2e tests for the project using your image:
 
 ```
@@ -177,10 +184,9 @@ make reset-image-refs
 ```
 
 If you're working on a release branch, set the `NEW_VERSION` variable to the release tag.
-The following example resets operator image references for branch release-1.10 tagged as v1.10.0:
 
 ```
-make reset-image-refs NEW_VERSION=v1.10.0
+make reset-image
 ```
 
 Run tests & validate against linters:
