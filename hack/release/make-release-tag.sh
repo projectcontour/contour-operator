@@ -60,6 +60,15 @@ run::sed \
   "-es|newTag: $OLDVERS|newTag: $NEWVERS|" \
   "config/manager/kustomization.yaml"
 
+# Update the operator's image pull policy. Set the pull policy with kustomize when
+# https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
+for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+  echo "setting \"imagePullPolicy: IfNotPresent\" for $file"
+  run::sed \
+    "-es|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|" \
+    "$file"
+done
+
 # If pushing the tag failed, then we might have already committed the
 # YAML updates. The "git commit" will fail if there are no changes, so
 # make sure that there are changes to commit before we do it.
