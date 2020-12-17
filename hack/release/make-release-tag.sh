@@ -8,6 +8,12 @@
 readonly PROGNAME=$(basename "$0")
 readonly OLDVERS="$1"
 readonly NEWVERS="$2"
+readonly CONTOUR_IMG="docker.io/projectcontour/contour:$NEWVERS"
+readonly OPERATOR_IMG="docker.io/projectcontour/contour-operator:$NEWVERS"
+readonly OPERATOR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/operator/operator.yaml"
+readonly CONTOUR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/contour/contour.yaml"
+readonly TEST_EXAMPLE="https://projectcontour.io/docs/$NEWVERS/deploy-options/#test-with-ingress"
+readonly CONDUCT_EXAMPLE="https://github.com/projectcontour/contour/blob/$NEWVERS/CODE_OF_CONDUCT.md"
 
 if [ -z "$OLDVERS" ] || [ -z "$NEWVERS" ]; then
     printf "Usage: %s OLDVERS NEWVERS\n" "$PROGNAME"
@@ -17,9 +23,6 @@ fi
 set -o errexit
 set -o nounset
 set -o pipefail
-
-readonly CONTOUR_IMG="docker.io/projectcontour/contour:$NEWVERS"
-readonly OPERATOR_IMG="docker.io/projectcontour/contour-operator:$NEWVERS"
 
 # If you are running this script, there's a good chance you switched
 # branches, do ensure the vendor cache is current.
@@ -69,6 +72,18 @@ for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
     "$file"
 done
 
+# Update the docs with the release version.
+run::sed \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/examples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/examples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
+  "-es|https://projectcontour.io/docs/main/deploy-options/#test-with-ingress|$TEST_EXAMPLE|" \
+  "-es|https://projectcontour.io/docs/$OLDVERS/deploy-options/#test-with-ingress|$TEST_EXAMPLE|" \
+  "-es|https://github.com/projectcontour/contour/blob/main/CODE_OF_CONDUCT.md|$CONDUCT_EXAMPLE|" \
+  "-es|https://github.com/projectcontour/contour/blob/$OLDVERS/CODE_OF_CONDUCT.md|$CONDUCT_EXAMPLE|" \
+  "README.md"
+
 # If pushing the tag failed, then we might have already committed the
 # YAML updates. The "git commit" will fail if there are no changes, so
 # make sure that there are changes to commit before we do it.
@@ -78,7 +93,8 @@ if $cfg_changed  || $example_changed ; then
   git commit -s -m "Update Contour Docker image to $NEWVERS." \
     config/manager/manager.yaml \
     examples/operator/operator.yaml \
-    config/manager/kustomization.yaml
+    config/manager/kustomization.yaml \
+    README.md
 fi
 
 git tag -F - "$NEWVERS" <<EOF
