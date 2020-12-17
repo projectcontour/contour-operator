@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
 	"github.com/projectcontour/contour-operator/controller/manager"
+	oputil "github.com/projectcontour/contour-operator/util"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -30,8 +31,7 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 )
 
 func init() {
@@ -60,6 +60,16 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	setupLog := ctrl.Log.WithName("setup")
+
+	images := []string{contourImage, envoyImage}
+	for _, image := range images {
+		// Parse will not handle short digests.
+		if err := oputil.ParseImage(image); err != nil {
+			setupLog.Error(err, "invalid image reference", "value", image)
+			os.Exit(1)
+		}
+	}
 
 	mgrOpts := ctrl.Options{
 		Scheme:             scheme,
