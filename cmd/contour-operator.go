@@ -51,7 +51,7 @@ var (
 func main() {
 	flag.StringVar(&contourImage, "contour-image", "docker.io/projectcontour/contour:main",
 		"The container image used for the managed Contour.")
-	flag.StringVar(&envoyImage, "envoy-image", "docker.io/envoyproxy/envoy:v1.16.1",
+	flag.StringVar(&envoyImage, "envoy-image", "docker.io/envoyproxy/envoy:v1.16.2",
 		"The container image used for the managed Envoy.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,

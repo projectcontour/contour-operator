@@ -251,10 +251,10 @@ spec:
               protocolVersion:
                 description: This field sets the version of the GRPC protocol that
                   Envoy uses to send requests to the extension service. Since Contour
-                  always uses the v2 Envoy API, this is currently fixed at "v2". However,
+                  always uses the v3 Envoy API, this is currently fixed at "v3". However,
                   other protocol options will be available in future.
                 enum:
-                - v2
+                - v3
                 type: string
               services:
                 description: Services specifies the set of Kubernetes Service resources
@@ -2349,7 +2349,7 @@ spec:
         - --contour-image
         - docker.io/projectcontour/contour:main
         - --envoy-image
-        - docker.io/envoyproxy/envoy:v1.16.1
+        - docker.io/envoyproxy/envoy:v1.16.2
         image: docker.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator
