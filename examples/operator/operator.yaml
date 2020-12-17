@@ -2347,11 +2347,11 @@ spec:
         command:
         - /contour-operator
         - --contour-image
-        - docker.io/projectcontour/contour:main
+        - docker.io/projectcontour/contour:v1.11.0
         - --envoy-image
         - docker.io/envoyproxy/envoy:v1.16.2
-        image: docker.io/projectcontour/contour-operator:main
-        imagePullPolicy: Always
+        image: docker.io/projectcontour/contour-operator:v1.11.0
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:

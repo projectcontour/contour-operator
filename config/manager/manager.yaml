@@ -19,13 +19,13 @@ spec:
       - command:
         - /contour-operator
         - --contour-image
-        - docker.io/projectcontour/contour:main
+        - docker.io/projectcontour/contour:v1.11.0
         - --envoy-image
         - docker.io/envoyproxy/envoy:v1.16.2
         args:
         - --enable-leader-election
         image: contour-operator
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:
