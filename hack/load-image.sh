@@ -45,8 +45,6 @@ fi
 # the kind cluster. Set the pull policy with kustomize when
 # https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
 for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
-  # The version might be main or OLDVERS depending on whether we are
-  # tagging from the release branch or from main.
   echo "setting \"imagePullPolicy: IfNotPresent\" for $file"
   run::sed \
     "-es|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|" \
