@@ -22,18 +22,18 @@ applications- Services, Ingress, and more.
 ## Background
 
 Contour Operator manages Contour using the `contours.operator.projectcontour.io` Custom Resource Definition (CRD). The
-Contour Custom Resource (CR) provides the user interface for managing an instance of Contour and is handled by the
-Kubernetes API just like built-in objects. Contour Operator monitors the Contour CR and provides status on whether the
-actual state matches the desired state of the object. Contour Operator will continue to support the Contour CRD. Adding
-support for Service APIs will provide users an alternative approach to managing Contour.
+Contour custom resource provides the user interface for managing an instance of Contour and is handled by the
+Kubernetes API just like built-in objects. Contour Operator monitors the Contour custom resource and provides status on
+whether the actual state matches the desired state of the object. Contour Operator will continue to support the Contour
+CRD. Adding support for Service APIs will provide users an alternative approach to managing Contour.
 
 ## High-Level Design
 
 Contour Operator will manage Contour using the `gatewayclasses.networking.x-k8s.io` and `gateways.networking.x-k8s.io`
-CRDs. The combination of GatewayClass and Gateway CRs will provide the user interface for managing an instance of
-Contour. Service APIs provides extension points to allow for custom resources to be linked at various layers of the API.
-This provides more granular customization at the appropriate places within the API structure. These extension points
-will be leveraged to expose Contour-specific configuration.
+CRDs. The combination of GatewayClass and Gateway custom resources will provide the user interface for managing an
+instance of Contour. Service APIs provides extension points to allow for resources to be linked at various layers. This
+provides more granular customization at the appropriate places within the API structure. These extension points will be
+leveraged to expose Contour-specific configuration.
 
 ## Detailed Design
 
@@ -42,7 +42,9 @@ will be leveraged to expose Contour-specific configuration.
 GatewayClass is a cluster-scoped resource that defines a set of Gateways sharing a common behavior. A GatewayClass
 with `controller: projectcontour.io/contour-operator` will be managed by Contour Operator. There MUST be at least one
 GatewayClass defined in order to be able to have a functional Gateway. This is similar to IngressClass for Ingress and
-StorageClass for PersistentVolumes. The following is an example of a GatewayClass managed by Contour Operator:
+StorageClass for PersistentVolumes.
+
+The following is an example of a GatewayClass managed by Contour Operator:
 
 ```yaml
 kind: GatewayClass
@@ -52,9 +54,9 @@ metadata:
 spec:
   controller: projectcontour.io/contour-operator
   parametersRef:
-    name: example-contour-config
+    name: example-contour
     group: operator.projectcontour.io
-    kind: ContourConfig
+    kind: Contour
 ```
 
 The `controller` field is a domain/path string that indicates the controller responsible for managing Gateways of this
@@ -75,33 +77,41 @@ contain a namespace field, the referenced resource must exist in a known namespa
 used as the known namespace. If the referenced resource cannot be found, the operator will set the GatewayClass
 `InvalidParameters` status condition to true.
 
-### ContourConfig
+### Contour
 
-A new ContourConfig CR will be introduced to provide a structured object for representing the Contour configuration.
-This configuration-only resource will be consumed by a GatewayClass. ContourConfig is equivalent to spec of a Contour CR
-to provide consistency and supportability for managing Contour using the Contour CR or Service APIs. For example:
+The Contour custom resource will be used to provide a structured object for representing the Contour configuration. A
+Contour custom resource will be consumed by a GatewayClass. Since the Contour custom resource triggers the operator to
+instantiate a Contour environment, a field will be added to prevent this behavior and treat the Contour as a
+configuration-only resource. The following data structure will be used to manage this behavior:
 
 ```go
-type ContourConfig struct {
-	// Spec defines the desired state of ContourConfig.
-	Spec ContourSpec `json:"spec,omitempty"`
+// ContourSpec currently exists.
+type ContourSpec struct {
+	// GatewayClassRef is a reference to a GatewayClass used for managing
+	// a Contour.
+	//
+	// +kubebuilder:default=None
+    GatewayClassRef string `json:"gatewayClassRef,omitempty"`
 }
 ```
 
-Here is an example ContourConfig:
-
+The following is an example of a Contour resource that references a GatewayClass:
 ```yaml
 apiVersion: operator.projectcontour.io/v1alpha1
-kind: ContourConfig
+kind: Contour
 metadata:
-  name: example-contour-config
+  name: example-contour
   namespace: contour-operator
 spec:
+  gatewayClassRef: example-gatewayclass
   replicas: 2
   namespace:
     name: projectcontour
 ```
-__Note:__ ContourConfig does not contain a status field. Status will be reflected in the associated GatewayClass.
+
+The `gatewayClassRef` is a reference to a GatewayClass used for managing the Contour. If unspecified, the field will
+default to "None", indicating a GatewayClass does not exist, and the operator should use the Contour resource to
+instantiate a Contour environment.
 
 ### Gateway
 
@@ -115,14 +125,16 @@ create an instance of Contour. Gateway is the resource that triggers actions in 
 resources represent structured configuration that are linked together by a Gateway.
 
 A Gateway MAY contain one or more Service APIs *Route references which serve to direct traffic for a subset of traffic
-to a specific service. Note that Contour Operator is NOT responsible for managing *Route Service API resources. The
-following is an example of a Gateway that listens for HTTP traffic on TCP port 80: 
+to a specific service. Note that Contour Operator is NOT responsible for managing *Route Service API resources.
+
+The following is a Gateway example that listens for HTTP traffic on TCP port 80:
 
 ```yaml
 kind: Gateway
 apiVersion: networking.x-k8s.io/v1alpha1
 metadata:
   name: example-gateway
+  namespace: projectcontour
 spec:
   gatewayClassName: example-gatewayclass
   listeners:
@@ -131,10 +143,32 @@ spec:
   ...
 ```
 
-The `port` or `protocol` fields are required and specify the network port/protocol pair that Envoy will listen for
-connection requests on. TLS configuration must be included in the Gateway listener when "HTTPS" or "TLS" is specified
-for `protocol`. `certificateRef` of a TLS configuration is a reference to a Secret in the operator's namespace
-containing a TLS certificate and private key. The secret MUST contain the following keys and data:
+The `port` or `protocol` fields are required and specify the network port/protocol pair that Envoy will listen on for
+connection requests. The operator will use the value of `port` for the Envoy Service. If multiple listeners are
+specified with unique ports, the operator will represent each port in the Envoy Service. The above Gateway example will
+create the following Envoy Service:
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: envoy
+  namespace: projectcontour
+  ...
+spec:
+  ports:
+  - port: 80
+    name: http
+    protocol: TCP
+   ...
+```
+
+__Note:__ Contour is responsible for constructing routing rules and forwarding traffic based on the other `listeners`
+fields.
+
+TLS configuration must be included in the Gateway listener when "HTTPS" or "TLS" is specified for
+`protocol`. The `certificateRef` field is a reference to a Secret in the Gateway's namespace containing a TLS
+certificate and private key. The secret MUST contain the following keys and data:
 
 - tls.crt: certificate file contents
 - tls.key: key file contents
@@ -143,6 +177,9 @@ For example:
 
 ```yaml
 kind: Gateway
+metadata:
+  name: example-gateway
+  namespace: projectcontour
 ...
 listeners:
 - protocol: HTTPS
@@ -152,13 +189,13 @@ listeners:
     certificateRef:
       kind: Secret
       group: core
-      name: default-cert
+      name: example-cert
 ---
 kind: Secret
 apiVersion: v1
 metadata:
-  name: default-cert
-  namespace: contour-operator
+  name: example-cert
+  namespace: example
 data:
   tls.crt: <CERT>
   tls.key: <KEY>
@@ -166,14 +203,16 @@ data:
 
 Gateway contains a `routes` field that specifies a schema for associating routes with the `listener` using Kubernetes
 selectors. A Route is a Service APIs resource capable of servicing a request and allows a user to expose a resource
-(i.e. Service) by an externally-reachable URL, proxy traffic to the resource, and terminate SSL/TLS connections. The
-following example will bind the Gateway to Routes that include label "app: example".The `port` or `protocol` fields are required when
+(i.e. Service) by an externally-reachable URL, proxy traffic to the resource, and terminate SSL/TLS connections.
+
+The following example will bind the Gateway to Routes that include label "app: example":
 
 ```yaml
 kind: Gateway
 apiVersion: networking.x-k8s.io/v1alpha1
 metadata:
   name: example-gateway
+  namespace: projectcontour
 spec:
   gatewayClassName: example-gatewayclass
   listeners:
@@ -192,22 +231,36 @@ metadata:
   labels:
     app: example
 spec:
+  gateways:
+    allow: All
   rules:
   - forwardTo:
     - serviceName: example-svc
       port: 8080
 ```
 
-The `addresses` field specifies one or more network addresses requested for this Gateway. If unspecified, an IP address
-will be automatically assigned. If the specified address is invalid or unavailable, the operator MUST indicate this in
-Gateway status. The following is a Gateway example that specifies IP address "1.2.3.4". The address will be used for
-each Gateway listener:
+After the operator instantiates a Contour environment, Contour will watch for xRoute resources such as the example
+HTTPRoute above and bind the route based on `gateways` field rules.
+
+__Note:__ Contour is responsible for forwarding traffic based on routing rules defined in xRoute resources.
+
+The Gateway `addresses` field specifies one or more network addresses requested for this Gateway. The operator will use
+values from this field for the Envoy Service resource. The specific Service field used for the values will depend on the
+network publishing type specified in the associated Contour. For example, if the network publishing type is "Internal",
+the operator will create an Envoy Service of type "ClusterIP" and set `clusterIPs: 1.2.3.4`.
+
+If `addresses` is unspecified, an IP address will be automatically assigned through existing Kubernetes mechanisms. If
+the specified address is invalid or unavailable, the operator will indicate this in Gateway status.
+
+The following is a Gateway example that specifies IP address "1.2.3.4". This address will be used for each Gateway
+listener:
 
 ```yaml
 kind: Gateway
 apiVersion: networking.x-k8s.io/v1alpha1
 metadata:
   name: example-gateway
+  namespace: projectcontour
 spec:
   gatewayClassName: example-gatewayclass
   addresses:
@@ -215,16 +268,21 @@ spec:
       value: 1.2.3.4
 ```
 
-Although Gateway supports multiple address types, only "IPAddress" will be supported by the Contour Operator.
+Although Gateway supports multiple address types, only "IPAddress" will be supported by the Contour Operator. If a named
+address is requested, the operator will surface the "Detached" listener status condition on the Gateway with the
+"UnsupportedAddress" reason.
 
 ## Implementation Details
 
 ### Controller
 
+Update the existing Contour controller to only instantiate a Contour environment if `contour.spec.gatewayClassRef` is
+"None".
+
 Create a controller that reconciles the GatewayClass resource and performs the following:
 
 - Only reconcile a GatewayClass that specifies `controller: projectcontour.io/contour-operator`.
-- Ensure the ContourConfig referenced by a GatewayClass `parametersRef` exists and is valid.
+- Ensure the Contour referenced by a GatewayClass `parametersRef` exists and is valid.
 - Update the GatewayClass status conditions accordingly.
 
 Create a controller that reconciles the Gateway resource and performs the following:
