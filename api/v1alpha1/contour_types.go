@@ -140,6 +140,13 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:default=LoadBalancerService
 	Type NetworkPublishingType `json:"type,omitempty"`
 
+	// loadBalancer holds parameters for the load balancer. Present only if type is
+	// LoadBalancerService.
+	//
+	// If unspecified, defaults to an external Classic AWS ELB.
+	//
+	LoadBalancer LoadBalancerStrategy `json:"loadBalancer,omitempty"`
+
 	// HTTPContainerPort is the HTTP port number to expose on the Envoy container.
 	// This must be a valid port number, 1 < x < 65536 and differ from
 	// HttpsContainerPort.
@@ -174,6 +181,60 @@ const (
 
 	// NodePortService publishes a network endpoint using a Kubernetes NodePort Service.
 	NodePortServicePublishingType NetworkPublishingType = "NodePortService"
+)
+
+// LoadBalancerStrategy holds parameters for a load balancer.
+type LoadBalancerStrategy struct {
+	// Scope indicates the scope at which the load balancer is exposed.
+	// Possible values are "External" and "Internal".
+	//
+	// +kubebuilder:default=External
+	Scope LoadBalancerScope `json:"scope,omitempty"`
+
+	// providerParameters contains load balancer information specific to
+	// the underlying infrastructure provider.
+	//
+	// +kubebuilder:default={type: "AWS"}
+	ProviderParameters ProviderLoadBalancerParameters `json:"providerParameters,omitempty"`
+}
+
+// LoadBalancerScope is the scope at which a load balancer is exposed.
+// +kubebuilder:validation:Enum=Internal;External
+type LoadBalancerScope string
+
+var (
+	// InternalLoadBalancer is a load balancer that is exposed only on the
+	// cluster's private network.
+	InternalLoadBalancer LoadBalancerScope = "Internal"
+
+	// ExternalLoadBalancer is a load balancer that is exposed on the
+	// cluster's public network (which is typically on the Internet).
+	ExternalLoadBalancer LoadBalancerScope = "External"
+)
+
+// ProviderLoadBalancerParameters holds desired load balancer information
+// specific to the underlying infrastructure provider.
+//
+// +union
+type ProviderLoadBalancerParameters struct {
+	// type is the underlying infrastructure provider for the load balancer.
+	// Allowed values are "AWS", "Azure", and "GCP".
+	//
+	// +unionDiscriminator
+	// +kubebuilder:default=AWS
+	Type LoadBalancerProviderType `json:"type,omitempty"`
+}
+
+// LoadBalancerProviderType is the underlying infrastructure provider for the
+// load balancer. Allowed values are "AWS", "Azure", and "GCP".
+//
+// +kubebuilder:validation:Enum=AWS;Azure;GCP
+type LoadBalancerProviderType string
+
+const (
+	AWSLoadBalancerProvider   LoadBalancerProviderType = "AWS"
+	AzureLoadBalancerProvider LoadBalancerProviderType = "Azure"
+	GCPLoadBalancerProvider   LoadBalancerProviderType = "GCP"
 )
 
 const (

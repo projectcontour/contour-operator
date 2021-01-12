@@ -72,6 +72,31 @@ spec:
                         maximum: 65535
                         minimum: 1
                         type: integer
+                      loadBalancer:
+                        description: "loadBalancer holds parameters for the load balancer. Present only if type is LoadBalancerService. \n If unspecified, defaults to an external Classic AWS ELB."
+                        properties:
+                          providerParameters:
+                            default:
+                              type: AWS
+                            description: providerParameters contains load balancer information specific to the underlying infrastructure provider.
+                            properties:
+                              type:
+                                default: AWS
+                                description: type is the underlying infrastructure provider for the load balancer. Allowed values are "AWS", "Azure", and "GCP".
+                                enum:
+                                - AWS
+                                - Azure
+                                - GCP
+                                type: string
+                            type: object
+                          scope:
+                            default: External
+                            description: Scope indicates the scope at which the load balancer is exposed. Possible values are "External" and "Internal".
+                            enum:
+                            - Internal
+                            - External
+                            type: string
+                        type: object
                       type:
                         default: LoadBalancerService
                         description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n In this configuration, network endpoints for Envoy use container networking. A Kubernetes LoadBalancer Service is created to publish Envoy network endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint and port 443 to publish Envoy's HTTPS network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes Envoy network endpoints using a Kubernetes NodePort Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes NodePort Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
