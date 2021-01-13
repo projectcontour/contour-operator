@@ -41,7 +41,7 @@ waitForHttpResponse() {
 kubectl::apply -f examples/operator/operator.yaml
 kubectl::apply -f examples/contour/contour.yaml
 kubectl::apply -f https://projectcontour.io/examples/kuard.yaml
-waitForHttpResponse http://local.projectcontour.io 1 50
+waitForHttpResponse http://local.projectcontour.io 1 100
 kubectl::delete -f https://projectcontour.io/examples/kuard.yaml
 kubectl::delete -f examples/contour/contour.yaml
 kubectl::delete -f examples/operator/operator.yaml
