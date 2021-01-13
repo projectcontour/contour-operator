@@ -122,8 +122,8 @@ Contour as a configuration-only resource. The following data structure will be u
 ```go
 // ContourSpec currently exists.
 type ContourSpec struct {
-	// GatewayClassRef is a reference to a GatewayClass used for managing
-	// a Contour.
+	// GatewayClassRef is a reference to a GatewayClass name used for
+	// managing a Contour.
 	//
 	// +kubebuilder:default=None
     GatewayClassRef string `json:"gatewayClassRef,omitempty"`
@@ -242,7 +242,7 @@ Gateway contains a `routes` field that specifies a schema for associating routes
 selectors. A Route is a Service APIs resource capable of servicing a request and allows a user to expose a resource
 (i.e. Service) by an externally-reachable URL, proxy traffic to the resource, and terminate SSL/TLS connections.
 
-The following example binds the Gateway to HTTPRoutes with label "app: example":
+The following example binds the Gateway to HTTPRoutes with an "app: example" label:
 
 ```yaml
 kind: Gateway
@@ -276,15 +276,17 @@ spec:
       port: 8080
 ```
 
-After the operator instantiates a Contour instance, Contour will watch for xRoute resources such as the example
-HTTPRoute above and bind the route based on `gateways` field rules.
+The operator will pass the Gateway namespace/name to Contour when creating an instance of Contour. After the operator
+instantiates a Contour instance, the Contour controller will watch for xRoute resources such as the example HTTPRoute
+above and bind the route based on rules of the `gateways` field.
 
 __Note:__ Contour is responsible for forwarding traffic based on routing rules defined in xRoute resources.
 
 The Gateway `addresses` field specifies one or more network addresses requested for this Gateway. The operator will use
 values from this field for the Envoy Service resource. The specific Service field used for the values will depend on the
 network publishing type specified in the associated Contour. For example, if the network publishing type is "Internal",
-the operator will create an Envoy Service of type "ClusterIP" and set `clusterIPs: 1.2.3.4`.
+the operator will create an Envoy Service of type "ClusterIP" and set `clusterIPs: 1.2.3.4`. The operator is responsible
+for surfacing the assigned address of the Envoy Service resource to `gateway.status.addresses[]`.
 
 If `addresses` is unspecified, an IP address will be automatically assigned through existing Kubernetes mechanisms. If
 the specified address is invalid or unavailable, the operator will indicate this in Gateway status.
@@ -372,11 +374,16 @@ resources.
   `controller: projectcontour.io/contour-operator-example? This would allow platform providers to support multiple
   Contour Operator's.
 - If `gatewayclass.spec.parametersRef` is unspecified, should the operator create a Contour instance with default
-  settings or should the GatewayClass be considered invalid?
+  settings or should the GatewayClass be considered invalid? The consensus achieved during 1/13/21 maintainers meeting
+  is to create a Contour instance with default setting when `parametersRef` is unspecified.
+  settings or should the GatewayClass be considered invalid
 - `Contour` is a namespace-scoped resource. However, `gatewayclass.spec.parametersref` expects a reference to a
   cluster-scoped resource. Should `Contour` be updated to a cluster-scoped resource or should a separate cluster-scoped
-  custom resource be created that is similar to `Contour`?
+  custom resource be created that is similar to `Contour`? The consensus achieved during the 1/13/21 maintainers meeting
+  is to use the `Contour` resource, even though the field does not specify a namespace. The operator's namespace will be
+  used. The lack of namespace-scoped support is being addressed upstream in [Issue 524][4].
 
 [1]: https://github.com/kubernetes-sigs/service-apis
 [2]: https://github.com/projectcontour/contour/issues/2809
 [3]: https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets
+[4]: https://github.com/kubernetes-sigs/service-apis/issues/524
