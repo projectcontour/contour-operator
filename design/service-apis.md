@@ -103,14 +103,7 @@ spec:
 
 The `controller` field is a domain/path string that indicates the controller responsible for managing Gateways of this
 class. The `projectcontour.io/contour-operator` string will be used to specify Contour Operator as the responsible
-controller. This field is not mutable and cannot be empty. Versioning can be accomplished by encoding the operator's
-version into the path. For example:
-
-```
-projectcontour.io/contour-operator/v1   // Use version 1
-projectcontour.io/contour-operator/v2   // Use version 2
-projectcontour.io/contour-operator      // Use the default version
-```
+controller. This field is not mutable and cannot be empty.
 
 The `parametersRef` field is a reference to an implementation-specific resource containing configuration parameters
 associated to the GatewayClass. This field will be used to expose Contour-specific configuration. If the field is
@@ -210,8 +203,9 @@ __Note:__ Contour is responsible for constructing routing rules and forwarding t
 fields.
 
 TLS configuration must be included in the Gateway listener when "HTTPS" or "TLS" is specified for
-`protocol`. The `certificateRef` field is a reference to a Secret in the Gateway's namespace containing a TLS
-certificate and private key. The secret MUST contain the following keys and data:
+`protocol`. The `certificateRef` field is a reference to a Secret of type `kubernetes.io/tls` in the Gateway's namespace
+containing a TLS certificate and private key. Per the TLS Secret [specification][3], the secret MUST contain the
+following keys and data:
 
 - tls.crt: certificate file contents
 - tls.key: key file contents
@@ -248,7 +242,7 @@ Gateway contains a `routes` field that specifies a schema for associating routes
 selectors. A Route is a Service APIs resource capable of servicing a request and allows a user to expose a resource
 (i.e. Service) by an externally-reachable URL, proxy traffic to the resource, and terminate SSL/TLS connections.
 
-The following example will bind the Gateway to Routes that include label "app: example":
+The following example binds the Gateway to HTTPRoutes with label "app: example":
 
 ```yaml
 kind: Gateway
@@ -339,10 +333,9 @@ consist of the following workflow:
 
 ## Implementation Details
 
-### Controller
+### Operator
 
-Update the existing Contour controller to only instantiate a Contour instance if `contour.spec.gatewayClassRef` is
-"None".
+Update the operator to only instantiate a Contour instance if `contour.spec.gatewayClassRef` is "None".
 
 Create a controller that reconciles the GatewayClass resource and performs the following:
 
@@ -370,15 +363,20 @@ resources.
 
 ### Open Questions
 
-- For versioned GatewayClass support, i.e. `controller: projectcontour.io/contour-operator/v1.12.0`, should Contour be
+- ~~For versioned GatewayClass support, i.e. `controller: projectcontour.io/contour-operator/v1.12.0`, should Contour be
   responsible for updating GatewayClass|Gateway|xRoute status when it's in this "detached" state? Contour could watch
   the operator's deployment and when unavailable update the status conditions of GatewayClass|Gateway|xRoute resources
-  accordingly.
+  accordingly.~~ Using `gatewayclass.spec.controller as a means to represent an operator/contour version has been
+  removed from this design.
 - Should `gatewayclass.spec.controller` reference a specific operator by name, i.e.
   `controller: projectcontour.io/contour-operator-example? This would allow platform providers to support multiple
   Contour Operator's.
 - If `gatewayclass.spec.parametersRef` is unspecified, should the operator create a Contour instance with default
   settings or should the GatewayClass be considered invalid?
+- `Contour` is a namespace-scoped resource. However, `gatewayclass.spec.parametersref` expects a reference to a
+  cluster-scoped resource. Should `Contour` be updated to a cluster-scoped resource or should a separate cluster-scoped
+  custom resource be created that is similar to `Contour`?
 
 [1]: https://github.com/kubernetes-sigs/service-apis
 [2]: https://github.com/projectcontour/contour/issues/2809
+[3]: https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets
