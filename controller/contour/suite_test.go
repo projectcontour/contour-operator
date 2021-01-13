@@ -50,7 +50,7 @@ const (
 	interval = time.Millisecond * 250
 
 	contourImage = "docker.io/projectcontour/contour:main"
-	envoyImage   = "docker.io/envoyproxy/envoy:v1.16.2"
+	envoyImage   = "docker.io/envoyproxy/envoy:v1.17.0"
 )
 
 var (
