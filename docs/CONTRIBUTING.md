@@ -61,7 +61,13 @@ To create a [kind](https://kind.sigs.k8s.io/) Kubernetes cluster:
 make local-cluster
 ```
 
-To run the e2e tests for the project:
+Load the operator image onto kind cluster nodes:
+
+```
+make load-image
+```
+
+Run the e2e tests for the project:
 
 ```
 make test-e2e
@@ -157,36 +163,35 @@ Build and push a Contour Operator container image that includes your changes
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
 ```
 
-If you're running a local kind cluster with `make local-cluster`, you can load
-the image directly to nodes instead of pushing it to a remote repository:
-
-```
-make load-image
-```
-
 Run the e2e tests for the project using your image:
 
 ```
 IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make test-e2e
 ```
 
-__Note:__ The e2e tests require a Kubernetes cluster and uses your current cluster context.
-To create a [kind](https://kind.sigs.k8s.io/) Kubernetes cluster:
+If you're running a local kind cluster with `make local-cluster`, you can load
+the image directly to nodes instead of pushing it to your remote repository:
 
 ```
-make local-cluster
+make load-image
+```
+
+Now running the e2e tests no longer require the `IMAGE` variable:
+
+```
+make test-e2e
 ```
 
 You must reset your custom operator image references before submitting your changes:
 
 ```
-make reset-image-refs
+make reset-image
 ```
 
 If you're working on a release branch, set the `NEW_VERSION` variable to the release tag.
 
 ```
-make reset-image
+make reset-image NEW_VERSION=v1.11.0
 ```
 
 Run tests & validate against linters:
