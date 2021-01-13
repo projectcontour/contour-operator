@@ -46,6 +46,11 @@ func DaemonsetConfigChanged(current, expected *appsv1.DaemonSet) (*appsv1.Daemon
 	return updated, true
 }
 
+// DaemonSetSelectorsDiffer checks if the current and expected DaemonSet selectors differ.
+func DaemonSetSelectorsDiffer(current, expected *appsv1.DaemonSet) bool {
+	return !apiequality.Semantic.DeepEqual(current.Spec.Selector, expected.Spec.Selector)
+}
+
 // JobConfigChanged checks if the current and expected Job match and if not,
 // returns true and the expected job.
 func JobConfigChanged(current, expected *batchv1.Job) (*batchv1.Job, bool) {
@@ -111,6 +116,11 @@ func DeploymentConfigChanged(current, expected *appsv1.Deployment) (*appsv1.Depl
 	}
 
 	return updated, true
+}
+
+// DeploymentSelectorsDiffer checks if the current and expected Deployment selectors differ.
+func DeploymentSelectorsDiffer(current, expected *appsv1.Deployment) bool {
+	return !apiequality.Semantic.DeepEqual(current.Spec.Selector, expected.Spec.Selector)
 }
 
 // ClusterIPServiceChanged checks if the spec of current and expected match and if not,

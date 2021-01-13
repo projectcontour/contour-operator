@@ -250,24 +250,28 @@ func contourOwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelec
 	}
 }
 
-// contourDeploymentPodSelector returns a label selector using
-// "contour.operator.projectcontour.io/deployment-contour" as the key
-// and the contour name as the value.
-func contourDeploymentPodSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
+// contourDeploymentPodSelector returns a label selector using "app: contour" as the
+// key/value pair.
+//
+// TODO [danehans]: Update to use "contour.operator.projectcontour.io/deployment-contour"
+// when https://github.com/projectcontour/contour/issues/1821 is fixed.
+func contourDeploymentPodSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			ContourDeploymentLabel: contour.Name,
+			"app": "contour",
 		},
 	}
 }
 
-// envoyDaemonSetPodSelector returns a label selector using
-// "contour.operator.projectcontour.io/daemonset-envoy" as the key and
-// contour name as the value.
-func envoyDaemonSetPodSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
+// envoyDaemonSetPodSelector returns a label selector using "app: envoy" as the
+// key/value pair.
+//
+// TODO [danehans]: Update to use "contour.operator.projectcontour.io/daemonset-envoy"
+// when https://github.com/projectcontour/contour/issues/1821 is fixed.
+func envoyDaemonSetPodSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			envoyDaemonSetLabel: contour.Name,
+			"app": "envoy",
 		},
 	}
 }

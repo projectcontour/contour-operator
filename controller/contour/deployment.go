@@ -55,9 +55,6 @@ const (
 	contourCfgVolMntDir = "config"
 	// contourCfgFileName is the name of the contour configuration file.
 	contourCfgFileName = "contour.yaml"
-	// ContourDeploymentLabel identifies a deployment as a contour deployment,
-	// and the value is the name of the owning contour.
-	ContourDeploymentLabel = "contour.operator.projectcontour.io/deployment-contour"
 	// xdsPort is the network port number of Contour's xDS service.
 	xdsPort = 8001
 	// metricsPort is the network port number of Contour's metrics service.
@@ -87,6 +84,13 @@ func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 			return updated, nil
 		}
 		return nil, fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+	}
+
+	differ := utilequality.DeploymentSelectorsDiffer(current, desired)
+	if differ {
+		r.Log.Info("selectors differ and are immutable, recreating deployment %s/%s",
+			"namespace", current.Namespace, "name", current.Name)
+		return nil, r.ensureDeploymentDeleted(ctx, contour)
 	}
 
 	updated, err := r.updateDeploymentIfNeeded(ctx, current, desired)
@@ -244,7 +248,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 			Replicas:                &contour.Spec.Replicas,
 			RevisionHistoryLimit:    pointer.Int32Ptr(int32(10)),
 			// Ensure the deployment adopts only its own pods.
-			Selector: contourDeploymentPodSelector(contour),
+			Selector: contourDeploymentPodSelector(),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -260,7 +264,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 						"prometheus.io/scrape": "true",
 						"prometheus.io/port":   fmt.Sprintf("%d", metricsPort),
 					},
-					Labels: contourDeploymentPodSelector(contour).MatchLabels,
+					Labels: contourDeploymentPodSelector().MatchLabels,
 				},
 				Spec: corev1.PodSpec{
 					// TODO [danehans]: Readdress anti-affinity when https://github.com/projectcontour/contour/issues/2997
@@ -273,7 +277,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										TopologyKey: "kubernetes.io/hostname",
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: contourDeploymentPodSelector(contour).MatchLabels,
+											MatchLabels: contourDeploymentPodSelector().MatchLabels,
 										},
 									},
 								},
