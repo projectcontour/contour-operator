@@ -43,7 +43,7 @@ import (
 const (
 	contourName       = "test-contour"
 	operatorNamespace = "test-contour-operator"
-	defaultNamespace  = "projectcontour"
+	defaultNamespace  = operatorv1alpha1.DefaultContourSpecNs
 	defaultReplicas   = int32(2)
 
 	timeout  = time.Second * 10

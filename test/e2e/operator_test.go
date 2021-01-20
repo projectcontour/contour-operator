@@ -40,7 +40,7 @@ var (
 	// operatorNs is the name of the operator's namespace.
 	operatorNs = "contour-operator"
 	// defaultContourNs is the default spec.namespace.name of a Contour.
-	defaultContourNs = "projectcontour"
+	defaultContourNs = operatorv1alpha1.DefaultContourSpecNs
 	// testUrl is the url used to test e2e functionality.
 	testUrl = "http://local.projectcontour.io/"
 	// expectedDeploymentConditions are the expected status conditions of a
