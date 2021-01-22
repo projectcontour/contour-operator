@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/controller/contour"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
+	"github.com/projectcontour/contour-operator/internal/equality"
+	"github.com/projectcontour/contour-operator/internal/operator/controller/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -130,10 +130,10 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 
 			mutated := original.DeepCopy()
 			tc.mutate(mutated)
-			if updated, changed := utilequality.DaemonsetConfigChanged(original, mutated); changed != tc.expect {
+			if updated, changed := equality.DaemonsetConfigChanged(original, mutated); changed != tc.expect {
 				t.Errorf("expect daemonsetConfigChanged to be %t, got %t", tc.expect, changed)
 			} else if changed {
-				if _, changedAgain := utilequality.DaemonsetConfigChanged(mutated, updated); changedAgain {
+				if _, changedAgain := equality.DaemonsetConfigChanged(mutated, updated); changedAgain {
 					t.Error("daemonsetConfigChanged does not behave as a fixed point function")
 				}
 			}
@@ -237,10 +237,10 @@ func TestJobConfigChanged(t *testing.T) {
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
-		if updated, changed := utilequality.JobConfigChanged(mutated, expected); changed != tc.expect {
+		if updated, changed := equality.JobConfigChanged(mutated, expected); changed != tc.expect {
 			t.Errorf("%s, expect jobConfigChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if _, changedAgain := utilequality.JobConfigChanged(updated, expected); changedAgain {
+			if _, changedAgain := equality.JobConfigChanged(updated, expected); changedAgain {
 				t.Errorf("%s, jobConfigChanged does not behave as a fixed point function", tc.description)
 			}
 		}
@@ -334,10 +334,10 @@ func TestDeploymentConfigChanged(t *testing.T) {
 
 		mutated := original.DeepCopy()
 		tc.mutate(mutated)
-		if updated, changed := utilequality.DeploymentConfigChanged(original, mutated); changed != tc.expect {
+		if updated, changed := equality.DeploymentConfigChanged(original, mutated); changed != tc.expect {
 			t.Errorf("%s, expect deploymentConfigChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if _, changedAgain := utilequality.DeploymentConfigChanged(updated, mutated); changedAgain {
+			if _, changedAgain := equality.DeploymentConfigChanged(updated, mutated); changedAgain {
 				t.Errorf("%s, deploymentConfigChanged does not behave as a fixed point function", tc.description)
 			}
 		}
@@ -439,10 +439,10 @@ func TestClusterIpServiceChanged(t *testing.T) {
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
-		if updated, changed := utilequality.ClusterIPServiceChanged(mutated, expected); changed != tc.expect {
+		if updated, changed := equality.ClusterIPServiceChanged(mutated, expected); changed != tc.expect {
 			t.Errorf("%s, expect ClusterIpServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if _, changedAgain := utilequality.ClusterIPServiceChanged(updated, expected); changedAgain {
+			if _, changedAgain := equality.ClusterIPServiceChanged(updated, expected); changedAgain {
 				t.Errorf("%s, ClusterIpServiceChanged does not behave as a fixed point function", tc.description)
 			}
 		}
@@ -551,10 +551,10 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
-		if updated, changed := utilequality.LoadBalancerServiceChanged(mutated, expected); changed != tc.expect {
+		if updated, changed := equality.LoadBalancerServiceChanged(mutated, expected); changed != tc.expect {
 			t.Errorf("%s, expect LoadBalancerServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
 		} else if changed {
-			if _, changedAgain := utilequality.LoadBalancerServiceChanged(updated, expected); changedAgain {
+			if _, changedAgain := equality.LoadBalancerServiceChanged(updated, expected); changedAgain {
 				t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
 			}
 		}
@@ -634,7 +634,7 @@ func TestContourStatusChangedChanged(t *testing.T) {
 	for _, tc := range testCases {
 		expected := tc.current.DeepCopy()
 		tc.mutate(expected)
-		if changed := utilequality.ContourStatusChanged(tc.current, *expected); changed != tc.expect {
+		if changed := equality.ContourStatusChanged(tc.current, *expected); changed != tc.expect {
 			t.Errorf("%s, expect ContourStatusChanged to be %t, got %t", tc.description, tc.expect, changed)
 		}
 	}

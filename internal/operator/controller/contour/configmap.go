@@ -113,7 +113,7 @@ accesslog-format: envoy
 `))
 
 // ensureConfigMap ensures that a ConfigMap exists for the given contour.
-func (r *Reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	desired, err := desiredConfigMap(contour)
 	if err != nil {
 		return fmt.Errorf("failed to build configmap: %w", err)
@@ -136,7 +136,7 @@ func (r *Reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alp
 
 // ensureConfigMapDeleted ensures the configmap for the provided contour
 // is deleted.
-func (r *Reconciler) ensureConfigMapDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureConfigMapDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -144,25 +144,25 @@ func (r *Reconciler) ensureConfigMapDeleted(ctx context.Context, contour *operat
 		},
 	}
 
-	if err := r.Client.Delete(ctx, cfgMap); err != nil {
+	if err := r.client.Delete(ctx, cfgMap); err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	r.Log.Info("deleted configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
+	r.log.Info("deleted configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
 
 	return nil
 }
 
 // currentConfigMap gets the ConfigMap for contour from the api server.
-func (r *Reconciler) currentConfigMap(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
+func (r *reconciler) currentConfigMap(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
 	current := &corev1.ConfigMap{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      contourCfgMapName,
 	}
-	err := r.Client.Get(ctx, key, current)
+	err := r.client.Get(ctx, key, current)
 	if err != nil {
 		return nil, err
 	}
@@ -203,28 +203,28 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 }
 
 // createConfigMap creates a ConfigMap resource for the provided cm.
-func (r *Reconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) error {
-	if err := r.Client.Create(ctx, cm); err != nil {
+func (r *reconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) error {
+	if err := r.client.Create(ctx, cm); err != nil {
 		return fmt.Errorf("failed to create configmap %s/%s: %w", cm.Namespace, cm.Name, err)
 	}
-	r.Log.Info("created configmap", "namespace", cm.Namespace, "name", cm.Name)
+	r.log.Info("created configmap", "namespace", cm.Namespace, "name", cm.Name)
 
 	return nil
 }
 
 // updateConfigMapIfNeeded updates a ConfigMap if current does not match desired.
-func (r *Reconciler) updateConfigMapIfNeeded(ctx context.Context, current, desired *corev1.ConfigMap) error {
+func (r *reconciler) updateConfigMapIfNeeded(ctx context.Context, current, desired *corev1.ConfigMap) error {
 	changed, updated := cfgFileChanged(current, desired)
 	if !changed {
-		r.Log.Info("configmap unchanged; skipped updating configmap", "namespace", current.Namespace,
+		r.log.Info("configmap unchanged; skipped updating configmap", "namespace", current.Namespace,
 			"name", current.Name)
 		return nil
 	}
 
-	if err := r.Client.Update(ctx, updated); err != nil {
+	if err := r.client.Update(ctx, updated); err != nil {
 		return fmt.Errorf("failed to update configmap: %w", err)
 	}
-	r.Log.Info("updated configmap; old: %#v, new: %#v", current, updated)
+	r.log.Info("updated configmap; old: %#v, new: %#v", current, updated)
 
 	return nil
 }

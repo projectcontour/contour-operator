@@ -19,8 +19,8 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	oputil "github.com/projectcontour/contour-operator/util"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
+	"github.com/projectcontour/contour-operator/internal/equality"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,8 +44,8 @@ const (
 // The method should first check for the secrets, then use certgen as a secret
 // generating strategy.
 // ensureJob ensures that a Job exists for the given contour.
-func (r *Reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	desired := DesiredJob(contour, r.Config.ContourImage)
+func (r *reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+	desired := DesiredJob(contour, r.config.ContourImage)
 
 	current, err := r.currentJob(ctx, contour)
 	if err != nil {
@@ -63,7 +63,7 @@ func (r *Reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Co
 }
 
 // ensureJobDeleted ensures the Job for the provided contour is deleted.
-func (r *Reconciler) ensureJobDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureJobDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -71,25 +71,25 @@ func (r *Reconciler) ensureJobDeleted(ctx context.Context, contour *operatorv1al
 		},
 	}
 
-	if err := r.Client.Delete(ctx, job); err != nil {
+	if err := r.client.Delete(ctx, job); err != nil {
 		if !errors.IsNotFound(err) {
 			return err
 		}
 		return nil
 	}
-	r.Log.Info("deleted job", "namespace", job.Namespace, "name", job.Name)
+	r.log.Info("deleted job", "namespace", job.Namespace, "name", job.Name)
 
 	return nil
 }
 
 // currentJob returns the current Job resource for the provided contour.
-func (r *Reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.Contour) (*batchv1.Job, error) {
+func (r *reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.Contour) (*batchv1.Job, error) {
 	current := &batchv1.Job{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      certgenJobName,
 	}
-	err := r.Client.Get(ctx, key, current)
+	err := r.client.Get(ctx, key, current)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 		Containers:                    []corev1.Container{container},
 		DeprecatedServiceAccount:      certGenRbacName,
 		ServiceAccountName:            certGenRbacName,
-		SecurityContext:               oputil.NewUnprivilegedPodSecurity(),
+		SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 		RestartPolicy:                 corev1.RestartPolicyNever,
 		DNSPolicy:                     corev1.DNSClusterFirst,
 		SchedulerName:                 "default-scheduler",
@@ -175,15 +175,15 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 }
 
 // recreateJobIfNeeded recreates a Job if current doesn't match desired.
-func (r *Reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *batchv1.Job) error {
-	updated, changed := utilequality.JobConfigChanged(current, desired)
+func (r *reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *batchv1.Job) error {
+	updated, changed := equality.JobConfigChanged(current, desired)
 	if !changed {
-		r.Log.Info("current job matches desired state; skipped updating",
+		r.log.Info("current job matches desired state; skipped updating",
 			"namespace", current.Namespace, "name", current.Name)
 		return nil
 	}
 
-	if err := r.Client.Delete(ctx, updated); err != nil {
+	if err := r.client.Delete(ctx, updated); err != nil {
 		if !errors.IsNotFound(err) {
 			return err
 		}
@@ -193,26 +193,26 @@ func (r *Reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *
 	if err := r.retryJobCreate(ctx, updated, time.Second*3); err != nil {
 		return err
 	}
-	r.Log.Info("recreated job", "namespace", updated.Namespace, "name", updated.Name)
+	r.log.Info("recreated job", "namespace", updated.Namespace, "name", updated.Name)
 
 	return nil
 }
 
 // createJob creates a Job resource for the provided job.
-func (r *Reconciler) createJob(ctx context.Context, job *batchv1.Job) error {
-	if err := r.Client.Create(ctx, job); err != nil {
+func (r *reconciler) createJob(ctx context.Context, job *batchv1.Job) error {
+	if err := r.client.Create(ctx, job); err != nil {
 		return fmt.Errorf("failed to create job %s/%s: %w", job.Namespace, job.Name, err)
 	}
-	r.Log.Info("created job", "namespace", job.Namespace, "name", job.Name)
+	r.log.Info("created job", "namespace", job.Namespace, "name", job.Name)
 
 	return nil
 }
 
 // retryJobCreate tries creating the provided Job, retrying every second
 // until timeout is reached.
-func (r *Reconciler) retryJobCreate(ctx context.Context, job *batchv1.Job, timeout time.Duration) error {
+func (r *reconciler) retryJobCreate(ctx context.Context, job *batchv1.Job, timeout time.Duration) error {
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := r.Client.Create(ctx, job); err != nil {
+		if err := r.client.Create(ctx, job); err != nil {
 			return false, nil
 		}
 		return true, nil

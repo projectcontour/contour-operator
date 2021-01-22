@@ -16,6 +16,8 @@ package contour
 import (
 	"testing"
 
+	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -92,14 +94,14 @@ func checkDaemonSetHasLabels(t *testing.T, deploy *appsv1.DaemonSet, expected ma
 }
 
 func TestDesiredDaemonSet(t *testing.T) {
-	ds := DesiredDaemonSet(cntr, contourImage, envoyImage)
+	ds := DesiredDaemonSet(cntr, operatorconfig.DefaultContourImage, operatorconfig.DefaultEnvoyImage)
 
 	container := checkDaemonSetHasContainer(t, ds, EnvoyContainerName, true)
-	checkContainerHasImage(t, container, envoyImage)
+	checkContainerHasImage(t, container, operatorconfig.DefaultEnvoyImage)
 	container = checkDaemonSetHasContainer(t, ds, ShutdownContainerName, true)
-	checkContainerHasImage(t, container, contourImage)
+	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
 	container = checkDaemonSetHasContainer(t, ds, envoyInitContainerName, true)
-	checkContainerHasImage(t, container, contourImage)
+	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
 	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyNsEnvVar)
 	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyPodEnvVar)
 	checkDaemonSetHasEnvVar(t, ds, envoyInitContainerName, envoyNsEnvVar)

@@ -18,17 +18,26 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	retryable "github.com/projectcontour/contour-operator/util/retryableerror"
+	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	controllerName = "contour_controller"
 )
 
 var pointerTo = func(ios intstr.IntOrString) *intstr.IntOrString { return &ios }
@@ -41,12 +50,11 @@ type Config struct {
 	EnvoyImage string
 }
 
-// Reconciler reconciles a Contour object.
-type Reconciler struct {
-	Config Config
-	Client client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+// reconciler reconciles a Contour object.
+type reconciler struct {
+	config Config
+	client client.Client
+	log    logr.Logger
 }
 
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours,verbs=get;list;watch;update
@@ -66,20 +74,71 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	_ = r.Log.WithValues("contour", req.NamespacedName)
+// New creates the contour controller from mgr and cfg. The controller will be pre-configured
+// to watch for Contour custom resources across all namespaces.
+func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
+	r := &reconciler{
+		config: cfg,
+		client: mgr.GetClient(),
+		log:    ctrl.Log.WithName(controllerName),
+	}
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return nil, err
+	}
+	if err := c.Watch(&source.Kind{Type: &operatorv1alpha1.Contour{}}, &handler.EnqueueRequestForObject{}); err != nil {
+		return nil, err
+	}
+	// Watch the Contour deployment and Envoy daemonset to properly surface Contour status conditions.
+	if err := c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, r.enqueueRequestForOwningContour()); err != nil {
+		return nil, err
+	}
+	if err := c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, r.enqueueRequestForOwningContour()); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
 
-	r.Log.Info("reconciling", "request", req)
+// enqueueRequestForOwningContour returns an event handler that maps events to
+// objects containing Contour owner labels.
+func (r *reconciler) enqueueRequestForOwningContour() handler.EventHandler {
+	return &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+			labels := a.Meta.GetLabels()
+			ns, nsFound := labels[operatorv1alpha1.OwningContourNsLabel]
+			name, nameFound := labels[operatorv1alpha1.OwningContourNameLabel]
+			if nsFound && nameFound {
+				r.log.Info("queueing contour", "namespace", ns, "name", name, "related", a.Meta.GetSelfLink())
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Namespace: ns,
+							Name:      name,
+						},
+					},
+				}
+			}
+			return []reconcile.Request{}
+		}),
+	}
+}
+
+// Reconcile reconciles watched objects and attempts to make the current state of
+// the object match the desired state.
+func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	_ = r.log.WithValues("contour", req.NamespacedName)
+
+	r.log.Info("reconciling", "request", req)
 
 	// Only proceed if we can get the state of contour.
 	contour := &operatorv1alpha1.Contour{}
-	if err := r.Client.Get(ctx, req.NamespacedName, contour); err != nil {
+	if err := r.client.Get(ctx, req.NamespacedName, contour); err != nil {
 		if errors.IsNotFound(err) {
 			// This means the contour was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related
 			// resource that got deleted async).
-			r.Log.Info("contour not found; reconciliation will be skipped", "request", req)
+			r.log.Info("contour not found; reconciliation will be skipped", "request", req)
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object, so requeue the request.
@@ -94,7 +153,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			if err := r.ensureContour(ctx, contour); err != nil {
 				switch e := err.(type) {
 				case retryable.Error:
-					r.Log.Error(e, "got retryable error; requeueing", "after", e.After())
+					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
 					return ctrl.Result{RequeueAfter: e.After()}, nil
 				default:
 					return ctrl.Result{}, err
@@ -111,7 +170,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err := r.ensureContourRemoved(ctx, contour); err != nil {
 			switch e := err.(type) {
 			case retryable.Error:
-				r.Log.Error(e, "got retryable error; requeueing", "after", e.After())
+				r.log.Error(e, "got retryable error; requeueing", "after", e.After())
 				return ctrl.Result{RequeueAfter: e.After()}, nil
 			default:
 				return ctrl.Result{}, err
@@ -122,14 +181,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&operatorv1alpha1.Contour{}).
 		Complete(r)
 }
 
 // ensureContour ensures all necessary resources exist for the given contour.
-func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	if err := r.ensureNamespace(ctx, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to ensure namespace %s for contour %s/%s: %w",
@@ -173,7 +232,7 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 }
 
 // ensureContourRemoved ensures all resources for the given contour do not exist.
-func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureContourRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	if err := r.ensureEnvoyServiceDeleted(ctx, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to remove service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
@@ -211,9 +270,9 @@ func (r *Reconciler) ensureContourRemoved(ctx context.Context, contour *operator
 
 // otherContoursExist lists Contour objects in all namespaces, returning the list
 // and true if any exist other than contour.
-func (r *Reconciler) otherContoursExist(ctx context.Context, contour *operatorv1alpha1.Contour) (bool, *operatorv1alpha1.ContourList, error) {
+func (r *reconciler) otherContoursExist(ctx context.Context, contour *operatorv1alpha1.Contour) (bool, *operatorv1alpha1.ContourList, error) {
 	contours := &operatorv1alpha1.ContourList{}
-	if err := r.Client.List(ctx, contours); err != nil {
+	if err := r.client.List(ctx, contours); err != nil {
 		return false, nil, fmt.Errorf("failed to list contours: %w", err)
 	}
 	if len(contours.Items) == 0 || len(contours.Items) == 1 && contours.Items[0].Name == contour.Name {
@@ -224,7 +283,7 @@ func (r *Reconciler) otherContoursExist(ctx context.Context, contour *operatorv1
 
 // otherContoursExistInSpecNs lists Contour objects in the same spec.namespace.name as contour,
 // returning true if any exist.
-func (r *Reconciler) otherContoursExistInSpecNs(ctx context.Context, contour *operatorv1alpha1.Contour) (bool, error) {
+func (r *reconciler) otherContoursExistInSpecNs(ctx context.Context, contour *operatorv1alpha1.Contour) (bool, error) {
 	exist, contours, err := r.otherContoursExist(ctx, contour)
 	if err != nil {
 		return false, err
@@ -279,7 +338,7 @@ func envoyDaemonSetPodSelector() *metav1.LabelSelector {
 // contourFinalized returns true if contour is finalized.
 func contourFinalized(contour *operatorv1alpha1.Contour) bool {
 	for _, f := range contour.Finalizers {
-		if f == contourFinalizer {
+		if f == ContourFinalizer {
 			return true
 		}
 	}

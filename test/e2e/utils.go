@@ -23,7 +23,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	oputil "github.com/projectcontour/contour-operator/util"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -58,7 +58,7 @@ func newClient() (client.Client, error) {
 }
 
 func newDefaultContour(ctx context.Context, cl client.Client, name, ns string) (*operatorv1alpha1.Contour, error) {
-	cntr := oputil.NewContour(name, ns)
+	cntr := objutil.NewContour(name, ns)
 	if err := cl.Create(ctx, cntr); err != nil {
 		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
@@ -66,7 +66,7 @@ func newDefaultContour(ctx context.Context, cl client.Client, name, ns string) (
 }
 
 func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool) (*operatorv1alpha1.Contour, error) {
-	cntr := oputil.NewContour(name, ns)
+	cntr := objutil.NewContour(name, ns)
 	cntr.Spec.Namespace.Name = specNs
 	cntr.Spec.Namespace.RemoveOnDeletion = remove
 	if err := cl.Create(ctx, cntr); err != nil {
@@ -76,7 +76,7 @@ func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, 
 }
 
 func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
-	cntr := oputil.NewContour(name, ns)
+	cntr := objutil.NewContour(name, ns)
 	if err := cl.Delete(ctx, cntr); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
@@ -104,7 +104,7 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func newDeployment(ctx context.Context, cl client.Client, name, ns, image string, replicas int) error {
-	deploy := oputil.NewDeployment(name, ns, image, replicas)
+	deploy := objutil.NewDeployment(name, ns, image, replicas)
 	if err := cl.Create(ctx, deploy); err != nil {
 		return fmt.Errorf("failed to create deployment %s/%s: %v", deploy.Namespace, deploy.Name, err)
 	}
@@ -112,7 +112,7 @@ func newDeployment(ctx context.Context, cl client.Client, name, ns, image string
 }
 
 func newClusterIPService(ctx context.Context, cl client.Client, name, ns string, port, targetPort int) error {
-	svc := oputil.NewClusterIPService(ns, name, port, targetPort)
+	svc := objutil.NewClusterIPService(ns, name, port, targetPort)
 	if err := cl.Create(ctx, svc); err != nil {
 		return fmt.Errorf("failed to create service %s/%s: %v", svc.Namespace, svc.Name, err)
 	}
@@ -120,7 +120,7 @@ func newClusterIPService(ctx context.Context, cl client.Client, name, ns string,
 }
 
 func newIngress(ctx context.Context, cl client.Client, name, ns, backendName string, backendPort int) error {
-	ing := oputil.NewIngress(name, ns, backendName, backendPort)
+	ing := objutil.NewIngress(name, ns, backendName, backendPort)
 	if err := cl.Create(ctx, ing); err != nil {
 		return fmt.Errorf("failed to create ingress %s/%s: %v", ing.Namespace, ing.Name, err)
 	}
@@ -216,7 +216,7 @@ func waitForHTTPResponse(url string, timeout time.Duration) error {
 }
 
 func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := oputil.NewNamespace(name)
+	ns := objutil.NewNamespace(name)
 	if err := cl.Delete(ctx, ns); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
@@ -243,7 +243,7 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 }
 
 func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := oputil.NewNamespace(name)
+	ns := objutil.NewNamespace(name)
 
 	key := types.NamespacedName{
 		Name: ns.Name,
