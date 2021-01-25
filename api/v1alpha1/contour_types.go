@@ -27,10 +27,6 @@ const (
 	// OwningContourNsLabel is the owner reference label used for a Contour
 	// created by the operator. The value should be the namespace of the contour.
 	OwningContourNsLabel = "contour.operator.projectcontour.io/owning-contour-namespace"
-
-	// DefaultContourSpecNs is the default name when spec.Namespace.Name of a Contour
-	// is unspecified.
-	DefaultContourSpecNs = "projectcontour"
 )
 
 // +kubebuilder:object:root=true
@@ -77,6 +73,7 @@ type ContourSpec struct {
 	//
 	// See each field for additional details.
 	//
+	// +kubebuilder:default={envoy: {type: LoadBalancerService, containerPorts: {{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}}}
 	NetworkPublishing NetworkPublishing `json:"networkPublishing,omitempty"`
 }
 
@@ -106,10 +103,14 @@ type NetworkPublishing struct {
 	// Envoy provides the schema for publishing the network endpoints of Envoy.
 	//
 	// If unset, defaults to:
-	//   type:               LoadBalancerService
-	//   httpContainerPort:  80
-	//   httpsContainerPort: 443
+	//   type: LoadBalancerService
+	//   containerPorts:
+	//   - name: http
+	//     portNumber: 8080
+	//   - name: https
+	//     portNumber: 8443
 	//
+	// +kubebuilder:default={type: LoadBalancerService, loadBalancer: {scope: External, providerParameters: {type: AWS}}, containerPorts: {{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}}
 	Envoy EnvoyNetworkPublishing `json:"envoy,omitempty"`
 }
 
@@ -145,29 +146,28 @@ type EnvoyNetworkPublishing struct {
 	//
 	// If unspecified, defaults to an external Classic AWS ELB.
 	//
+	// +kubebuilder:default={scope: External, providerParameters: {type: AWS}}
 	LoadBalancer LoadBalancerStrategy `json:"loadBalancer,omitempty"`
 
-	// HTTPContainerPort is the HTTP port number to expose on the Envoy container.
-	// This must be a valid port number, 1 < x < 65536 and differ from
-	// HttpsContainerPort.
+	// ContainerPorts is a list of container ports to expose from the Envoy container(s).
+	// Exposing a port here gives the system additional information about the network
+	// connections the Envoy container uses, but is primarily informational. Not specifying
+	// a port here DOES NOT prevent that port from being exposed by Envoy. Any port which is
+	// listening on the default "0.0.0.0" address inside the Envoy container will be accessible
+	// from the network. Names and port numbers must be unique in the list container ports. Two
+	// ports must be specified, one named "http" for Envoy's insecure service and one named
+	// "https" for Envoy's secure service.
 	//
-	// If unset, defaults to 80.
+	// TODO [danehans]: Update minItems to 1, requiring only https when the following issue
+	// is fixed: https://github.com/projectcontour/contour/issues/2577.
 	//
-	// +kubebuilder:default=80
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	HTTPContainerPort int `json:"httpContainerPort,omitempty"`
-
-	// HTTPSContainerPort is the HTTPS port number to expose on the Envoy container.
-	// This must be a valid port number, 1 < x < 65536 and differ from
-	// HttpContainerPort.
+	// TODO [danehans]: Increase maxItems when https://github.com/projectcontour/contour/pull/3263
+	// is implemented.
 	//
-	// If unset, defaults to 443.
-	//
-	// +kubebuilder:default=443
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	HTTPSContainerPort int `json:"httpsContainerPort,omitempty"`
+	// +kubebuilder:validation:MinItems=2
+	// +kubebuilder:validation:MaxItems=2
+	// +kubebuilder:default={{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}
+	ContainerPorts []ContainerPort `json:"containerPorts,omitempty"`
 }
 
 // EndpointPublishingType is a way to publish network endpoints.
@@ -236,6 +236,23 @@ const (
 	AzureLoadBalancerProvider LoadBalancerProviderType = "Azure"
 	GCPLoadBalancerProvider   LoadBalancerProviderType = "GCP"
 )
+
+// ContainerPort is the schema to specify a network port for a container.
+// A container port gives the system additional information about network
+// connections a container uses, but is primarily informational.
+type ContainerPort struct {
+	// Name is an IANA_SVC_NAME within the pod.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// PortNumber is the network port number to expose on the envoy pod.
+	// The number must be greater than 0 and less than 65536.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	PortNumber int32 `json:"portNumber"`
+}
 
 const (
 	// Available indicates that the contour is running and available.
