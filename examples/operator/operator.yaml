@@ -898,6 +898,7 @@ spec:
                             unit:
                               description: Unit defines the period of time within
                                 which requests over the limit will be rate limited.
+                                Valid values are "second", "minute" and "hour".
                               enum:
                               - second
                               - minute
@@ -1558,7 +1559,8 @@ spec:
                             type: integer
                           unit:
                             description: Unit defines the period of time within which
-                              requests over the limit will be rate limited.
+                              requests over the limit will be rate limited. Valid
+                              values are "second", "minute" and "hour".
                             enum:
                             - second
                             - minute
