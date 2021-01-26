@@ -58,9 +58,6 @@ const (
 	envoyCfgVolMntDir = "config"
 	// envoyCfgFileName is the name of the Envoy configuration file.
 	envoyCfgFileName = "envoy.json"
-	// envoyDaemonSetLabel identifies a daemonset as a contour daemonset,
-	// and the value is the name of the owning contour.
-	envoyDaemonSetLabel = "contour.operator.projectcontour.io/daemonset-envoy"
 	// xdsResourceVersion is the version of the Envoy xdS resource types.
 	xdsResourceVersion = "v3"
 )
@@ -80,6 +77,13 @@ func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 			return updated, nil
 		}
 		return nil, fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
+
+	differ := utilequality.DaemonSetSelectorsDiffer(current, desired)
+	if differ {
+		r.Log.Info("selectors differ and are immutable, recreating daemonset %s/%s",
+			"namespace", current.Namespace, "name", current.Name)
+		return nil, r.ensureDaemonSetDeleted(ctx, contour)
 	}
 
 	updated, err := r.updateDaemonSetIfNeeded(ctx, current, desired)
@@ -312,7 +316,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		Spec: appsv1.DaemonSetSpec{
 			RevisionHistoryLimit: pointer.Int32Ptr(int32(10)),
 			// Ensure the deamonset adopts only its own pods.
-			Selector: envoyDaemonSetPodSelector(contour),
+			Selector: envoyDaemonSetPodSelector(),
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
 				Type: appsv1.RollingUpdateDaemonSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDaemonSet{
@@ -328,7 +332,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 						"prometheus.io/port":   "8002",
 						"prometheus.io/path":   "/stats/prometheus",
 					},
-					Labels: envoyDaemonSetPodSelector(contour).MatchLabels,
+					Labels: envoyDaemonSetPodSelector().MatchLabels,
 				},
 				Spec: corev1.PodSpec{
 					Containers:     containers,
