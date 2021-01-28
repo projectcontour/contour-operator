@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package parse
 
 import (
 	// Import the hash implementations or this package will panic if
@@ -24,9 +24,9 @@ import (
 	"github.com/docker/distribution/reference"
 )
 
-// ParseImage parses s, returning and error if s is not a syntactically
-// valid image reference. ParseImage does not not handle short digests.
-func ParseImage(s string) error {
+// Image parses s, returning and error if s is not a syntactically
+// valid image reference. Image does not not handle short digests.
+func Image(s string) error {
 	_, err := reference.Parse(s)
 	if err != nil {
 		return fmt.Errorf("failed to parse s %s: %w", s, err)

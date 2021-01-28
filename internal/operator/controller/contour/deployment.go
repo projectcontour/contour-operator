@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	oputil "github.com/projectcontour/contour-operator/util"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
+	"github.com/projectcontour/contour-operator/internal/equality"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -68,8 +68,8 @@ const (
 )
 
 // ensureDeployment ensures a deployment exists for the given contour.
-func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
-	desired, err := DesiredDeployment(contour, r.Config.ContourImage)
+func (r *reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
+	desired, err := DesiredDeployment(contour, r.config.ContourImage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build deployment: %w", err)
 	}
@@ -86,9 +86,9 @@ func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 		return nil, fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	differ := utilequality.DeploymentSelectorsDiffer(current, desired)
+	differ := equality.DeploymentSelectorsDiffer(current, desired)
 	if differ {
-		r.Log.Info("selectors differ and are immutable, recreating deployment %s/%s",
+		r.log.Info("selectors differ and are immutable, recreating deployment %s/%s",
 			"namespace", current.Namespace, "name", current.Name)
 		return nil, r.ensureDeploymentDeleted(ctx, contour)
 	}
@@ -103,7 +103,7 @@ func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 
 // ensureDeploymentDeleted ensures the deployment for the provided contour
 // is deleted.
-func (r *Reconciler) ensureDeploymentDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureDeploymentDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -111,13 +111,13 @@ func (r *Reconciler) ensureDeploymentDeleted(ctx context.Context, contour *opera
 		},
 	}
 
-	if err := r.Client.Delete(ctx, deployment); err != nil {
+	if err := r.client.Delete(ctx, deployment); err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	r.Log.Info("deleted deployment", "namespace", deployment.Namespace, "name", deployment.Name)
+	r.log.Info("deleted deployment", "namespace", deployment.Namespace, "name", deployment.Name)
 
 	return nil
 }
@@ -320,7 +320,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 					ServiceAccountName:            contourRbacName,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
-					SecurityContext:               oputil.NewUnprivilegedPodSecurity(),
+					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
 				},
 			},
@@ -331,14 +331,14 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 }
 
 // currentDeployment returns the current Deployment resource for the provided contour.
-func (r *Reconciler) currentDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
+func (r *reconciler) currentDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
 	deploy := &appsv1.Deployment{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      contourDeploymentName,
 	}
 
-	if err := r.Client.Get(ctx, key, deploy); err != nil {
+	if err := r.client.Get(ctx, key, deploy); err != nil {
 		return nil, err
 	}
 
@@ -346,26 +346,26 @@ func (r *Reconciler) currentDeployment(ctx context.Context, contour *operatorv1a
 }
 
 // createDeployment creates a Deployment resource for the provided deploy.
-func (r *Reconciler) createDeployment(ctx context.Context, deploy *appsv1.Deployment) (*appsv1.Deployment, error) {
-	if err := r.Client.Create(ctx, deploy); err != nil {
+func (r *reconciler) createDeployment(ctx context.Context, deploy *appsv1.Deployment) (*appsv1.Deployment, error) {
+	if err := r.client.Create(ctx, deploy); err != nil {
 		return nil, fmt.Errorf("failed to create deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 	}
-	r.Log.Info("created deployment", "namespace", deploy.Namespace, "name", deploy.Name)
+	r.log.Info("created deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 
 	return deploy, nil
 }
 
 // updateDeploymentIfNeeded updates a Deployment if current does not match desired.
-func (r *Reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
-	deploy, updated := utilequality.DeploymentConfigChanged(current, desired)
+func (r *reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
+	deploy, updated := equality.DeploymentConfigChanged(current, desired)
 	if updated {
-		if err := r.Client.Update(ctx, deploy); err != nil {
+		if err := r.client.Update(ctx, deploy); err != nil {
 			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 		}
-		r.Log.Info("updated deployment", "namespace", deploy.Namespace, "name", deploy.Name)
+		r.log.Info("updated deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 		return deploy, nil
 	}
-	r.Log.Info("deployment unchanged; skipped updating deployment",
+	r.log.Info("deployment unchanged; skipped updating deployment",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return current, nil

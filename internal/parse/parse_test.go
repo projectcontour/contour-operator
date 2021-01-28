@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package parse
 
 import (
 	"testing"
@@ -62,7 +62,7 @@ func TestParse(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		err := ParseImage(tc.image)
+		err := Image(tc.image)
 		switch {
 		case err != nil && tc.expected:
 			t.Fatalf("%q: %v", tc.description, err)

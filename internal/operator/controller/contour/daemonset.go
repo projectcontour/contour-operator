@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
+	"github.com/projectcontour/contour-operator/internal/equality"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,8 +63,8 @@ const (
 )
 
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
-func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
-	desired := DesiredDaemonSet(contour, r.Config.ContourImage, r.Config.EnvoyImage)
+func (r *reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
+	desired := DesiredDaemonSet(contour, r.config.ContourImage, r.config.EnvoyImage)
 
 	current, err := r.currentDaemonSet(ctx, contour)
 	if err != nil {
@@ -79,9 +79,9 @@ func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 		return nil, fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 
-	differ := utilequality.DaemonSetSelectorsDiffer(current, desired)
+	differ := equality.DaemonSetSelectorsDiffer(current, desired)
 	if differ {
-		r.Log.Info("selectors differ and are immutable, recreating daemonset %s/%s",
+		r.log.Info("selectors differ and are immutable, recreating daemonset %s/%s",
 			"namespace", current.Namespace, "name", current.Name)
 		return nil, r.ensureDaemonSetDeleted(ctx, contour)
 	}
@@ -95,7 +95,7 @@ func (r *Reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 }
 
 // ensureDaemonSetDeleted ensures the DaemonSet for the provided contour is deleted.
-func (r *Reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -103,13 +103,13 @@ func (r *Reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operat
 		},
 	}
 
-	if err := r.Client.Delete(ctx, ds); err != nil {
+	if err := r.client.Delete(ctx, ds); err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to delete daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
-	r.Log.Info("deleted daemonset", "namespace", ds.Namespace, "name", ds.Name)
+	r.log.Info("deleted daemonset", "namespace", ds.Namespace, "name", ds.Name)
 
 	return nil
 }
@@ -371,14 +371,14 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 }
 
 // currentDaemonSet returns the current DaemonSet resource for the provided contour.
-func (r *Reconciler) currentDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
+func (r *reconciler) currentDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      envoyDaemonSetName,
 	}
 
-	if err := r.Client.Get(ctx, key, ds); err != nil {
+	if err := r.client.Get(ctx, key, ds); err != nil {
 		return nil, err
 	}
 
@@ -386,26 +386,26 @@ func (r *Reconciler) currentDaemonSet(ctx context.Context, contour *operatorv1al
 }
 
 // createDaemonSet creates a DaemonSet resource for the provided ds.
-func (r *Reconciler) createDaemonSet(ctx context.Context, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
-	if err := r.Client.Create(ctx, ds); err != nil {
+func (r *reconciler) createDaemonSet(ctx context.Context, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+	if err := r.client.Create(ctx, ds); err != nil {
 		return nil, fmt.Errorf("failed to create daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 	}
-	r.Log.Info("created daemonset", "namespace", ds.Namespace, "name", ds.Name)
+	r.log.Info("created daemonset", "namespace", ds.Namespace, "name", ds.Name)
 
 	return ds, nil
 }
 
 // updateDaemonSetIfNeeded updates a DaemonSet if current does not match desired.
-func (r *Reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
-	ds, updated := utilequality.DaemonsetConfigChanged(current, desired)
+func (r *reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+	ds, updated := equality.DaemonsetConfigChanged(current, desired)
 	if updated {
-		if err := r.Client.Update(ctx, ds); err != nil {
+		if err := r.client.Update(ctx, ds); err != nil {
 			return nil, fmt.Errorf("failed to update daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 		}
-		r.Log.Info("updated daemonset", "namespace", ds.Namespace, "name", ds.Name)
+		r.log.Info("updated daemonset", "namespace", ds.Namespace, "name", ds.Name)
 		return ds, nil
 	}
-	r.Log.Info("daemonset unchanged; skipped updating daemonset",
+	r.log.Info("daemonset unchanged; skipped updating daemonset",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return current, nil

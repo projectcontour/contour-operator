@@ -17,85 +17,56 @@ import (
 	"flag"
 	"os"
 
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
-	"github.com/projectcontour/contour-operator/controller/manager"
-	oputil "github.com/projectcontour/contour-operator/util"
+	"github.com/projectcontour/contour-operator/internal/operator"
+	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+	parse "github.com/projectcontour/contour-operator/internal/parse"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
-	scheme = runtime.NewScheme()
-)
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = operatorv1alpha1.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
-}
-
-var (
-	contourImage         string
-	envoyImage           string
-	metricsAddr          string
-	enableLeaderElection bool
+	opCfg operatorconfig.Config
 )
 
 func main() {
-	flag.StringVar(&contourImage, "contour-image", "docker.io/projectcontour/contour:main",
+	flag.StringVar(&opCfg.ContourImage, "contour-image", operatorconfig.DefaultContourImage,
 		"The container image used for the managed Contour.")
-	flag.StringVar(&envoyImage, "envoy-image", "docker.io/envoyproxy/envoy:v1.17.0",
+	flag.StringVar(&opCfg.EnvoyImage, "envoy-image", operatorconfig.DefaultEnvoyImage,
 		"The container image used for the managed Envoy.")
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-addr", operatorconfig.DefaultMetricsAddr, "The "+
+		"address the metric endpoint binds to. It can be set to \"0\" to disable serving metrics.")
+	flag.BoolVar(&opCfg.LeaderElection, "enable-leader-election", operatorconfig.DefaultEnableLeaderElection,
+		"Enable leader election for the operator. Enabling this will ensure there is only one active operator.")
 	flag.Parse()
+
+	opCfg.LeaderElectionID = operatorconfig.DefaultEnableLeaderElectionID
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog := ctrl.Log.WithName("setup")
 
-	images := []string{contourImage, envoyImage}
+	images := []string{opCfg.ContourImage, opCfg.EnvoyImage}
 	for _, image := range images {
 		// Parse will not handle short digests.
-		if err := oputil.ParseImage(image); err != nil {
+		if err := parse.Image(image); err != nil {
 			setupLog.Error(err, "invalid image reference", "value", image)
 			os.Exit(1)
 		}
 	}
 
-	mgrOpts := ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "0d879e31.projectcontour.io",
-	}
+	setupLog.Info("using contour", "image", opCfg.ContourImage)
+	setupLog.Info("using envoy", "image", opCfg.EnvoyImage)
 
-	cntrCfg := contourcontroller.Config{
-		ContourImage: contourImage,
-		EnvoyImage:   envoyImage,
-	}
-	setupLog.Info("using contour", "image", cntrCfg.ContourImage)
-	setupLog.Info("using envoy", "image", cntrCfg.EnvoyImage)
-
-	mgr, err := manager.NewContourManager(mgrOpts, cntrCfg)
+	op, err := operator.New(ctrl.GetConfigOrDie(), &opCfg)
 	if err != nil {
-		setupLog.Error(err, "failed to create a manager")
+		setupLog.Error(err, "failed to create contour operator")
 		os.Exit(1)
 	}
 
-	// +kubebuilder:scaffold:builder
-
-	setupLog.Info("starting contour-operator")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "failed to start contour-operator")
+	setupLog.Info("starting contour operator")
+	if err := op.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "failed to start contour operator")
 		os.Exit(1)
 	}
 }

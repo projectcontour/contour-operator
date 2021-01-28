@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
+	"github.com/projectcontour/contour-operator/internal/equality"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +46,7 @@ const (
 )
 
 // ensureContourService ensures that a Contour Service exists for the given contour.
-func (r *Reconciler) ensureContourService(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureContourService(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	desired := DesiredContourService(contour)
 
 	current, err := r.currentContourService(ctx, contour)
@@ -65,7 +65,7 @@ func (r *Reconciler) ensureContourService(ctx context.Context, contour *operator
 }
 
 // ensureEnvoyService ensures that an Envoy Service exists for the given contour.
-func (r *Reconciler) ensureEnvoyService(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureEnvoyService(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	desired := DesiredEnvoyService(contour)
 
 	current, err := r.currentEnvoyService(ctx, contour)
@@ -85,7 +85,7 @@ func (r *Reconciler) ensureEnvoyService(ctx context.Context, contour *operatorv1
 
 // ensureContourServiceDeleted ensures that a Contour Service for the
 // provided contour is deleted.
-func (r *Reconciler) ensureContourServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureContourServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -93,20 +93,20 @@ func (r *Reconciler) ensureContourServiceDeleted(ctx context.Context, contour *o
 		},
 	}
 
-	if err := r.Client.Delete(ctx, svc); err != nil {
+	if err := r.client.Delete(ctx, svc); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete service %s/%s: %w", svc.Namespace, svc.Name, err)
 		}
 		return nil
 	}
-	r.Log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
+	r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 
 	return nil
 }
 
 // ensureEnvoyServiceDeleted ensures that an Envoy Service for the
 // provided contour is deleted.
-func (r *Reconciler) ensureEnvoyServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureEnvoyServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -114,13 +114,13 @@ func (r *Reconciler) ensureEnvoyServiceDeleted(ctx context.Context, contour *ope
 		},
 	}
 
-	if err := r.Client.Delete(ctx, svc); err != nil {
+	if err := r.client.Delete(ctx, svc); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete service %s/%s: %w", svc.Namespace, svc.Name, err)
 		}
 		return nil
 	}
-	r.Log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
+	r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 
 	return nil
 }
@@ -184,13 +184,13 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 }
 
 // currentContourService returns the current Contour Service for the provided contour.
-func (r *Reconciler) currentContourService(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
+func (r *reconciler) currentContourService(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
 	current := &corev1.Service{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      contourSvcName,
 	}
-	err := r.Client.Get(ctx, key, current)
+	err := r.client.Get(ctx, key, current)
 	if err != nil {
 		return nil, err
 	}
@@ -198,13 +198,13 @@ func (r *Reconciler) currentContourService(ctx context.Context, contour *operato
 }
 
 // currentEnvoyService returns the current Envoy Service for the provided contour.
-func (r *Reconciler) currentEnvoyService(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
+func (r *reconciler) currentEnvoyService(ctx context.Context, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
 	current := &corev1.Service{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
 		Name:      envoySvcName,
 	}
-	err := r.Client.Get(ctx, key, current)
+	err := r.client.Get(ctx, key, current)
 	if err != nil {
 		return nil, err
 	}
@@ -212,42 +212,42 @@ func (r *Reconciler) currentEnvoyService(ctx context.Context, contour *operatorv
 }
 
 // createService creates a Service resource for the provided svc.
-func (r *Reconciler) createService(ctx context.Context, svc *corev1.Service) error {
-	if err := r.Client.Create(ctx, svc); err != nil {
+func (r *reconciler) createService(ctx context.Context, svc *corev1.Service) error {
+	if err := r.client.Create(ctx, svc); err != nil {
 		return fmt.Errorf("failed to create service %s/%s: %w", svc.Namespace, svc.Name, err)
 	}
-	r.Log.Info("created service", "namespace", svc.Namespace, "name", svc.Name)
+	r.log.Info("created service", "namespace", svc.Namespace, "name", svc.Name)
 
 	return nil
 }
 
 // updateContourServiceIfNeeded updates a Contour Service if current does not match desired.
-func (r *Reconciler) updateContourServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
-	svc, updated := utilequality.ClusterIPServiceChanged(current, desired)
+func (r *reconciler) updateContourServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
+	svc, updated := equality.ClusterIPServiceChanged(current, desired)
 	if updated {
-		if err := r.Client.Update(ctx, svc); err != nil {
+		if err := r.client.Update(ctx, svc); err != nil {
 			return fmt.Errorf("failed to update service %s/%s: %w", svc.Namespace, svc.Name, err)
 		}
-		r.Log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
+		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
 		return nil
 	}
-	r.Log.Info("service unchanged; skipped updating service",
+	r.log.Info("service unchanged; skipped updating service",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return nil
 }
 
 // updateEnvoyServiceIfNeeded updates an Envoy Service if current does not match desired.
-func (r *Reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
-	svc, updated := utilequality.LoadBalancerServiceChanged(current, desired)
+func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
+	svc, updated := equality.LoadBalancerServiceChanged(current, desired)
 	if updated {
-		if err := r.Client.Update(ctx, svc); err != nil {
+		if err := r.client.Update(ctx, svc); err != nil {
 			return fmt.Errorf("failed to update service %s/%s: %w", svc.Namespace, svc.Name, err)
 		}
-		r.Log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
+		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
 		return nil
 	}
-	r.Log.Info("service unchanged; skipped updating service",
+	r.log.Info("service unchanged; skipped updating service",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return nil

@@ -16,6 +16,8 @@ package contour
 import (
 	"testing"
 
+	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -44,9 +46,9 @@ func checkJobHasContainer(t *testing.T, job *batchv1.Job, name string) *corev1.C
 }
 
 func TestDesiredJob(t *testing.T) {
-	job := DesiredJob(cntr, contourImage)
+	job := DesiredJob(cntr, operatorconfig.DefaultContourImage)
 
 	container := checkJobHasContainer(t, job, jobContainerName)
-	checkContainerHasImage(t, container, contourImage)
+	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
 	checkJobHasEnvVar(t, job, jobNsEnvVar)
 }

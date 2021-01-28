@@ -28,17 +28,17 @@ import (
 var namespaceCoreList = []string{"contour-operator", "default", "kube-system"}
 
 // ensureNamespace ensures the namespace for the provided name exists.
-func (r *Reconciler) ensureNamespace(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureNamespace(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	name := contour.Spec.Namespace.Name
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if err := r.Client.Create(ctx, ns); err != nil {
+	if err := r.client.Create(ctx, ns); err != nil {
 		if errors.IsAlreadyExists(err) {
-			r.Log.Info("namespace exists", "name", ns.Name)
+			r.log.Info("namespace exists", "name", ns.Name)
 			return nil
 		}
 		return fmt.Errorf("failed to create namespace %s: %w", ns.Name, err)
 	}
-	r.Log.Info("created namespace", "name", ns.Name)
+	r.log.Info("created namespace", "name", ns.Name)
 	return nil
 }
 
@@ -47,16 +47,16 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, contour *operatorv1alp
 //   - RemoveOnDeletion is unspecified or set to false.
 //   - Another contour exists in the same namespace.
 //   - The namespace of contour matches a name in namespaceCoreList.
-func (r *Reconciler) ensureNamespaceRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *reconciler) ensureNamespaceRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	name := contour.Spec.Namespace.Name
 	if !contour.Spec.Namespace.RemoveOnDeletion {
-		r.Log.Info("remove on deletion is not set for contour; skipping removal of namespace",
+		r.log.Info("remove on deletion is not set for contour; skipping removal of namespace",
 			"contour_namespace", contour.Namespace, "contour_name", contour.Name, "namespace", name)
 		return nil
 	}
 	for _, ns := range namespaceCoreList {
 		if name == ns {
-			r.Log.Info("namespace of contour matches core list; skipping namespace removal",
+			r.log.Info("namespace of contour matches core list; skipping namespace removal",
 				"contour_namespace", contour.Namespace, "contour_name", contour.Name, "namespace", name)
 			return nil
 		}
@@ -67,16 +67,16 @@ func (r *Reconciler) ensureNamespaceRemoved(ctx context.Context, contour *operat
 	}
 	if !exist {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-		if err := r.Client.Delete(ctx, ns); err != nil {
+		if err := r.client.Delete(ctx, ns); err != nil {
 			if errors.IsNotFound(err) {
-				r.Log.Info("namespace does not exist", "name", ns.Name)
+				r.log.Info("namespace does not exist", "name", ns.Name)
 				return nil
 			}
 			return fmt.Errorf("failed to delete namespace %s: %w", ns.Name, err)
 		}
-		r.Log.Info("deleted namespace", "name", ns.Name)
+		r.log.Info("deleted namespace", "name", ns.Name)
 		return nil
 	}
-	r.Log.Info("other contours with same spec namespace; skipping namespace removal", "name", name)
+	r.log.Info("other contours with same spec namespace; skipping namespace removal", "name", name)
 	return nil
 }

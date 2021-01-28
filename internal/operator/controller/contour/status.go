@@ -19,8 +19,8 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	utilequality "github.com/projectcontour/contour-operator/util/equality"
-	retryable "github.com/projectcontour/contour-operator/util/retryableerror"
+	"github.com/projectcontour/contour-operator/internal/equality"
+	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +33,7 @@ var clock utilclock.Clock = utilclock.RealClock{}
 
 // syncContourStatus computes the current status of contour and updates status upon
 // any changes since last sync.
-func (r *Reconciler) syncContourStatus(ctx context.Context, contour *operatorv1alpha1.Contour, deployment *appsv1.Deployment, ds *appsv1.DaemonSet) error {
+func (r *reconciler) syncContourStatus(ctx context.Context, contour *operatorv1alpha1.Contour, deployment *appsv1.Deployment, ds *appsv1.DaemonSet) error {
 	var errs []error
 	updated := contour.DeepCopy()
 	if deployment != nil {
@@ -44,8 +44,8 @@ func (r *Reconciler) syncContourStatus(ctx context.Context, contour *operatorv1a
 	}
 	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeContourAvailableCondition(deployment, ds))
 
-	if utilequality.ContourStatusChanged(contour.Status, updated.Status) {
-		if err := r.Client.Status().Update(ctx, updated); err != nil {
+	if equality.ContourStatusChanged(contour.Status, updated.Status) {
+		if err := r.client.Status().Update(ctx, updated); err != nil {
 			errs = append(errs, fmt.Errorf("failed to update contour %s/%s status: %w", contour.Namespace,
 				contour.Name, err))
 		}
