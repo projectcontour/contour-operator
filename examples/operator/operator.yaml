@@ -69,6 +69,139 @@ spec:
                       namespace. \n 2. Another Contour exists in the namespace."
                     type: boolean
                 type: object
+              networkPublishing:
+                default:
+                  envoy:
+                    containerPorts:
+                    - name: http
+                      portNumber: 8080
+                    - name: https
+                      portNumber: 8443
+                    type: LoadBalancerService
+                description: "NetworkPublishing defines the schema for publishing
+                  Contour to a network. \n See each field for additional details."
+                properties:
+                  envoy:
+                    default:
+                      containerPorts:
+                      - name: http
+                        portNumber: 8080
+                      - name: https
+                        portNumber: 8443
+                      loadBalancer:
+                        providerParameters:
+                          type: AWS
+                        scope: External
+                      type: LoadBalancerService
+                    description: "Envoy provides the schema for publishing the network
+                      endpoints of Envoy. \n If unset, defaults to:   type: LoadBalancerService
+                      \  containerPorts:   - name: http     portNumber: 8080   - name:
+                      https     portNumber: 8443"
+                    properties:
+                      containerPorts:
+                        default:
+                        - name: http
+                          portNumber: 8080
+                        - name: https
+                          portNumber: 8443
+                        description: "ContainerPorts is a list of container ports
+                          to expose from the Envoy container(s). Exposing a port here
+                          gives the system additional information about the network
+                          connections the Envoy container uses, but is primarily informational.
+                          Not specifying a port here DOES NOT prevent that port from
+                          being exposed by Envoy. Any port which is listening on the
+                          default \"0.0.0.0\" address inside the Envoy container will
+                          be accessible from the network. Names and port numbers must
+                          be unique in the list container ports. Two ports must be
+                          specified, one named \"http\" for Envoy's insecure service
+                          and one named \"https\" for Envoy's secure service. \n TODO
+                          [danehans]: Update minItems to 1, requiring only https when
+                          the following issue is fixed: https://github.com/projectcontour/contour/issues/2577.
+                          \n TODO [danehans]: Increase maxItems when https://github.com/projectcontour/contour/pull/3263
+                          is implemented."
+                        items:
+                          description: ContainerPort is the schema to specify a network
+                            port for a container. A container port gives the system
+                            additional information about network connections a container
+                            uses, but is primarily informational.
+                          properties:
+                            name:
+                              description: Name is an IANA_SVC_NAME within the pod.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            portNumber:
+                              description: PortNumber is the network port number to
+                                expose on the envoy pod. The number must be greater
+                                than 0 and less than 65536.
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                          required:
+                          - name
+                          - portNumber
+                          type: object
+                        maxItems: 2
+                        minItems: 2
+                        type: array
+                      loadBalancer:
+                        default:
+                          providerParameters:
+                            type: AWS
+                          scope: External
+                        description: "loadBalancer holds parameters for the load balancer.
+                          Present only if type is LoadBalancerService. \n If unspecified,
+                          defaults to an external Classic AWS ELB."
+                        properties:
+                          providerParameters:
+                            default:
+                              type: AWS
+                            description: providerParameters contains load balancer
+                              information specific to the underlying infrastructure
+                              provider.
+                            properties:
+                              type:
+                                default: AWS
+                                description: type is the underlying infrastructure
+                                  provider for the load balancer. Allowed values are
+                                  "AWS", "Azure", and "GCP".
+                                enum:
+                                - AWS
+                                - Azure
+                                - GCP
+                                type: string
+                            type: object
+                          scope:
+                            default: External
+                            description: Scope indicates the scope at which the load
+                              balancer is exposed. Possible values are "External"
+                              and "Internal".
+                            enum:
+                            - Internal
+                            - External
+                            type: string
+                        type: object
+                      type:
+                        default: LoadBalancerService
+                        description: "Type is the type of publishing strategy to use.
+                          Valid values are: \n * LoadBalancerService \n In this configuration,
+                          network endpoints for Envoy use container networking. A
+                          Kubernetes LoadBalancer Service is created to publish Envoy
+                          network endpoints. The Service uses port 80 to publish Envoy's
+                          HTTP network endpoint and port 443 to publish Envoy's HTTPS
+                          network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+                          \n * NodePortService \n Publishes Envoy network endpoints
+                          using a Kubernetes NodePort Service. \n In this configuration,
+                          Envoy network endpoints use container networking. A Kubernetes
+                          NodePort Service is created to publish the network endpoints.
+                          \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
+                        enum:
+                        - LoadBalancerService
+                        - NodePortService
+                        type: string
+                    type: object
+                type: object
               replicas:
                 default: 2
                 description: Replicas is the desired number of Contour replicas. If
