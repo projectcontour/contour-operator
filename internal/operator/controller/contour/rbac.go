@@ -18,17 +18,11 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	objutil "github.com/projectcontour/contour-operator/internal/object"
 
-	projectcontourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -46,266 +40,129 @@ const (
 // provided contour.
 func (r *reconciler) ensureRBAC(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	ns := contour.Spec.Namespace.Name
-	ctr := types.NamespacedName{Namespace: ns, Name: contourRbacName}
-	envoy := types.NamespacedName{Namespace: ns, Name: envoyRbacName}
-	certGen := types.NamespacedName{Namespace: ns, Name: certGenRbacName}
-	names := []types.NamespacedName{ctr, envoy, certGen}
+	names := []string{contourRbacName, envoyRbacName, certGenRbacName}
 	certSvcAct := &corev1.ServiceAccount{}
 	for _, name := range names {
-		svcAct, err := r.ensureServiceAccount(ctx, name)
+		svcAct, err := r.ensureServiceAccount(ctx, name, contour)
 		if err != nil {
-			return fmt.Errorf("failed to ensure service account for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+			return fmt.Errorf("failed to ensure service account %s/%s: %w", ns, name, err)
 		}
 		if svcAct.Name == certGenRbacName {
 			certSvcAct = svcAct
 		}
 	}
-	cr, err := r.ensureClusterRole(ctx, contourRbacName)
+	cr, err := r.ensureClusterRole(ctx, contourRbacName, contour)
 	if err != nil {
-		return fmt.Errorf("failed to ensure cluster role for contour %s/%s: %w", contour.Namespace,
-			contour.Name, err)
+		return fmt.Errorf("failed to ensure cluster role %s: %w", contourRbacName, err)
 	}
-	if err := r.ensureClusterRoleBinding(ctx, contourRbacName, cr.Name, ctr); err != nil {
-		return fmt.Errorf("failed to ensure cluster role binding for contour %s/%s: %w", contour.Namespace,
-			contour.Name, err)
+	if err := r.ensureClusterRoleBinding(ctx, contourRbacName, cr.Name, contourRbacName, contour); err != nil {
+		return fmt.Errorf("failed to ensure cluster role binding %s: %w", contourRbacName, err)
 	}
-	certRole, err := r.ensureRole(ctx, certGen)
+	certRole, err := r.ensureRole(ctx, certGenRbacName, contour)
 	if err != nil {
-		return fmt.Errorf("failed to ensure role for contour %s/%s: %w", contour.Namespace,
-			contour.Name, err)
+		return fmt.Errorf("failed to ensure role %s/%s: %w", ns, certGenRbacName, err)
 	}
-	if err := r.ensureRoleBinding(ctx, ctr, certSvcAct, certRole); err != nil {
-		return fmt.Errorf("failed to ensure role binding for contour %s/%s: %w", contour.Namespace,
-			contour.Name, err)
+	if err := r.ensureRoleBinding(ctx, contourRbacName, certSvcAct.Name, certRole.Name, contour); err != nil {
+		return fmt.Errorf("failed to ensure role binding %s/%s: %w", ns, contourRbacName, err)
 	}
 
-	return nil
-}
-
-// ensureServiceAccount ensures a ServiceAccount resource exists with the provided name.
-func (r *reconciler) ensureServiceAccount(ctx context.Context, name types.NamespacedName) (*corev1.ServiceAccount, error) {
-	sa := objutil.NewServiceAccount(name.Namespace, name.Name)
-	if err := r.client.Create(ctx, sa); err != nil {
-		if errors.IsAlreadyExists(err) {
-			r.log.Info("service account exists; skipped adding", "namespace", sa.Namespace, "name", sa.Name)
-			return sa, nil
-		}
-		return nil, fmt.Errorf("failed to create service account %s/%s: %w", sa.Namespace, sa.Name, err)
-	}
-	r.log.Info("created service account", "namespace", sa.Namespace, "name", sa.Name)
-	return sa, nil
-}
-
-// ensureClusterRole ensures a ClusterRole resource exists with the
-// provided name.
-func (r *reconciler) ensureClusterRole(ctx context.Context, name string) (*rbacv1.ClusterRole, error) {
-	cr := desiredClusterRole(name)
-	if err := r.client.Create(ctx, cr); err != nil {
-		if errors.IsAlreadyExists(err) {
-			r.log.Info("cluster role exists; skipped adding", "name", cr.Name)
-			return cr, nil
-		}
-		return nil, fmt.Errorf("failed to create cluster role %s: %w", cr.Name, err)
-	}
-	r.log.Info("created cluster role", "name", cr.Name)
-	return cr, nil
-}
-
-// desiredClusterRole constructs an instance of the desired ClusterRole resource
-// with the provided name.
-func desiredClusterRole(name string) *rbacv1.ClusterRole {
-	groupAll := []string{corev1.GroupName}
-	groupNet := []string{networkingv1.GroupName}
-	groupExt := []string{apiextensionsv1.GroupName}
-	groupContour := []string{projectcontourv1.GroupName}
-	verbCGU := []string{"create", "get", "update"}
-	verbGLW := []string{"get", "list", "watch"}
-
-	cfgMap := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupAll,
-		Resources: []string{"configmaps"},
-	}
-	endPt := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"endpoints"},
-	}
-	secret := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"secrets"},
-	}
-	svc := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"services"},
-	}
-	crd := rbacv1.PolicyRule{
-		Verbs:     []string{"list"},
-		APIGroups: groupExt,
-		Resources: []string{"customresourcedefinitions"},
-	}
-	svcAPI := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupNet,
-		// TODO [danehans]: Update roles when v1alpha1 Service APIs are released.
-		Resources: []string{"gatewayclasses", "gateways", "httproutes", "tcproutes"},
-	}
-	ing := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupNet,
-		Resources: []string{"ingresses"},
-	}
-	ingStatus := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupNet,
-		Resources: []string{"ingresses/status"},
-	}
-	cntr := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupContour,
-		Resources: []string{"httpproxies", "tlscertificatedelegations", "extensionservices"},
-	}
-	cntrStatus := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupContour,
-		Resources: []string{"httpproxies/status", "extensionservices/status"},
-	}
-
-	cr := objutil.NewClusterRole(name)
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, svcAPI, ing, ingStatus, cntr, cntrStatus, crd}
-	return cr
-}
-
-// ensureRole ensures a Role resource with the provided name exists.
-func (r *reconciler) ensureRole(ctx context.Context, name types.NamespacedName) (*rbacv1.Role, error) {
-	role := desiredRole(name)
-	if err := r.client.Create(ctx, role); err != nil {
-		if errors.IsAlreadyExists(err) {
-			r.log.Info("role exists; skipped adding", "namespace", role.Namespace, "name", role.Name)
-			return role, nil
-		}
-		return nil, fmt.Errorf("failed to create role %s/%s: %w", role.Namespace, role.Name, err)
-	}
-	r.log.Info("created role", "namespace", role.Namespace, "name", role.Name)
-	return role, nil
-}
-
-// desiredRole constructs an instance of the desired Role resource with
-// the provided name.
-func desiredRole(name types.NamespacedName) *rbacv1.Role {
-	groupAll := []string{""}
-	verbCU := []string{"create", "update"}
-	secret := rbacv1.PolicyRule{
-		Verbs:     verbCU,
-		APIGroups: groupAll,
-		Resources: []string{"secrets"},
-	}
-	role := objutil.NewRole(name.Namespace, name.Name)
-	role.Rules = []rbacv1.PolicyRule{secret}
-	return role
-}
-
-// ensureRoleBinding ensures a RoleBinding resource with the provided name exists.
-// The RoleBinding will use svcAct for the subject and role for the role reference.
-func (r *reconciler) ensureRoleBinding(ctx context.Context, name types.NamespacedName, svcAct *corev1.ServiceAccount, role *rbacv1.Role) error {
-	rb := objutil.NewRoleBinding(name.Namespace, name.Name)
-	rb.Subjects = []rbacv1.Subject{{
-		Kind:      "ServiceAccount",
-		APIGroup:  corev1.GroupName,
-		Name:      svcAct.Name,
-		Namespace: svcAct.Namespace,
-	}}
-	rb.RoleRef = rbacv1.RoleRef{
-		APIGroup: rbacv1.GroupName,
-		Kind:     "Role",
-		Name:     role.Name,
-	}
-
-	if err := r.client.Create(ctx, rb); err != nil {
-		if errors.IsAlreadyExists(err) {
-			r.log.Info("role binding exists; skipped adding", "name", rb.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to create role binding %s: %w", rb.Name, err)
-	}
-	r.log.Info("created role binding", "name", rb.Name)
-	return nil
-}
-
-// ensureClusterRoleBinding ensures a ClusterRoleBinding resource with the provided
-// name exists, using roleName for the role reference and svcAct for the subject.
-func (r *reconciler) ensureClusterRoleBinding(ctx context.Context, name, roleName string, svcAct types.NamespacedName) error {
-	crb := objutil.NewClusterRoleBinding(name)
-	crb.Subjects = []rbacv1.Subject{{
-		Kind:      "ServiceAccount",
-		APIGroup:  corev1.GroupName,
-		Name:      svcAct.Name,
-		Namespace: svcAct.Namespace,
-	},
-	}
-	crb.RoleRef = rbacv1.RoleRef{
-		APIGroup: rbacv1.GroupName,
-		Kind:     "ClusterRole",
-		Name:     roleName,
-	}
-
-	if err := r.client.Create(ctx, crb); err != nil {
-		if errors.IsAlreadyExists(err) {
-			r.log.Info("cluster role binding exists; skipped adding", "name", crb.Name)
-			return nil
-		}
-		return fmt.Errorf("failed to create cluster role binding %s: %w", crb.Name, err)
-	}
-	r.log.Info("created cluster role binding", "name", crb.Name)
 	return nil
 }
 
 // ensureRBACRemoved ensures all the necessary RBAC resources for the provided
-// contour do not exist.
+// contour are deleted if Contour owner labels exist.
 func (r *reconciler) ensureRBACRemoved(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	ns := contour.Spec.Namespace.Name
 	objectsToDelete := []runtime.Object{}
-	exist, err := r.otherContoursExistInSpecNs(ctx, contour)
+	contoursExist, err := r.otherContoursExistInSpecNs(ctx, contour)
 	if err != nil {
-		return fmt.Errorf("failed to verify if contours exist in namespace %s: %w",
+		return fmt.Errorf("failed to verify if contours contoursExist in namespace %s: %w",
 			contour.Spec.Namespace.Name, err)
 	}
-	if !exist {
-		cntrRoleBind := objutil.NewRoleBinding(ns, contourRbacName)
-		cntrRole := objutil.NewRole(ns, contourRbacName)
-		certRole := objutil.NewRole(ns, certGenRbacName)
-		objectsToDelete = append(objectsToDelete, cntrRoleBind, cntrRole, certRole)
+	if !contoursExist {
+		cntrRoleBind, err := r.currentRoleBinding(ctx, ns, contourRbacName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if cntrRoleBind != nil {
+			objectsToDelete = append(objectsToDelete, cntrRoleBind)
+		}
+		cntrRole, err := r.currentRole(ctx, ns, contourRbacName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if cntrRole != nil {
+			objectsToDelete = append(objectsToDelete, cntrRole)
+		}
+		certRole, err := r.currentRole(ctx, ns, certGenRbacName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if certRole != nil {
+			objectsToDelete = append(objectsToDelete, certRole)
+		}
 		names := []string{contourRbacName, envoyRbacName, certGenRbacName}
 		for _, name := range names {
-			svcAct := objutil.NewServiceAccount(ns, name)
-			objectsToDelete = append(objectsToDelete, svcAct)
+			svcAct, err := r.currentServiceAccount(ctx, ns, name)
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					return err
+				}
+			}
+			if svcAct != nil {
+				objectsToDelete = append(objectsToDelete, svcAct)
+			}
 		}
 	}
-	exist, _, err = r.otherContoursExist(ctx, contour)
+	contoursExist, _, err = r.otherContoursExist(ctx, contour)
 	if err != nil {
 		return fmt.Errorf("failed to verify if contours exist in any namespace: %w", err)
 	}
-	if !exist {
-		crb := objutil.NewClusterRoleBinding(contourRbacName)
-		cr := objutil.NewClusterRole(contourRbacName)
-		objectsToDelete = append(objectsToDelete, crb, cr)
+	if !contoursExist {
+		crb, err := r.currentClusterRoleBinding(ctx, contourRbacName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if crb != nil {
+			objectsToDelete = append(objectsToDelete, crb)
+		}
+		cr, err := r.currentClusterRole(ctx, contourRbacName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if cr != nil {
+			objectsToDelete = append(objectsToDelete, cr)
+		}
 	}
 	for _, object := range objectsToDelete {
 		kind := object.GetObjectKind().GroupVersionKind().Kind
 		namespace := object.(metav1.Object).GetNamespace()
 		name := object.(metav1.Object).GetName()
-		if err := r.client.Delete(ctx, object); err != nil {
-			if errors.IsNotFound(err) {
-				r.log.Info("object does not exist; skipping removal", "kind", kind, "namespace",
-					namespace, "name", name)
-				continue
+		if !ownerLabelsExist(object.(metav1.Object), contour) {
+			r.log.Info("object not labeled; skipping deletion", "kind", kind, "namespace", namespace,
+				"name", name)
+		} else {
+			if err := r.client.Delete(ctx, object); err != nil {
+				if errors.IsNotFound(err) {
+					r.log.Info("object does not exist; skipping removal", "kind", kind, "namespace",
+						namespace, "name", name)
+					continue
+				}
+				return fmt.Errorf("failed to delete %s %s/%s: %w", kind, namespace, name, err)
 			}
-			return fmt.Errorf("failed to delete %s %s/%s: %w", kind, namespace, name, err)
+			r.log.Info("deleted object", "kind", kind, "namespace", namespace, "name", name)
 		}
-		r.log.Info("deleted object", "kind", kind, "namespace", namespace, "name", name)
 	}
 	return utilerrors.NewAggregate(errs)
 }

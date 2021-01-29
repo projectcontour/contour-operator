@@ -17,10 +17,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/equality"
+	equality "github.com/projectcontour/contour-operator/internal/equality"
 	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -69,11 +68,7 @@ const (
 
 // ensureDeployment ensures a deployment exists for the given contour.
 func (r *reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
-	desired, err := DesiredDeployment(contour, r.config.ContourImage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build deployment: %w", err)
-	}
-
+	desired := DesiredDeployment(contour, r.config.ContourImage)
 	current, err := r.currentDeployment(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -93,7 +88,7 @@ func (r *reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 		return nil, r.ensureDeploymentDeleted(ctx, contour)
 	}
 
-	updated, err := r.updateDeploymentIfNeeded(ctx, current, desired)
+	updated, err := r.updateDeploymentIfNeeded(ctx, contour, current, desired)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
@@ -102,42 +97,34 @@ func (r *reconciler) ensureDeployment(ctx context.Context, contour *operatorv1al
 }
 
 // ensureDeploymentDeleted ensures the deployment for the provided contour
-// is deleted.
+// is deleted if Contour owner labels exist.
 func (r *reconciler) ensureDeploymentDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      contourDeploymentName,
-		},
-	}
-
-	if err := r.client.Delete(ctx, deployment); err != nil {
+	deploy, err := r.currentDeployment(ctx, contour)
+	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	r.log.Info("deleted deployment", "namespace", deployment.Namespace, "name", deployment.Name)
+
+	if !ownerLabelsExist(deploy, contour) {
+		r.log.Info("deployment not labeled; skipping deletion", "namespace", deploy.Namespace, "name", deploy.Name)
+	} else {
+		if err := r.client.Delete(ctx, deploy); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		r.log.Info("deleted deployment", "namespace", deploy.Namespace, "name", deploy.Name)
+	}
 
 	return nil
 }
 
 // DesiredDeployment returns the desired deployment for the provided contour using
 // image as Contour's container image.
-func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1.Deployment, error) {
-	parsedImage := strings.Split(image, ":")
-	labels := map[string]string{
-		"app.kubernetes.io/name":     "contour",
-		"app.kubernetes.io/instance": contour.Name,
-		// The image tag is used as the version.
-		"app.kubernetes.io/version":    parsedImage[1],
-		"app.kubernetes.io/component":  "ingress-controller",
-		"app.kubernetes.io/managed-by": "contour-operator",
-		// Associate the deployment with the provided contour.
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-	}
-
+func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.Deployment {
 	container := corev1.Container{
 		Name:            contourContainerName,
 		Image:           image,
@@ -241,7 +228,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      contourDeploymentName,
-			Labels:    labels,
+			Labels:    makeDeploymentLabels(contour, objutil.TagFromImage(image)),
 		},
 		Spec: appsv1.DeploymentSpec{
 			ProgressDeadlineSeconds: pointer.Int32Ptr(int32(600)),
@@ -327,7 +314,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) (*appsv1
 		},
 	}
 
-	return deploy, nil
+	return deploy
 }
 
 // currentDeployment returns the current Deployment resource for the provided contour.
@@ -355,8 +342,14 @@ func (r *reconciler) createDeployment(ctx context.Context, deploy *appsv1.Deploy
 	return deploy, nil
 }
 
-// updateDeploymentIfNeeded updates a Deployment if current does not match desired.
-func (r *reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
+// updateDeploymentIfNeeded updates a Deployment if current does not match desired,
+// using contour to verify the existence of owner labels.
+func (r *reconciler) updateDeploymentIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("deployment missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return current, nil
+	}
 	deploy, updated := equality.DeploymentConfigChanged(current, desired)
 	if updated {
 		if err := r.client.Update(ctx, deploy); err != nil {
@@ -365,8 +358,25 @@ func (r *reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desi
 		r.log.Info("updated deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 		return deploy, nil
 	}
-	r.log.Info("deployment unchanged; skipped updating deployment",
+	r.log.Info("deployment unchanged; skipped updating",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return current, nil
+}
+
+// makeDeploymentLabels returns labels for a Contour deployment, using
+// "app.kubernetes.io/version: image" and contour fields for other label values.
+func makeDeploymentLabels(contour *operatorv1alpha1.Contour, image string) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":     "contour",
+		"app.kubernetes.io/instance": contour.Name,
+		// The image tag is used as the version.
+		"app.kubernetes.io/version":    image,
+		"app.kubernetes.io/component":  "ingress-controller",
+		"app.kubernetes.io/managed-by": "contour-operator",
+		// Associate the deployment with the provided contour.
+		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+	}
+
 }

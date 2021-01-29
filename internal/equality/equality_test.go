@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/equality"
+	equality "github.com/projectcontour/contour-operator/internal/equality"
 	"github.com/projectcontour/contour-operator/internal/operator/controller/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -327,11 +327,7 @@ func TestDeploymentConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		original, err := contour.DesiredDeployment(cntr, testImage)
-		if err != nil {
-			t.Errorf("invalid deployment: %w", err)
-		}
-
+		original := contour.DesiredDeployment(cntr, testImage)
 		mutated := original.DeepCopy()
 		tc.mutate(mutated)
 		if updated, changed := equality.DeploymentConfigChanged(original, mutated); changed != tc.expect {

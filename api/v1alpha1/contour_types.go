@@ -87,6 +87,8 @@ type NamespaceSpec struct {
 	//
 	// 2. Another Contour exists in the namespace.
 	//
+	// 3. The namespace does not contain the Contour owning label.
+	//
 	// +kubebuilder:default=false
 	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }

@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/equality"
+	equality "github.com/projectcontour/contour-operator/internal/equality"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +57,7 @@ func (r *reconciler) ensureContourService(ctx context.Context, contour *operator
 		return fmt.Errorf("failed to get service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	if err := r.updateContourServiceIfNeeded(ctx, current, desired); err != nil {
+	if err := r.updateContourServiceIfNeeded(ctx, contour, current, desired); err != nil {
 		return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
@@ -76,7 +76,7 @@ func (r *reconciler) ensureEnvoyService(ctx context.Context, contour *operatorv1
 		return fmt.Errorf("failed to get service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	if err := r.updateEnvoyServiceIfNeeded(ctx, current, desired); err != nil {
+	if err := r.updateEnvoyServiceIfNeeded(ctx, contour, current, desired); err != nil {
 		return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
@@ -84,22 +84,27 @@ func (r *reconciler) ensureEnvoyService(ctx context.Context, contour *operatorv1
 }
 
 // ensureContourServiceDeleted ensures that a Contour Service for the
-// provided contour is deleted.
+// provided contour is deleted if Contour owner labels exist.
 func (r *reconciler) ensureContourServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      contourSvcName,
-		},
+	svc, err := r.currentContourService(ctx, contour)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	if err := r.client.Delete(ctx, svc); err != nil {
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete service %s/%s: %w", svc.Namespace, svc.Name, err)
+	if !ownerLabelsExist(svc, contour) {
+		r.log.Info("service not labeled; skipping deletion", "namespace", svc.Namespace, "name", svc.Name)
+	} else {
+		if err := r.client.Delete(ctx, svc); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
-		return nil
+		r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 	}
-	r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 
 	return nil
 }
@@ -107,20 +112,25 @@ func (r *reconciler) ensureContourServiceDeleted(ctx context.Context, contour *o
 // ensureEnvoyServiceDeleted ensures that an Envoy Service for the
 // provided contour is deleted.
 func (r *reconciler) ensureEnvoyServiceDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      envoySvcName,
-		},
+	svc, err := r.currentEnvoyService(ctx, contour)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	if err := r.client.Delete(ctx, svc); err != nil {
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete service %s/%s: %w", svc.Namespace, svc.Name, err)
+	if !ownerLabelsExist(svc, contour) {
+		r.log.Info("service not labeled; skipping deletion", "namespace", svc.Namespace, "name", svc.Name)
+	} else {
+		if err := r.client.Delete(ctx, svc); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
-		return nil
+		r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 	}
-	r.log.Info("deleted service", "namespace", svc.Namespace, "name", svc.Name)
 
 	return nil
 }
@@ -131,6 +141,10 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      contourSvcName,
+			Labels: map[string]string{
+				operatorv1alpha1.OwningContourNameLabel: contour.Name,
+				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -157,6 +171,10 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			Namespace:   contour.Spec.Namespace.Name,
 			Name:        envoySvcName,
 			Annotations: map[string]string{awsLbBackendProtoAnnotation: "tcp"},
+			Labels: map[string]string{
+				operatorv1alpha1.OwningContourNameLabel: contour.Name,
+				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
@@ -222,7 +240,12 @@ func (r *reconciler) createService(ctx context.Context, svc *corev1.Service) err
 }
 
 // updateContourServiceIfNeeded updates a Contour Service if current does not match desired.
-func (r *reconciler) updateContourServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
+func (r *reconciler) updateContourServiceIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("service missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return nil
+	}
 	svc, updated := equality.ClusterIPServiceChanged(current, desired)
 	if updated {
 		if err := r.client.Update(ctx, svc); err != nil {
@@ -231,14 +254,20 @@ func (r *reconciler) updateContourServiceIfNeeded(ctx context.Context, current, 
 		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
 		return nil
 	}
-	r.log.Info("service unchanged; skipped updating service",
+	r.log.Info("service unchanged; skipped updating",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return nil
 }
 
-// updateEnvoyServiceIfNeeded updates an Envoy Service if current does not match desired.
-func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, current, desired *corev1.Service) error {
+// updateEnvoyServiceIfNeeded updates an Envoy Service if current does not match desired,
+// using contour to verify the existence of owner labels.
+func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("service missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return nil
+	}
 	svc, updated := equality.LoadBalancerServiceChanged(current, desired)
 	if updated {
 		if err := r.client.Update(ctx, svc); err != nil {
@@ -247,7 +276,7 @@ func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, current, de
 		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
 		return nil
 	}
-	r.log.Info("service unchanged; skipped updating service",
+	r.log.Info("service unchanged; skipped updating",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return nil

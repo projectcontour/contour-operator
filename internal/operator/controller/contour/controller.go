@@ -345,3 +345,28 @@ func contourFinalized(contour *operatorv1alpha1.Contour) bool {
 
 	return false
 }
+
+// ownerLabelsExist returns true if obj contains Contour owner labels.
+func ownerLabelsExist(obj metav1.Object, contour *operatorv1alpha1.Contour) bool {
+	labels := obj.GetLabels()
+	nameFound := false
+	nsFound := false
+	if labels == nil {
+		return false
+	}
+	for l, v := range labels {
+		switch {
+		case nameFound && nsFound:
+			return true
+		case l == operatorv1alpha1.OwningContourNameLabel && v == contour.Name:
+			nameFound = true
+		case l == operatorv1alpha1.OwningContourNsLabel && v == contour.Namespace:
+			nsFound = true
+		}
+	}
+	if nameFound && nsFound {
+		return true
+	}
+	// no contour owning name and ns labels found.
+	return false
+}

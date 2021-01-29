@@ -19,6 +19,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
@@ -238,4 +239,144 @@ func ContourStatusChanged(current, expected operatorv1alpha1.ContourStatus) bool
 	}
 
 	return false
+}
+
+// NamespaceConfigChanged checks if the current and expected Namespace match
+// and if not, returns true and the expected Namespace.
+func NamespaceConfigChanged(current, expected *corev1.Namespace) (*corev1.Namespace, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		updated = expected
+		changed = true
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// ServiceAccountConfigChanged checks if the current and expected ServiceAccount
+// match and if not, returns true and the expected ServiceAccount.
+func ServiceAccountConfigChanged(current, expected *corev1.ServiceAccount) (*corev1.ServiceAccount, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		updated = expected
+		changed = true
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// ClusterRoleConfigChanged checks if the current and expected ClusterRole
+// match and if not, returns true and the expected ClusterRole.
+func ClusterRoleConfigChanged(current, expected *rbacv1.ClusterRole) (*rbacv1.ClusterRole, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		changed = true
+		updated.Labels = expected.Labels
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Rules, expected.Rules) {
+		changed = true
+		updated.Rules = expected.Rules
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// ClusterRoleBindingConfigChanged checks if the current and expected ClusterRoleBinding
+// match and if not, returns true and the expected ClusterRoleBinding.
+func ClusterRoleBindingConfigChanged(current, expected *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		changed = true
+		updated.Labels = expected.Labels
+
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Subjects, expected.Subjects) {
+		changed = true
+		updated.Subjects = expected.Subjects
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.RoleRef, expected.RoleRef) {
+		changed = true
+		updated.RoleRef = expected.RoleRef
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// RoleConfigChanged checks if the current and expected Role match
+// and if not, returns true and the expected Role.
+func RoleConfigChanged(current, expected *rbacv1.Role) (*rbacv1.Role, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		changed = true
+		updated.Labels = expected.Labels
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Rules, expected.Rules) {
+		changed = true
+		updated.Rules = expected.Rules
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// RoleBindingConfigChanged checks if the current and expected RoleBinding
+// match and if not, returns true and the expected RoleBinding.
+func RoleBindingConfigChanged(current, expected *rbacv1.RoleBinding) (*rbacv1.RoleBinding, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		changed = true
+		updated.Labels = expected.Labels
+
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Subjects, expected.Subjects) {
+		changed = true
+		updated.Subjects = expected.Subjects
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.RoleRef, expected.RoleRef) {
+		changed = true
+		updated.RoleRef = expected.RoleRef
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
 }

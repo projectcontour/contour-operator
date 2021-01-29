@@ -127,7 +127,7 @@ func (r *reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alp
 		return fmt.Errorf("failed to get configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	if err := r.updateConfigMapIfNeeded(ctx, current, desired); err != nil {
+	if err := r.updateConfigMapIfNeeded(ctx, contour, current, desired); err != nil {
 		return fmt.Errorf("failed to update configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
@@ -135,22 +135,27 @@ func (r *reconciler) ensureConfigMap(ctx context.Context, contour *operatorv1alp
 }
 
 // ensureConfigMapDeleted ensures the configmap for the provided contour
-// is deleted.
+// is deleted if Contour owner labels exist.
 func (r *reconciler) ensureConfigMapDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	cfgMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      contourCfgMapName,
-		},
-	}
-
-	if err := r.client.Delete(ctx, cfgMap); err != nil {
+	cfgMap, err := r.currentConfigMap(ctx, contour)
+	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	r.log.Info("deleted configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
+
+	if !ownerLabelsExist(cfgMap, contour) {
+		r.log.Info("configmap not labeled; skipping deletion", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
+	} else {
+		if err := r.client.Delete(ctx, cfgMap); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		r.log.Info("deleted configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
+	}
 
 	return nil
 }
@@ -212,11 +217,17 @@ func (r *reconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) 
 	return nil
 }
 
-// updateConfigMapIfNeeded updates a ConfigMap if current does not match desired.
-func (r *reconciler) updateConfigMapIfNeeded(ctx context.Context, current, desired *corev1.ConfigMap) error {
+// updateConfigMapIfNeeded updates a ConfigMap if current does not match desired,
+// using contour to verify the existence of owner labels.
+func (r *reconciler) updateConfigMapIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *corev1.ConfigMap) error {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("configmap missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return nil
+	}
 	changed, updated := cfgFileChanged(current, desired)
 	if !changed {
-		r.log.Info("configmap unchanged; skipped updating configmap", "namespace", current.Namespace,
+		r.log.Info("configmap unchanged; skipped updating", "namespace", current.Namespace,
 			"name", current.Name)
 		return nil
 	}
@@ -224,7 +235,7 @@ func (r *reconciler) updateConfigMapIfNeeded(ctx context.Context, current, desir
 	if err := r.client.Update(ctx, updated); err != nil {
 		return fmt.Errorf("failed to update configmap: %w", err)
 	}
-	r.log.Info("updated configmap; old: %#v, new: %#v", current, updated)
+	r.log.Info("updated configmap %s/%s", updated.Namespace, updated.Name)
 
 	return nil
 }

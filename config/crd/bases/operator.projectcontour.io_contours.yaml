@@ -51,7 +51,7 @@ spec:
                     type: string
                   removeOnDeletion:
                     default: false
-                    description: "RemoveOnDeletion will remove the namespace when the Contour is deleted. If set to True, deletion will not occur if any of the following conditions exist: \n 1. The Contour namespace is \"default\", \"kube-system\" or the    contour-operator's namespace. \n 2. Another Contour exists in the namespace."
+                    description: "RemoveOnDeletion will remove the namespace when the Contour is deleted. If set to True, deletion will not occur if any of the following conditions exist: \n 1. The Contour namespace is \"default\", \"kube-system\" or the    contour-operator's namespace. \n 2. Another Contour exists in the namespace. \n 3. The namespace does not contain the Contour owning label."
                     type: boolean
                 type: object
               replicas:

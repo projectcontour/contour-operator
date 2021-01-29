@@ -26,14 +26,22 @@ import (
 const (
 	testContourName = "test-contour"
 	testOperatorNs  = "test-contour-operator"
+	contourImage    = "test-image:tag"
 )
 
-var cntr = &operatorv1alpha1.Contour{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      testContourName,
-		Namespace: testOperatorNs,
-	},
-}
+var (
+	cntr = &operatorv1alpha1.Contour{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testContourName,
+			Namespace: testOperatorNs,
+		},
+	}
+
+	ownerLabels = map[string]string{
+		operatorv1alpha1.OwningContourNameLabel: cntr.Name,
+		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,
+	}
+)
 
 func checkContainerHasImage(t *testing.T, container *corev1.Container, image string) {
 	t.Helper()
