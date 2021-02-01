@@ -45,9 +45,9 @@ const (
 // generating strategy.
 // ensureJob ensures that a Job exists for the given contour.
 func (r *reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	desired := DesiredJob(contour, r.config.ContourImage)
-
-	current, err := r.currentJob(ctx, contour)
+	image := r.config.ContourImage
+	desired := DesiredJob(contour, image)
+	current, err := r.currentJob(ctx, contour, objutil.TagFromImage(image))
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return r.createJob(ctx, desired)
@@ -55,39 +55,45 @@ func (r *reconciler) ensureJob(ctx context.Context, contour *operatorv1alpha1.Co
 		return fmt.Errorf("failed to get job %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	if err := r.recreateJobIfNeeded(ctx, current, desired); err != nil {
+	if err := r.recreateJobIfNeeded(ctx, contour, current, desired); err != nil {
 		return fmt.Errorf("failed to recreate job %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
 	return nil
 }
 
-// ensureJobDeleted ensures the Job for the provided contour is deleted.
+// ensureJobDeleted ensures the Job for the provided contour is deleted
+// if Contour owner labels exist.
 func (r *reconciler) ensureJobDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      certgenJobName,
-		},
+	job, err := r.currentJob(ctx, contour, objutil.TagFromImage(r.config.ContourImage))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	if err := r.client.Delete(ctx, job); err != nil {
-		if !errors.IsNotFound(err) {
-			return err
+	if !ownerLabelsExist(job, contour) {
+		r.log.Info("job not labeled; skipping deletion", "namespace", job.Namespace, "name", job.Name)
+	} else {
+		if err := r.client.Delete(ctx, job); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			return nil
 		}
-		return nil
+		r.log.Info("deleted job", "namespace", job.Namespace, "name", job.Name)
 	}
-	r.log.Info("deleted job", "namespace", job.Namespace, "name", job.Name)
 
 	return nil
 }
 
 // currentJob returns the current Job resource for the provided contour.
-func (r *reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.Contour) (*batchv1.Job, error) {
+func (r *reconciler) currentJob(ctx context.Context, contour *operatorv1alpha1.Contour, tag string) (*batchv1.Job, error) {
 	current := &batchv1.Job{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      certgenJobName,
+		Name:      fmt.Sprintf("%s-%s", certgenJobName, tag),
 	}
 	err := r.client.Get(ctx, key, current)
 	if err != nil {
@@ -152,7 +158,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      certgenJobName,
+			Name:      fmt.Sprintf("%s-%s", certgenJobName, objutil.TagFromImage(image)),
 			Namespace: contour.Spec.Namespace.Name,
 			Labels:    labels,
 		},
@@ -174,12 +180,17 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 	return job
 }
 
-// recreateJobIfNeeded recreates a Job if current doesn't match desired.
-func (r *reconciler) recreateJobIfNeeded(ctx context.Context, current, desired *batchv1.Job) error {
+// recreateJobIfNeeded recreates a Job if current doesn't match desired,
+// using contour to verify the existence of owner labels.
+func (r *reconciler) recreateJobIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *batchv1.Job) error {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("job missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return nil
+	}
 	updated, changed := equality.JobConfigChanged(current, desired)
 	if !changed {
-		r.log.Info("current job matches desired state; skipped updating",
-			"namespace", current.Namespace, "name", current.Name)
+		r.log.Info("job unchanged; skipped updating", "namespace", current.Namespace, "name", current.Name)
 		return nil
 	}
 

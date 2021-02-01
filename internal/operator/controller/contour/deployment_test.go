@@ -16,7 +16,7 @@ package contour
 import (
 	"testing"
 
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -66,14 +66,11 @@ func checkDeploymentHasLabels(t *testing.T, deploy *appsv1.Deployment, expected 
 }
 
 func TestDesiredDeployment(t *testing.T) {
-	deploy, err := DesiredDeployment(cntr, operatorconfig.DefaultContourImage)
-	if err != nil {
-		t.Errorf("invalid deployment: %w", err)
-	}
-
+	deploy := DesiredDeployment(cntr, contourImage)
 	container := checkDeploymentHasContainer(t, deploy, contourContainerName, true)
-	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
+	checkContainerHasImage(t, container, contourImage)
 	checkDeploymentHasEnvVar(t, deploy, contourNsEnvVar)
 	checkDeploymentHasEnvVar(t, deploy, contourPodEnvVar)
-	checkDeploymentHasLabels(t, deploy, deploy.Labels)
+	labels := makeDeploymentLabels(cntr, objutil.TagFromImage(contourImage))
+	checkDeploymentHasLabels(t, deploy, labels)
 }

@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package object
+package util
 
 import (
+	"strings"
+
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -198,4 +200,14 @@ func NewIngress(name, ns, backendName string, backendPort int) *networkingv1.Ing
 			},
 		},
 	}
+}
+
+// TagFromImage returns the tag from the provided image or an
+// empty string if the image does not contain a tag.
+func TagFromImage(image string) string {
+	if strings.Contains(image, ":") {
+		parsed := strings.Split(image, ":")
+		return parsed[1]
+	}
+	return ""
 }

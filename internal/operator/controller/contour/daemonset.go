@@ -17,10 +17,10 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,18 +65,16 @@ const (
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
 func (r *reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
 	desired := DesiredDaemonSet(contour, r.config.ContourImage, r.config.EnvoyImage)
-
 	current, err := r.currentDaemonSet(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			updated, err := r.createDaemonSet(ctx, desired)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create daemonset for contour %s/%s: %w", contour.Namespace,
-					contour.Name, err)
+				return nil, fmt.Errorf("failed to create daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
 			}
 			return updated, nil
 		}
-		return nil, fmt.Errorf("failed to get daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+		return nil, fmt.Errorf("failed to get daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
 	differ := equality.DaemonSetSelectorsDiffer(current, desired)
@@ -86,7 +84,7 @@ func (r *reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 		return nil, r.ensureDaemonSetDeleted(ctx, contour)
 	}
 
-	updated, err := r.updateDaemonSetIfNeeded(ctx, current, desired)
+	updated, err := r.updateDaemonSetIfNeeded(ctx, contour, current, desired)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
@@ -94,22 +92,28 @@ func (r *reconciler) ensureDaemonSet(ctx context.Context, contour *operatorv1alp
 	return updated, nil
 }
 
-// ensureDaemonSetDeleted ensures the DaemonSet for the provided contour is deleted.
+// ensureDaemonSetDeleted ensures the DaemonSet for the provided contour is deleted
+// if Contour owner labels exist.
 func (r *reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      envoyDaemonSetName,
-		},
-	}
-
-	if err := r.client.Delete(ctx, ds); err != nil {
+	ds, err := r.currentDaemonSet(ctx, contour)
+	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to delete daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+		return err
 	}
-	r.log.Info("deleted daemonset", "namespace", ds.Namespace, "name", ds.Name)
+
+	if !ownerLabelsExist(ds, contour) {
+		r.log.Info("daemonset not labeled; skipping deletion", "namespace", ds.Namespace, "name", ds.Name)
+	} else {
+		if err := r.client.Delete(ctx, ds); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		r.log.Info("deleted daemonset", "namespace", ds.Namespace, "name", ds.Name)
+	}
 
 	return nil
 }
@@ -118,13 +122,11 @@ func (r *reconciler) ensureDaemonSetDeleted(ctx context.Context, contour *operat
 // contourImage as the shutdown-manager/envoy-initconfig container images and
 // envoyImage as Envoy's container image.
 func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImage string) *appsv1.DaemonSet {
-	parsedImage := strings.Split(contourImage, ":")
-	imageTag := parsedImage[1]
 	labels := map[string]string{
 		"app.kubernetes.io/name":     "contour",
 		"app.kubernetes.io/instance": contour.Name,
 		// The contourImage tag is used as the version.
-		"app.kubernetes.io/version":    imageTag,
+		"app.kubernetes.io/version":    objutil.TagFromImage(contourImage),
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// Associate the daemonset with the provided contour.
@@ -395,8 +397,14 @@ func (r *reconciler) createDaemonSet(ctx context.Context, ds *appsv1.DaemonSet) 
 	return ds, nil
 }
 
-// updateDaemonSetIfNeeded updates a DaemonSet if current does not match desired.
-func (r *reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+// updateDaemonSetIfNeeded updates a DaemonSet if current does not match desired,
+// using contour to verify the existence of owner labels.
+func (r *reconciler) updateDaemonSetIfNeeded(ctx context.Context, contour *operatorv1alpha1.Contour, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+	if !ownerLabelsExist(current, contour) {
+		r.log.Info("daemonset missing owner labels; skipped updating", "namespace", current.Namespace,
+			"name", current.Name)
+		return current, nil
+	}
 	ds, updated := equality.DaemonsetConfigChanged(current, desired)
 	if updated {
 		if err := r.client.Update(ctx, ds); err != nil {
@@ -405,7 +413,7 @@ func (r *reconciler) updateDaemonSetIfNeeded(ctx context.Context, current, desir
 		r.log.Info("updated daemonset", "namespace", ds.Namespace, "name", ds.Name)
 		return ds, nil
 	}
-	r.log.Info("daemonset unchanged; skipped updating daemonset",
+	r.log.Info("daemonset unchanged; skipped updating",
 		"namespace", current.Namespace, "name", current.Name)
 
 	return current, nil
