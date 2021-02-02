@@ -13,12 +13,14 @@
 
 package config
 
-var (
+const (
 	DefaultContourImage           = "docker.io/projectcontour/contour:main"
 	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.17.0"
 	DefaultMetricsAddr            = ":8080"
 	DefaultEnableLeaderElection   = false
 	DefaultEnableLeaderElectionID = "0d879e31.projectcontour.io"
+	// DefaultContourSpecNs is the default spec.namespace.name of a Contour.
+	DefaultContourSpecNs = "projectcontour"
 )
 
 // Config is configuration of the operator.

@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	equality "github.com/projectcontour/contour-operator/internal/equality"
-	"github.com/projectcontour/contour-operator/internal/operator/controller/contour"
+	"github.com/projectcontour/contour-operator/internal/equality"
+	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -104,14 +104,14 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 			description: "if probe values are set to default values",
 			mutate: func(ds *appsv1.DaemonSet) {
 				for i, c := range ds.Spec.Template.Spec.Containers {
-					if c.Name == contour.ShutdownContainerName {
+					if c.Name == contourcontroller.ShutdownContainerName {
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.TimeoutSeconds = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = int32(10)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = int32(3)
 					}
-					if c.Name == contour.EnvoyContainerName {
+					if c.Name == contourcontroller.EnvoyContainerName {
 						ds.Spec.Template.Spec.Containers[i].ReadinessProbe.TimeoutSeconds = int32(1)
 						// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
 						// so they are omitted.
@@ -126,7 +126,7 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			original := contour.DesiredDaemonSet(cntr, testImage, testImage)
+			original := contourcontroller.DesiredDaemonSet(cntr, testImage, testImage)
 
 			mutated := original.DeepCopy()
 			tc.mutate(mutated)
@@ -233,7 +233,7 @@ func TestJobConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected := contour.DesiredJob(cntr, testImage)
+		expected := contourcontroller.DesiredJob(cntr, testImage)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -327,7 +327,7 @@ func TestDeploymentConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		original := contour.DesiredDeployment(cntr, testImage)
+		original := contourcontroller.DesiredDeployment(cntr, testImage)
 		mutated := original.DeepCopy()
 		tc.mutate(mutated)
 		if updated, changed := equality.DeploymentConfigChanged(original, mutated); changed != tc.expect {
@@ -431,7 +431,7 @@ func TestClusterIpServiceChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected := contour.DesiredContourService(cntr)
+		expected := contourcontroller.DesiredContourService(cntr)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -540,10 +540,30 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			description: "if annotations have changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Annotations = map[string]string{}
+			},
+			expect: true,
+		},
 	}
 
 	for _, tc := range testCases {
-		expected := contour.DesiredEnvoyService(cntr)
+		cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
+		cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
+		cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
+			{
+				Name:       "http",
+				PortNumber: contourcontroller.EnvoyServiceHTTPPort,
+			},
+			{
+				Name:       "https",
+				PortNumber: contourcontroller.EnvoyServiceHTTPSPort,
+			},
+		}
+		expected := contourcontroller.DesiredEnvoyService(cntr)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -552,6 +572,52 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 		} else if changed {
 			if _, changedAgain := equality.LoadBalancerServiceChanged(updated, expected); changedAgain {
 				t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
+			}
+		}
+	}
+}
+
+func TestNodePortServiceChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(service *corev1.Service)
+		expect      bool
+	}{
+		{
+			description: "if nothing changed",
+			mutate:      func(_ *corev1.Service) {},
+			expect:      false,
+		},
+		{
+			description: "if the nodeport port number changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.Ports[0].NodePort = int32(1234)
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.NodePortServicePublishingType
+		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
+			{
+				Name:       "http",
+				PortNumber: contourcontroller.EnvoyServiceHTTPPort,
+			},
+			{
+				Name:       "https",
+				PortNumber: contourcontroller.EnvoyServiceHTTPSPort,
+			},
+		}
+		expected := contourcontroller.DesiredEnvoyService(cntr)
+
+		mutated := expected.DeepCopy()
+		tc.mutate(mutated)
+		if updated, changed := equality.NodePortServiceChanged(mutated, expected); changed != tc.expect {
+			t.Errorf("%s, expect NodePortServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+		} else if changed {
+			if _, changedAgain := equality.NodePortServiceChanged(updated, expected); changedAgain {
+				t.Errorf("%s, NodePortServiceChanged does not behave as a fixed point function", tc.description)
 			}
 		}
 	}

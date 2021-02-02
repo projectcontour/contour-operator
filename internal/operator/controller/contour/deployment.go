@@ -60,10 +60,6 @@ const (
 	metricsPort = 8000
 	// debugPort is the network port number of Contour's debug service.
 	debugPort = 6060
-	// httpPort is the network port number of HTTP.
-	httpPort = 80
-	// httpsPort is the network port number of HTTPS.
-	httpsPort = 443
 )
 
 // ensureDeployment ensures a deployment exists for the given contour.
@@ -125,25 +121,32 @@ func (r *reconciler) ensureDeploymentDeleted(ctx context.Context, contour *opera
 // DesiredDeployment returns the desired deployment for the provided contour using
 // image as Contour's container image.
 func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.Deployment {
+	args := []string{
+		"serve",
+		"--incluster",
+		"--xds-address=0.0.0.0",
+		fmt.Sprintf("--xds-port=%d", xdsPort),
+		fmt.Sprintf("--contour-cafile=%s", filepath.Join("/", contourCertsVolMntDir, "ca.crt")),
+		fmt.Sprintf("--contour-cert-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.crt")),
+		fmt.Sprintf("--contour-key-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.key")),
+		fmt.Sprintf("--config-path=%s", filepath.Join("/", contourCfgVolMntDir, contourCfgFileName)),
+	}
+	// Pass the insecure/secure flags to Contour if using non-default ports.
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		switch {
+		case port.Name == "http" && port.PortNumber != envoyInsecureContainerPort:
+			args = append(args, fmt.Sprintf("--envoy-service-http-port=%d", port.PortNumber))
+		case port.Name == "https" && port.PortNumber != envoySecureContainerPort:
+			args = append(args, fmt.Sprintf("--envoy-service-https-port=%d", port.PortNumber))
+		}
+	}
+
 	container := corev1.Container{
 		Name:            contourContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"contour",
-		},
-		Args: []string{
-			"serve",
-			"--incluster",
-			"--xds-address=0.0.0.0",
-			fmt.Sprintf("--xds-port=%d", xdsPort),
-			fmt.Sprintf("--envoy-service-http-port=%d", httpPort),
-			fmt.Sprintf("--envoy-service-https-port=%d", httpsPort),
-			fmt.Sprintf("--contour-cafile=%s", filepath.Join("/", contourCertsVolMntDir, "ca.crt")),
-			fmt.Sprintf("--contour-cert-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.crt")),
-			fmt.Sprintf("--contour-key-file=%s", filepath.Join("/", contourCertsVolMntDir, "tls.key")),
-			fmt.Sprintf("--config-path=%s", filepath.Join("/", contourCfgVolMntDir, contourCfgFileName)),
-		},
+		Command:         []string{"contour"},
+		Args:            args,
 		Env: []corev1.EnvVar{
 			{
 				Name: contourNsEnvVar,

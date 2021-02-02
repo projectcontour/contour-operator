@@ -16,7 +16,8 @@ package contour
 import (
 	"testing"
 
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,15 +52,15 @@ func checkDaemonSetHasEnvVar(t *testing.T, ds *appsv1.DaemonSet, container, name
 	t.Errorf("daemonset is missing environment variable %q", name)
 }
 
-func checkDaemonSetHasContainer(t *testing.T, deploy *appsv1.DaemonSet, name string, expect bool) *corev1.Container {
+func checkDaemonSetHasContainer(t *testing.T, ds *appsv1.DaemonSet, name string, expect bool) *corev1.Container {
 	t.Helper()
 
-	if deploy.Spec.Template.Spec.Containers == nil {
+	if ds.Spec.Template.Spec.Containers == nil {
 		t.Error("daemonset has no containers")
 	}
 
 	if name == envoyInitContainerName {
-		for _, container := range deploy.Spec.Template.Spec.InitContainers {
+		for _, container := range ds.Spec.Template.Spec.InitContainers {
 			if container.Name == name {
 				if expect {
 					return &container
@@ -68,7 +69,7 @@ func checkDaemonSetHasContainer(t *testing.T, deploy *appsv1.DaemonSet, name str
 			}
 		}
 	} else {
-		for _, container := range deploy.Spec.Template.Spec.Containers {
+		for _, container := range ds.Spec.Template.Spec.Containers {
 			if container.Name == name {
 				if expect {
 					return &container
@@ -83,27 +84,45 @@ func checkDaemonSetHasContainer(t *testing.T, deploy *appsv1.DaemonSet, name str
 	return nil
 }
 
-func checkDaemonSetHasLabels(t *testing.T, deploy *appsv1.DaemonSet, expected map[string]string) {
+func checkDaemonSetHasLabels(t *testing.T, ds *appsv1.DaemonSet, expected map[string]string) {
 	t.Helper()
 
-	if apiequality.Semantic.DeepEqual(deploy.Labels, expected) {
+	if apiequality.Semantic.DeepEqual(ds.Labels, expected) {
 		return
 	}
 
-	t.Errorf("daemonset has unexpected %q labels", deploy.Labels)
+	t.Errorf("daemonset has unexpected %q labels", ds.Labels)
+}
+
+func checkContainerHasPort(t *testing.T, ds *appsv1.DaemonSet, port int32) {
+	t.Helper()
+
+	for _, c := range ds.Spec.Template.Spec.Containers {
+		for _, p := range c.Ports {
+			if p.ContainerPort == port {
+				return
+			}
+		}
+	}
+	t.Errorf("container is missing containerPort %q", port)
 }
 
 func TestDesiredDaemonSet(t *testing.T) {
-	ds := DesiredDaemonSet(cntr, operatorconfig.DefaultContourImage, operatorconfig.DefaultEnvoyImage)
+	lb := operatorv1alpha1.LoadBalancerServicePublishingType
+	ctr := objutil.NewContour(testContourName, testContourNs, testContourSpecNs, false, lb)
+	ds := DesiredDaemonSet(ctr, testContourImage, testEnvoyImage)
 
 	container := checkDaemonSetHasContainer(t, ds, EnvoyContainerName, true)
-	checkContainerHasImage(t, container, operatorconfig.DefaultEnvoyImage)
+	checkContainerHasImage(t, container, testEnvoyImage)
 	container = checkDaemonSetHasContainer(t, ds, ShutdownContainerName, true)
-	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
+	checkContainerHasImage(t, container, testContourImage)
 	container = checkDaemonSetHasContainer(t, ds, envoyInitContainerName, true)
-	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
+	checkContainerHasImage(t, container, testContourImage)
 	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyNsEnvVar)
 	checkDaemonSetHasEnvVar(t, ds, EnvoyContainerName, envoyPodEnvVar)
 	checkDaemonSetHasEnvVar(t, ds, envoyInitContainerName, envoyNsEnvVar)
 	checkDaemonSetHasLabels(t, ds, ds.Labels)
+	for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		checkContainerHasPort(t, ds, port.PortNumber)
+	}
 }

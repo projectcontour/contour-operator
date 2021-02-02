@@ -164,9 +164,9 @@ func ClusterIPServiceChanged(current, expected *corev1.Service) (*corev1.Service
 	return updated, true
 }
 
-// LoadBalancerServiceChanged checks if the spec of current and expected match and if not,
-// returns true and the expected Service resource. The healthCheckNodePort and a port's
-// nodePort are not compared since they are dynamically assigned.
+// LoadBalancerServiceChanged checks if current and expected match and if not, returns
+// true and the expected Service resource. The healthCheckNodePort and a port's nodePort
+// are not compared since they are dynamically assigned.
 func LoadBalancerServiceChanged(current, expected *corev1.Service) (*corev1.Service, bool) {
 	changed := false
 	updated := current.DeepCopy()
@@ -213,6 +213,62 @@ func LoadBalancerServiceChanged(current, expected *corev1.Service) (*corev1.Serv
 
 	if !apiequality.Semantic.DeepEqual(current.Spec.Type, expected.Spec.Type) {
 		updated.Spec.Type = expected.Spec.Type
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Annotations, expected.Annotations) {
+		updated.Annotations = expected.Annotations
+		changed = true
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	return updated, true
+}
+
+// NodePortServiceChanged checks if current and expected match and if not, returns
+// true and the expected Service resource. The healthCheckNodePort is not compared
+// since it's dynamically assigned.
+func NodePortServiceChanged(current, expected *corev1.Service) (*corev1.Service, bool) {
+	changed := false
+	updated := current.DeepCopy()
+
+	if len(current.Spec.Ports) != len(expected.Spec.Ports) {
+		updated.Spec.Ports = expected.Spec.Ports
+		changed = true
+	}
+
+	for i, p := range current.Spec.Ports {
+		if !apiequality.Semantic.DeepEqual(p, expected.Spec.Ports[i]) {
+			updated.Spec.Ports = expected.Spec.Ports
+			changed = true
+		}
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.Selector, expected.Spec.Selector) {
+		updated.Spec.Selector = expected.Spec.Selector
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.ExternalTrafficPolicy, expected.Spec.ExternalTrafficPolicy) {
+		updated.Spec.ExternalTrafficPolicy = expected.Spec.ExternalTrafficPolicy
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.SessionAffinity, expected.Spec.SessionAffinity) {
+		updated.Spec.SessionAffinity = expected.Spec.SessionAffinity
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec.Type, expected.Spec.Type) {
+		updated.Spec.Type = expected.Spec.Type
+		changed = true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Annotations, expected.Annotations) {
+		updated.Annotations = expected.Annotations
 		changed = true
 	}
 

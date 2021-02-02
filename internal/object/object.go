@@ -117,13 +117,35 @@ func NewNamespace(name string) *corev1.Namespace {
 	}
 }
 
-// NewContour makes a Contour object using the provided ns/name
-// for the object's namespace and name.
-func NewContour(name, ns string) *operatorv1alpha1.Contour {
+// NewContour makes a Contour object using the provided ns/name for the
+// object's namespace/name, pubType for the network publishing type of
+// Envoy, and Envoy container ports 8080/8443.
+func NewContour(name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) *operatorv1alpha1.Contour {
 	return &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{
+				Name:             specNs,
+				RemoveOnDeletion: remove,
+			},
+			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
+				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+					Type: pubType,
+					ContainerPorts: []operatorv1alpha1.ContainerPort{
+						{
+							Name:       "http",
+							PortNumber: int32(8080),
+						},
+						{
+							Name:       "https",
+							PortNumber: int32(8443),
+						},
+					},
+				},
+			},
 		},
 	}
 }
