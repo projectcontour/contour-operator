@@ -2427,6 +2427,7 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
+  - backendpolicies
   - gatewayclasses
   - gateways
   - httproutes
