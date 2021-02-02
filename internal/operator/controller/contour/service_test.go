@@ -17,38 +17,44 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var (
-	testName = "test-svc"
-	testNs   = testName + "-ns"
-)
-
-func checkServiceHasPort(t *testing.T, svc *corev1.Service, port int) {
+func checkServiceHasPort(t *testing.T, svc *corev1.Service, port int32) {
 	t.Helper()
 
 	for _, p := range svc.Spec.Ports {
-		if p.Port == int32(port) {
+		if p.Port == port {
 			return
 		}
 	}
 	t.Errorf("service is missing port %q", port)
 }
 
-func checkServiceHasTargetPort(t *testing.T, svc *corev1.Service, port int) {
+func checkServiceHasNodeport(t *testing.T, svc *corev1.Service, port int32) {
 	t.Helper()
 
-	intStrPort := intstr.IntOrString{IntVal: int32(port)}
+	for _, p := range svc.Spec.Ports {
+		if p.NodePort == port {
+			return
+		}
+	}
+	t.Errorf("service is missing nodeport %q", port)
+}
+
+func checkServiceHasTargetPort(t *testing.T, svc *corev1.Service, port int32) {
+	t.Helper()
+
+	intStrPort := intstr.IntOrString{IntVal: port}
 	for _, p := range svc.Spec.Ports {
 		if p.TargetPort == intStrPort {
 			return
 		}
 	}
-	t.Errorf("service is missing targetPort %q", port)
+	t.Errorf("service is missing targetPort %d", port)
 }
 
 func checkServiceHasPortName(t *testing.T, svc *corev1.Service, name string) {
@@ -73,13 +79,24 @@ func checkServiceHasPortProtocol(t *testing.T, svc *corev1.Service, protocol cor
 	t.Errorf("service is missing port protocol %q", protocol)
 }
 
-func TestDesiredContourService(t *testing.T) {
-	ctr := &operatorv1alpha1.Contour{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNs,
-		},
+func checkServiceHasAnnotation(t *testing.T, svc *corev1.Service, key string) {
+	t.Helper()
+
+	if svc.Annotations == nil {
+		t.Errorf("service is missing annotations")
 	}
+	for k := range svc.Annotations {
+		if k == key {
+			return
+		}
+	}
+
+	t.Errorf("service is missing annotation %q", key)
+}
+
+func TestDesiredContourService(t *testing.T) {
+	lb := operatorv1alpha1.LoadBalancerServicePublishingType
+	ctr := objutil.NewContour(testContourName, testContourNs, testContourSpecNs, true, lb)
 
 	svc := DesiredContourService(ctr)
 
@@ -90,20 +107,33 @@ func TestDesiredContourService(t *testing.T) {
 }
 
 func TestDesiredEnvoyService(t *testing.T) {
-	ctr := &operatorv1alpha1.Contour{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNs,
-		},
-	}
-
+	nodePort := operatorv1alpha1.NodePortServicePublishingType
+	ctr := objutil.NewContour(testContourName, testContourNs, testContourSpecNs, false, nodePort)
 	svc := DesiredEnvoyService(ctr)
 
-	checkServiceHasPort(t, svc, httpPort)
-	checkServiceHasPort(t, svc, httpsPort)
-	checkServiceHasTargetPort(t, svc, httpPort)
-	checkServiceHasTargetPort(t, svc, httpsPort)
+	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
+	checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
+	checkServiceHasNodeport(t, svc, envoyNodePortHTTPPort)
+	checkServiceHasNodeport(t, svc, envoyNodePortHTTPSPort)
+	for _, port := range ctr.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		checkServiceHasTargetPort(t, svc, port.PortNumber)
+	}
 	checkServiceHasPortName(t, svc, "http")
 	checkServiceHasPortName(t, svc, "https")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
+	// Check LB annotations for the different provider types.
+	ctr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
+	ctr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
+	ctr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+	svc = DesiredEnvoyService(ctr)
+	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
+	ctr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
+	svc = DesiredEnvoyService(ctr)
+	checkServiceHasAnnotation(t, svc, awsInternalLBAnnotation)
+	ctr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
+	svc = DesiredEnvoyService(ctr)
+	checkServiceHasAnnotation(t, svc, azureInternalLBAnnotation)
+	ctr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
+	svc = DesiredEnvoyService(ctr)
+	checkServiceHasAnnotation(t, svc, gcpLBTypeAnnotation)
 }

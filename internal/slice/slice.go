@@ -40,3 +40,13 @@ func ContainsString(slice []string, s string) bool {
 	}
 	return false
 }
+
+// ContainsInt32 checks if a given int32 slice contains the provided int32.
+func ContainsInt32(slice []int32, i int32) bool {
+	for _, item := range slice {
+		if item == i {
+			return true
+		}
+	}
+	return false
+}

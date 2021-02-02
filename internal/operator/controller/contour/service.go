@@ -43,6 +43,62 @@ const (
 	// TODO [danehans]: Make proxy protocol configurable or automatically enabled. See
 	// https://github.com/projectcontour/contour-operator/issues/49 for details.
 	awsLbBackendProtoAnnotation = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
+	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
+	EnvoyServiceHTTPPort = int32(80)
+	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
+	EnvoyServiceHTTPSPort = int32(443)
+	// envoyNodePortHTTPPort is the NodePort port number for Envoy's HTTP service. For NodePort
+	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	envoyNodePortHTTPPort = int32(30080)
+	// envoyNodePortHTTPSPort is the NodePort port number for Envoy's HTTPS service. For NodePort
+	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	envoyNodePortHTTPSPort = int32(30443)
+	// awsProviderType is the name of the Amazon Web Services provider.
+	awsProviderType = "AWS"
+	// azureProviderType is the name of the Microsoft Azure provider.
+	azureProviderType = "Azure"
+	// gcpProviderType is the name of the Google Cloud Platform provider.
+	gcpProviderType = "GCP"
+	// awsInternalLBAnnotation is the annotation used on a service to specify an AWS
+	// load balancer as being internal.
+	awsInternalLBAnnotation = "service.beta.kubernetes.io/aws-load-balancer-internal"
+	// azureInternalLBAnnotation is the annotation used on a service to specify an Azure
+	// load balancer as being internal.
+	azureInternalLBAnnotation = "service.beta.kubernetes.io/azure-load-balancer-internal"
+	// gcpLBTypeAnnotation is the annotation used on a service to specify a GCP load balancer
+	// type.
+	gcpLBTypeAnnotation = "cloud.google.com/load-balancer-type"
+)
+
+var (
+	// LbAnnotations maps cloud providers to the provider's annotation
+	// key/value pair used for managing a load balancer. For additional
+	// details see:
+	//  https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+	//
+	LbAnnotations = map[operatorv1alpha1.LoadBalancerProviderType]map[string]string{
+		awsProviderType: {
+			awsLbBackendProtoAnnotation: "tcp",
+		},
+	}
+
+	// InternalLBAnnotations maps cloud providers to the provider's annotation
+	// key/value pair used for managing an internal load balancer. For additional
+	// details see:
+	//  https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+	//
+	InternalLBAnnotations = map[operatorv1alpha1.LoadBalancerProviderType]map[string]string{
+		awsProviderType: {
+			awsInternalLBAnnotation: "0.0.0.0/0",
+		},
+		azureProviderType: {
+			// Azure load balancers are not customizable and are set to (2 fail @ 5s interval, 2 healthy)
+			azureInternalLBAnnotation: "true",
+		},
+		gcpProviderType: {
+			gcpLBTypeAnnotation: "Internal",
+		},
+	}
 )
 
 // ensureContourService ensures that a Contour Service exists for the given contour.
@@ -166,11 +222,36 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 
 // DesiredEnvoyService generates the desired Envoy Service for the given contour.
 func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
+	var ports []corev1.ServicePort
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		var p corev1.ServicePort
+		httpFound := false
+		httpsFound := false
+		switch {
+		case httpsFound && httpFound:
+			break
+		case port.Name == "http":
+			httpFound = true
+			p.Name = port.Name
+			p.Port = EnvoyServiceHTTPPort
+			p.Protocol = corev1.ProtocolTCP
+			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
+			ports = append(ports, p)
+		case port.Name == "https":
+			httpsFound = true
+			p.Name = port.Name
+			p.Port = EnvoyServiceHTTPSPort
+			p.Protocol = corev1.ProtocolTCP
+			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
+			ports = append(ports, p)
+		}
+	}
+
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   contour.Spec.Namespace.Name,
 			Name:        envoySvcName,
-			Annotations: map[string]string{awsLbBackendProtoAnnotation: "tcp"},
+			Annotations: map[string]string{},
 			Labels: map[string]string{
 				operatorv1alpha1.OwningContourNameLabel: contour.Name,
 				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
@@ -178,24 +259,32 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		},
 		Spec: corev1.ServiceSpec{
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "http",
-					Port:       int32(httpPort),
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{IntVal: int32(httpPort)},
-				},
-				{
-					Name:       "https",
-					Port:       int32(httpsPort),
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{IntVal: int32(httpsPort)},
-				},
-			},
-			Selector:        envoyDaemonSetPodSelector().MatchLabels,
-			Type:            corev1.ServiceTypeLoadBalancer,
-			SessionAffinity: corev1.ServiceAffinityNone,
+			Ports:                 ports,
+			Selector:              envoyDaemonSetPodSelector().MatchLabels,
+			SessionAffinity:       corev1.ServiceAffinityNone,
 		},
+	}
+
+	epType := contour.Spec.NetworkPublishing.Envoy.Type
+	switch epType {
+	case operatorv1alpha1.LoadBalancerServicePublishingType:
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+		provider := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
+		lbAnnotations := LbAnnotations[provider]
+		for name, value := range lbAnnotations {
+			svc.Annotations[name] = value
+		}
+		isInternal := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope == operatorv1alpha1.InternalLoadBalancer
+		if isInternal {
+			internalAnnotations := InternalLBAnnotations[provider]
+			for name, value := range internalAnnotations {
+				svc.Annotations[name] = value
+			}
+		}
+	case operatorv1alpha1.NodePortServicePublishingType:
+		svc.Spec.Type = corev1.ServiceTypeNodePort
+		svc.Spec.Ports[0].NodePort = envoyNodePortHTTPPort
+		svc.Spec.Ports[1].NodePort = envoyNodePortHTTPSPort
 	}
 
 	return svc
@@ -246,12 +335,12 @@ func (r *reconciler) updateContourServiceIfNeeded(ctx context.Context, contour *
 			"name", current.Name)
 		return nil
 	}
-	svc, updated := equality.ClusterIPServiceChanged(current, desired)
+	_, updated := equality.ClusterIPServiceChanged(current, desired)
 	if updated {
-		if err := r.client.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update service %s/%s: %w", svc.Namespace, svc.Name, err)
+		if err := r.client.Update(ctx, desired); err != nil {
+			return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 		}
-		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
+		r.log.Info("updated service", "namespace", desired.Namespace, "name", desired.Name)
 		return nil
 	}
 	r.log.Info("service unchanged; skipped updating",
@@ -268,12 +357,20 @@ func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, contour *op
 			"name", current.Name)
 		return nil
 	}
-	svc, updated := equality.LoadBalancerServiceChanged(current, desired)
+	updated := false
+	switch contour.Spec.NetworkPublishing.Envoy.Type {
+	case operatorv1alpha1.NodePortServicePublishingType:
+		_, updated = equality.LoadBalancerServiceChanged(current, desired)
+	// Add additional network publishing types as they are introduced.
+	default:
+		// LoadBalancerService is the default network publishing type.
+		_, updated = equality.NodePortServiceChanged(current, desired)
+	}
 	if updated {
-		if err := r.client.Update(ctx, svc); err != nil {
-			return fmt.Errorf("failed to update service %s/%s: %w", svc.Namespace, svc.Name, err)
+		if err := r.client.Update(ctx, desired); err != nil {
+			return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 		}
-		r.log.Info("updated service", "namespace", svc.Namespace, "name", svc.Name)
+		r.log.Info("updated service", "namespace", desired.Namespace, "name", desired.Name)
 		return nil
 	}
 	r.log.Info("service unchanged; skipped updating",

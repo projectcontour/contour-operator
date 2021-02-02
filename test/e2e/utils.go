@@ -57,18 +57,8 @@ func newClient() (client.Client, error) {
 	return kubeClient, nil
 }
 
-func newDefaultContour(ctx context.Context, cl client.Client, name, ns string) (*operatorv1alpha1.Contour, error) {
-	cntr := objutil.NewContour(name, ns)
-	if err := cl.Create(ctx, cntr); err != nil {
-		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
-	}
-	return cntr, nil
-}
-
-func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool) (*operatorv1alpha1.Contour, error) {
-	cntr := objutil.NewContour(name, ns)
-	cntr.Spec.Namespace.Name = specNs
-	cntr.Spec.Namespace.RemoveOnDeletion = remove
+func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
+	cntr := objutil.NewContour(name, ns, specNs, remove, pubType)
 	if err := cl.Create(ctx, cntr); err != nil {
 		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
@@ -76,7 +66,12 @@ func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, 
 }
 
 func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
-	cntr := objutil.NewContour(name, ns)
+	cntr := &operatorv1alpha1.Contour{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+	}
 	if err := cl.Delete(ctx, cntr); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete contour %s/%s: %v", cntr.Namespace, cntr.Name, err)

@@ -145,6 +145,10 @@ func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("failed to get contour %q: %w", req, err)
 	}
 
+	if err := validateContour(contour); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
+
 	// The contour is safe to process, so ensure current state matches desired state.
 	desired := contour.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
@@ -219,8 +223,12 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 		if err := r.ensureContourService(ctx, contour); err != nil {
 			errs = append(errs, fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		}
-		if err := r.ensureEnvoyService(ctx, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+			if err := r.ensureEnvoyService(ctx, contour); err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
+					contour.Namespace, contour.Name, err))
+			}
 		}
 	}
 

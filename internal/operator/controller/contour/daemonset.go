@@ -60,6 +60,10 @@ const (
 	envoyCfgFileName = "envoy.json"
 	// xdsResourceVersion is the version of the Envoy xdS resource types.
 	xdsResourceVersion = "v3"
+	// envoyInsecureContainerPort is the network port number of Envoy's insecure listener.
+	envoyInsecureContainerPort = int32(8080)
+	// envoySecureContainerPort is the network port number of Envoy's secure listener.
+	envoySecureContainerPort = int32(8443)
 )
 
 // ensureDaemonSet ensures a DaemonSet exists for the given contour.
@@ -132,6 +136,16 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		// Associate the daemonset with the provided contour.
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+	}
+
+	var ports []corev1.ContainerPort
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		p := corev1.ContainerPort{
+			Name:          port.Name,
+			ContainerPort: port.PortNumber,
+			Protocol:      corev1.ProtocolTCP,
+		}
+		ports = append(ports, p)
 	}
 
 	containers := []corev1.Container{
@@ -218,24 +232,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				SuccessThreshold:    int32(1),
 				TimeoutSeconds:      int32(1),
 			},
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "http",
-					ContainerPort: int32(httpPort),
-					// Required for kind/bare-metal deployments but unneeded otherwise.
-					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.
-					HostPort: int32(httpPort),
-					Protocol: "TCP",
-				},
-				{
-					Name:          "https",
-					ContainerPort: int32(httpsPort),
-					// Required for kind/bare-metal deployments but unneeded otherwise.
-					// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/70 merges.
-					HostPort: int32(httpsPort),
-					Protocol: "TCP",
-				},
-			},
+			Ports: ports,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      envoyCertsVolName,

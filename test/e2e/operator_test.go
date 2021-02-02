@@ -23,6 +23,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +41,7 @@ var (
 	// operatorNs is the name of the operator's namespace.
 	operatorNs = "contour-operator"
 	// defaultContourNs is the default spec.namespace.name of a Contour.
-	defaultContourNs = "projectcontour"
+	defaultContourNs = config.DefaultContourSpecNs
 	// testUrl is the url used to test e2e functionality.
 	testUrl = "http://local.projectcontour.io/"
 	// expectedDeploymentConditions are the expected status conditions of a
@@ -81,18 +82,19 @@ func TestOperatorDeploymentAvailable(t *testing.T) {
 	t.Logf("observed expected status conditions for deployment %s/%s", operatorNs, operatorName)
 }
 
-func TestDefaultContour(t *testing.T) {
-	testName := "test-default-contour"
-	cntr, err := newDefaultContour(ctx, kclient, testName, operatorNs)
+func TestContourNodePort(t *testing.T) {
+	testName := "test-nodeport-contour"
+	nodePort := operatorv1alpha1.NodePortServicePublishingType
+	cntr, err := newContour(ctx, kclient, testName, operatorNs, defaultContourNs, false, nodePort)
 	if err != nil {
 		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
@@ -137,7 +139,8 @@ func TestContourSpecNs(t *testing.T) {
 	testName := "test-user-contour"
 	specNs := fmt.Sprintf("%s-%s", defaultContourNs, testName)
 	removeNs := true
-	cntr, err := newContour(ctx, kclient, testName, operatorNs, specNs, removeNs)
+	nodePort := operatorv1alpha1.NodePortServicePublishingType
+	cntr, err := newContour(ctx, kclient, testName, operatorNs, specNs, removeNs, nodePort)
 	if err != nil {
 		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
 	}

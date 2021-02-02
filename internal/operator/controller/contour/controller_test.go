@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,9 +25,12 @@ import (
 
 // Define utility constants for object names, testing timeouts/durations intervals, etc.
 const (
-	testContourName = "test-contour"
-	testOperatorNs  = "test-contour-operator"
-	contourImage    = "test-image:tag"
+	testContourName   = "test-contour"
+	testContourNs     = testContourName + "-ns"
+	testOperatorNs    = testContourName + "-operator"
+	testContourSpecNs = config.DefaultContourSpecNs
+	testContourImage  = config.DefaultContourImage
+	testEnvoyImage    = config.DefaultEnvoyImage
 )
 
 var (

@@ -14,8 +14,10 @@
 package contour
 
 import (
+	"fmt"
 	"testing"
 
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objutil "github.com/projectcontour/contour-operator/internal/object"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -65,12 +67,50 @@ func checkDeploymentHasLabels(t *testing.T, deploy *appsv1.Deployment, expected 
 	t.Errorf("deployment has unexpected %q labels", deploy.Labels)
 }
 
+func checkContainerHasArg(t *testing.T, container corev1.Container, arg string) {
+	t.Helper()
+
+	for _, a := range container.Args {
+		if a == arg {
+			return
+		}
+	}
+	t.Errorf("container is missing argument %q", arg)
+}
+
 func TestDesiredDeployment(t *testing.T) {
-	deploy := DesiredDeployment(cntr, contourImage)
+	lb := operatorv1alpha1.LoadBalancerServicePublishingType
+	ctr := objutil.NewContour(testContourName, testContourNs, testContourSpecNs, false, lb)
+	// Change the default ports to test Envoy service port args.
+	for i, p := range ctr.Spec.NetworkPublishing.Envoy.ContainerPorts {
+		if p.Name == "http" && p.PortNumber == envoyInsecureContainerPort {
+			ctr.Spec.NetworkPublishing.Envoy.ContainerPorts[i].PortNumber = int32(8081)
+		}
+		if p.Name == "https" && p.PortNumber == envoySecureContainerPort {
+			ctr.Spec.NetworkPublishing.Envoy.ContainerPorts[i].PortNumber = int32(8444)
+		}
+	}
+
+	deploy := DesiredDeployment(ctr, testContourImage)
+
 	container := checkDeploymentHasContainer(t, deploy, contourContainerName, true)
-	checkContainerHasImage(t, container, contourImage)
+	checkContainerHasImage(t, container, testContourImage)
 	checkDeploymentHasEnvVar(t, deploy, contourNsEnvVar)
 	checkDeploymentHasEnvVar(t, deploy, contourPodEnvVar)
-	labels := makeDeploymentLabels(cntr, objutil.TagFromImage(contourImage))
-	checkDeploymentHasLabels(t, deploy, labels)
+	checkDeploymentHasLabels(t, deploy, deploy.Labels)
+
+	for _, c := range deploy.Spec.Template.Spec.Containers {
+		if c.Name == contourContainerName {
+			for _, port := range container.Ports {
+				if port.Name == "http" && port.ContainerPort != envoyInsecureContainerPort {
+					arg := fmt.Sprintf("--envoy-service-http-port=%d", port.ContainerPort)
+					checkContainerHasArg(t, c, arg)
+				}
+				if port.Name == "https" && port.ContainerPort != envoySecureContainerPort {
+					arg := fmt.Sprintf("--envoy-service-https-port=%d", port.ContainerPort)
+					checkContainerHasArg(t, c, arg)
+				}
+			}
+		}
+	}
 }
