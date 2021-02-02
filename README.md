@@ -1,6 +1,9 @@
 # contour-operator
-Welcome to the Contour Operator project. Contour Operator deploys and manages Contour using an
-[operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/). 
+Contour Operator provides a method for packaging, deploying, and managing [Contour][1]. The operator extends the
+functionality of the Kubernetes API to create, configure, and manage instances of Contour on behalf of users. It builds
+upon the basic Kubernetes resource and controller concepts, but includes domain-specific knowledge to automate the
+entire lifecycle of Contour. Refer to the official [Kubernetes documentation][2] to learn more about the benefits of the
+operator pattern.
 
 ## Get Started
 
@@ -70,3 +73,6 @@ workflow and instructions on the developer certificate of origin that is require
 - Check out the [open issues](https://github.com/projectcontour/contour-operator/issues).
 - Join the Contour Slack channel: [#contour](https://kubernetes.slack.com/messages/contour/)
 - Join the **Contour Community Meetings** - [details can be found here](https://projectcontour.io/community)
+
+[1]: https://projectcontour.io/
+[2]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
