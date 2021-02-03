@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	equality "github.com/projectcontour/contour-operator/internal/equality"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,16 +44,6 @@ const (
 	// TODO [danehans]: Make proxy protocol configurable or automatically enabled. See
 	// https://github.com/projectcontour/contour-operator/issues/49 for details.
 	awsLbBackendProtoAnnotation = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
-	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
-	EnvoyServiceHTTPPort = int32(80)
-	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
-	EnvoyServiceHTTPSPort = int32(443)
-	// envoyNodePortHTTPPort is the NodePort port number for Envoy's HTTP service. For NodePort
-	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
-	envoyNodePortHTTPPort = int32(30080)
-	// envoyNodePortHTTPSPort is the NodePort port number for Envoy's HTTPS service. For NodePort
-	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
-	envoyNodePortHTTPSPort = int32(30443)
 	// awsProviderType is the name of the Amazon Web Services provider.
 	awsProviderType = "AWS"
 	// azureProviderType is the name of the Microsoft Azure provider.
@@ -233,14 +224,14 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		case port.Name == "http":
 			httpFound = true
 			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPPort
+			p.Port = config.EnvoyServiceHTTPPort
 			p.Protocol = corev1.ProtocolTCP
 			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
 			ports = append(ports, p)
 		case port.Name == "https":
 			httpsFound = true
 			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPSPort
+			p.Port = config.EnvoyServiceHTTPSPort
 			p.Protocol = corev1.ProtocolTCP
 			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
 			ports = append(ports, p)
@@ -283,8 +274,8 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		}
 	case operatorv1alpha1.NodePortServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeNodePort
-		svc.Spec.Ports[0].NodePort = envoyNodePortHTTPPort
-		svc.Spec.Ports[1].NodePort = envoyNodePortHTTPSPort
+		svc.Spec.Ports[0].NodePort = config.EnvoyNodePortHTTPPort
+		svc.Spec.Ports[1].NodePort = config.EnvoyNodePortHTTPSPort
 	}
 
 	return svc

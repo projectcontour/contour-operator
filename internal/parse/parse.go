@@ -20,6 +20,8 @@ import (
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 	"fmt"
+	"os/exec"
+	"strings"
 
 	"github.com/docker/distribution/reference"
 )
@@ -33,4 +35,55 @@ func Image(s string) error {
 	}
 
 	return nil
+}
+
+// DeploymentLogsForString parses the container logs of the specified ns/name
+// deployment, returning true if the string was found.
+// TODO [danehans]: Refactor to use client-go GetLogs() method:
+// https://github.com/projectcontour/contour-operator/issues/200
+func DeploymentLogsForString(ns, name, container, expectedString string) (bool, error) {
+	cmdPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return false, err
+	}
+	slashName := fmt.Sprintf("deployment/%s", name)
+	nsFlag := fmt.Sprintf("--namespace=%s", ns)
+	args := []string{"logs", slashName, "-c", container, nsFlag}
+	found, err := lookForString(cmdPath, args, expectedString)
+	if err != nil {
+		return false, err
+	}
+	if found {
+		return true, nil
+	}
+	return false, nil
+}
+
+// lookForString looks for the given string using cmd and args, returning
+// true if the string was found.
+func lookForString(cmd string, args []string, expectedString string) (bool, error) {
+	result, err := runCmd(cmd, args)
+	if err != nil {
+		return false, err
+	}
+	if strings.Contains(result, expectedString) {
+		return true, nil
+	}
+	return false, nil
+}
+
+// runCmd runs command cmd with arguments args and returns the output
+// of the command or an error.
+func runCmd(cmd string, args []string) (string, error) {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, ".") {
+			return "", fmt.Errorf("invalid argument %q", arg)
+		}
+	}
+	execCmd := exec.Command(cmd, args...)
+	result, err := execCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to run command %q with args %q: %v", cmd, args, err)
+	}
+	return string(result), nil
 }

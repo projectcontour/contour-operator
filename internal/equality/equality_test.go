@@ -18,6 +18,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -556,11 +557,11 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
 				Name:       "http",
-				PortNumber: contourcontroller.EnvoyServiceHTTPPort,
+				PortNumber: config.EnvoyServiceHTTPPort,
 			},
 			{
 				Name:       "https",
-				PortNumber: contourcontroller.EnvoyServiceHTTPSPort,
+				PortNumber: config.EnvoyServiceHTTPSPort,
 			},
 		}
 		expected := contourcontroller.DesiredEnvoyService(cntr)
@@ -602,11 +603,11 @@ func TestNodePortServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
 				Name:       "http",
-				PortNumber: contourcontroller.EnvoyServiceHTTPPort,
+				PortNumber: config.EnvoyServiceHTTPPort,
 			},
 			{
 				Name:       "https",
-				PortNumber: contourcontroller.EnvoyServiceHTTPSPort,
+				PortNumber: config.EnvoyServiceHTTPSPort,
 			},
 		}
 		expected := contourcontroller.DesiredEnvoyService(cntr)

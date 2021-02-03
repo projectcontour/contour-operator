@@ -17,7 +17,7 @@ import (
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestImage(t *testing.T) {
 	testCases := []struct {
 		description string
 		image       string

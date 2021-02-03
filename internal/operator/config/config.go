@@ -21,6 +21,16 @@ const (
 	DefaultEnableLeaderElectionID = "0d879e31.projectcontour.io"
 	// DefaultContourSpecNs is the default spec.namespace.name of a Contour.
 	DefaultContourSpecNs = "projectcontour"
+	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
+	EnvoyServiceHTTPPort = int32(80)
+	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
+	EnvoyServiceHTTPSPort = int32(443)
+	// EnvoyNodePortHTTPPort is the NodePort port number for Envoy's HTTP service. For NodePort
+	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	EnvoyNodePortHTTPPort = int32(30080)
+	// EnvoyNodePortHTTPSPort is the NodePort port number for Envoy's HTTPS service. For NodePort
+	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	EnvoyNodePortHTTPSPort = int32(30443)
 )
 
 // Config is configuration of the operator.
