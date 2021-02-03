@@ -360,11 +360,11 @@ func (r *reconciler) updateEnvoyServiceIfNeeded(ctx context.Context, contour *op
 	updated := false
 	switch contour.Spec.NetworkPublishing.Envoy.Type {
 	case operatorv1alpha1.NodePortServicePublishingType:
-		_, updated = equality.LoadBalancerServiceChanged(current, desired)
+		_, updated = equality.NodePortServiceChanged(current, desired)
 	// Add additional network publishing types as they are introduced.
 	default:
 		// LoadBalancerService is the default network publishing type.
-		_, updated = equality.NodePortServiceChanged(current, desired)
+		_, updated = equality.LoadBalancerServiceChanged(current, desired)
 	}
 	if updated {
 		if err := r.client.Update(ctx, desired); err != nil {
