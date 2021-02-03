@@ -5,4 +5,4 @@ resources:
 images:
 - name: contour-operator
   newName: docker.io/projectcontour/contour-operator
-  newTag: main
+  newTag: v1.12.0
