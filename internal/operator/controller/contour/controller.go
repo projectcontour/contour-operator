@@ -196,40 +196,41 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // ensureContour ensures all necessary resources exist for the given contour.
 func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
-	if err := r.ensureNamespace(ctx, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to ensure namespace %s for contour %s/%s: %w",
-			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err))
-	}
-	if err := r.ensureRBAC(ctx, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to ensure rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	}
-
 	deploy := &appsv1.Deployment{}
 	ds := &appsv1.DaemonSet{}
-	if len(errs) == 0 {
-		if err := r.ensureConfigMap(ctx, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	if contour.Spec.GatewayClassRef == "None" {
+		if err := r.ensureNamespace(ctx, contour); err != nil {
+			errs = append(errs, fmt.Errorf("failed to ensure namespace %s for contour %s/%s: %w",
+				contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err))
 		}
-		if err := r.ensureJob(ctx, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure job for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+		if err := r.ensureRBAC(ctx, contour); err != nil {
+			errs = append(errs, fmt.Errorf("failed to ensure rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		}
-		var err error
-		deploy, err = r.ensureDeployment(ctx, contour)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		}
-		ds, err = r.ensureDaemonSet(ctx, contour)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		}
-		if err := r.ensureContourService(ctx, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		}
-		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-			if err := r.ensureEnvoyService(ctx, contour); err != nil {
-				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
-					contour.Namespace, contour.Name, err))
+		if len(errs) == 0 {
+			if err := r.ensureConfigMap(ctx, contour); err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			}
+			if err := r.ensureJob(ctx, contour); err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure job for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			}
+			var err error
+			deploy, err = r.ensureDeployment(ctx, contour)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			}
+			ds, err = r.ensureDaemonSet(ctx, contour)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			}
+			if err := r.ensureContourService(ctx, contour); err != nil {
+				errs = append(errs, fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			}
+			if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
+				contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+				if err := r.ensureEnvoyService(ctx, contour); err != nil {
+					errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
+						contour.Namespace, contour.Name, err))
+				}
 			}
 		}
 	}

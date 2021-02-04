@@ -75,6 +75,12 @@ type ContourSpec struct {
 	//
 	// +kubebuilder:default={envoy: {type: LoadBalancerService, containerPorts: {{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}}}
 	NetworkPublishing NetworkPublishing `json:"networkPublishing,omitempty"`
+
+	// GatewayClassRef is a reference to a GatewayClass name used for
+	// managing a Contour.
+	//
+	// +kubebuilder:default=None
+	GatewayClassRef string `json:"gatewayClassRef,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.

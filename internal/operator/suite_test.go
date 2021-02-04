@@ -42,10 +42,11 @@ import (
 
 // Define utility constants for object names, testing timeouts/durations intervals, etc.
 const (
-	testContourName  = "test-contour"
-	testOperatorNs   = "test-contour-operator"
-	defaultNamespace = "projectcontour"
-	defaultReplicas  = int32(2)
+	testContourName        = "test-contour"
+	testOperatorNs         = "test-contour-operator"
+	defaultNamespace       = "projectcontour"
+	defaultGatewayClassRef = "None"
+	defaultReplicas        = int32(2)
 
 	timeout  = time.Second * 10
 	interval = time.Millisecond * 250
@@ -153,6 +154,13 @@ var _ = Describe("Run controller", func() {
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope
 			}, timeout, interval).Should(Equal(operatorv1alpha1.ExternalLoadBalancer))
+
+			By("Expecting default gatewayClassRef")
+			Eventually(func() string {
+				f := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
+				return f.Spec.GatewayClassRef
+			}, timeout, interval).Should(Equal(defaultGatewayClassRef))
 
 			// Update the contour
 			By("By updating a contour spec")
