@@ -20,7 +20,6 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test
         run: |
-          go mod vendor
           make test
   test-example-linux:
     runs-on: ubuntu-latest
@@ -36,7 +35,6 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-example
         run: |
-          go mod vendor
           make local-cluster load-image example test-example
   test-e2e-linux:
     runs-on: ubuntu-latest
@@ -52,7 +50,6 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-e2e
         run: |
-          go mod vendor
           make local-cluster load-image test-e2e
   codespell:
     name: Codespell
