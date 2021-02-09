@@ -81,12 +81,8 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
-  - backendpolicies
-  - gatewayclasses
-  - gateways
-  - httproutes
+  - ingressclasses
   - ingresses
-  - tcproutes
   verbs:
   - get
   - list
@@ -95,6 +91,24 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses/status
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - networking.x-k8s.io
+  resources:
+  - gatewayclasses
+  - gateways
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.x-k8s.io
+  resources:
+  - gatewayclasses/status
+  - gateways/status
   verbs:
   - create
   - get
