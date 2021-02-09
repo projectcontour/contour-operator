@@ -76,7 +76,7 @@ check: test lint-golint lint-codespell
 
 # Run tests
 test: generate fmt vet manifests verify-image
-	go test ./... -coverprofile cover.out
+	go test -mod=readonly ./... -coverprofile cover.out
 
 lint-golint:
 	@echo Running Go linter ...
@@ -90,7 +90,7 @@ lint-codespell:
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/contour-operator cmd/contour-operator.go
+	go build -mod=readonly -o bin/contour-operator cmd/contour-operator.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests install
@@ -200,4 +200,4 @@ release:
 test-e2e: ## Runs e2e tests.
 .PHONY: test-e2e
 test-e2e: deploy
-	go test -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e
+	go test -mod=readonly -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e
