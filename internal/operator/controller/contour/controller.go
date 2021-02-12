@@ -147,13 +147,12 @@ func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("failed to get contour %q: %w", req, err)
 	}
 
-	if err := validateContour(contour); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
-	}
-
 	// The contour is safe to process, so ensure current state matches desired state.
 	desired := contour.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
+		if err := validateContour(contour); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
+		}
 		switch {
 		case contourFinalized(contour):
 			if err := r.ensureContour(ctx, contour); err != nil {
