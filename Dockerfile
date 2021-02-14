@@ -15,6 +15,7 @@ RUN go mod download
 COPY cmd/contour-operator.go contour-operator.go
 COPY api/ api/
 COPY internal/ internal/
+COPY pkg/ pkg/
 
 ARG TARGETOS
 ARG TARGETARCH

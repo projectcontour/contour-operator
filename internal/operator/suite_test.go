@@ -21,8 +21,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
-	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
-	"github.com/projectcontour/contour-operator/internal/slice"
+	"github.com/projectcontour/contour-operator/pkg/slice"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -63,7 +62,7 @@ var (
 	}
 
 	ctx       = context.Background()
-	finalizer = contourcontroller.ContourFinalizer
+	finalizer = operatorv1alpha1.ContourFinalizer
 
 	operator *Operator
 )

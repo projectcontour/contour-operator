@@ -19,7 +19,7 @@ import (
 
 	"github.com/projectcontour/contour-operator/internal/operator"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
-	parse "github.com/projectcontour/contour-operator/internal/parse"
+	"github.com/projectcontour/contour-operator/internal/parse"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"

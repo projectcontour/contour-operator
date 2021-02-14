@@ -18,8 +18,10 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
-	"github.com/projectcontour/contour-operator/internal/operator/config"
-	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
+	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
+	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
+	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
+	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -105,14 +107,14 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 			description: "if probe values are set to default values",
 			mutate: func(ds *appsv1.DaemonSet) {
 				for i, c := range ds.Spec.Template.Spec.Containers {
-					if c.Name == contourcontroller.ShutdownContainerName {
+					if c.Name == objds.ShutdownContainerName {
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.Handler.HTTPGet.Scheme = "HTTP"
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.TimeoutSeconds = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = int32(10)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = int32(1)
 						ds.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = int32(3)
 					}
-					if c.Name == contourcontroller.EnvoyContainerName {
+					if c.Name == objds.EnvoyContainerName {
 						ds.Spec.Template.Spec.Containers[i].ReadinessProbe.TimeoutSeconds = int32(1)
 						// ReadinessProbe InitialDelaySeconds and PeriodSeconds are not set as defaults,
 						// so they are omitted.
@@ -127,7 +129,7 @@ func TestDaemonSetConfigChanged(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			original := contourcontroller.DesiredDaemonSet(cntr, testImage, testImage)
+			original := objds.DesiredDaemonSet(cntr, testImage, testImage)
 
 			mutated := original.DeepCopy()
 			tc.mutate(mutated)
@@ -234,7 +236,7 @@ func TestJobConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected := contourcontroller.DesiredJob(cntr, testImage)
+		expected := objjob.DesiredJob(cntr, testImage)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -328,7 +330,7 @@ func TestDeploymentConfigChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		original := contourcontroller.DesiredDeployment(cntr, testImage)
+		original := objdeploy.DesiredDeployment(cntr, testImage)
 		mutated := original.DeepCopy()
 		tc.mutate(mutated)
 		if updated, changed := equality.DeploymentConfigChanged(original, mutated); changed != tc.expect {
@@ -432,7 +434,7 @@ func TestClusterIpServiceChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected := contourcontroller.DesiredContourService(cntr)
+		expected := objsvc.DesiredContourService(cntr)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -557,14 +559,18 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
 				Name:       "http",
-				PortNumber: config.EnvoyServiceHTTPPort,
+				PortNumber: objsvc.EnvoyServiceHTTPPort,
 			},
 			{
 				Name:       "https",
-				PortNumber: config.EnvoyServiceHTTPSPort,
+				PortNumber: objsvc.EnvoyServiceHTTPPort,
+			},
+			{
+				Name:       "https",
+				PortNumber: objsvc.EnvoyServiceHTTPSPort,
 			},
 		}
-		expected := contourcontroller.DesiredEnvoyService(cntr)
+		expected := objsvc.DesiredEnvoyService(cntr)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)
@@ -603,14 +609,18 @@ func TestNodePortServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
 				Name:       "http",
-				PortNumber: config.EnvoyServiceHTTPPort,
+				PortNumber: objsvc.EnvoyServiceHTTPPort,
 			},
 			{
 				Name:       "https",
-				PortNumber: config.EnvoyServiceHTTPSPort,
+				PortNumber: objsvc.EnvoyServiceHTTPSPort,
+			},
+			{
+				Name:       "https",
+				PortNumber: objsvc.EnvoyServiceHTTPSPort,
 			},
 		}
-		expected := contourcontroller.DesiredEnvoyService(cntr)
+		expected := objsvc.DesiredEnvoyService(cntr)
 
 		mutated := expected.DeepCopy()
 		tc.mutate(mutated)

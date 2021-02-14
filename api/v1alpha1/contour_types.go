@@ -27,6 +27,9 @@ const (
 	// OwningContourNsLabel is the owner reference label used for a Contour
 	// created by the operator. The value should be the namespace of the contour.
 	OwningContourNsLabel = "contour.operator.projectcontour.io/owning-contour-namespace"
+
+	// ContourFinalizer is the name of the finalizer used for a Contour.
+	ContourFinalizer = "contour.operator.projectcontour.io/finalizer"
 )
 
 // +kubebuilder:object:root=true
