@@ -39,6 +39,10 @@ spec:
           spec:
             description: Spec defines the desired state of Contour.
             properties:
+              gatewayClassRef:
+                default: None
+                description: GatewayClassRef is a reference to a GatewayClass name used for managing a Contour.
+                type: string
               namespace:
                 default:
                   name: projectcontour
