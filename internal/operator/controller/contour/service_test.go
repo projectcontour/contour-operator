@@ -18,6 +18,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objutil "github.com/projectcontour/contour-operator/internal/object"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -111,10 +112,10 @@ func TestDesiredEnvoyService(t *testing.T) {
 	ctr := objutil.NewContour(testContourName, testContourNs, testContourSpecNs, false, nodePort)
 	svc := DesiredEnvoyService(ctr)
 
-	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
-	checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
-	checkServiceHasNodeport(t, svc, envoyNodePortHTTPPort)
-	checkServiceHasNodeport(t, svc, envoyNodePortHTTPSPort)
+	checkServiceHasPort(t, svc, config.EnvoyServiceHTTPPort)
+	checkServiceHasPort(t, svc, config.EnvoyServiceHTTPSPort)
+	checkServiceHasNodeport(t, svc, config.EnvoyNodePortHTTPPort)
+	checkServiceHasNodeport(t, svc, config.EnvoyNodePortHTTPSPort)
 	for _, port := range ctr.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		checkServiceHasTargetPort(t, svc, port.PortNumber)
 	}
