@@ -1,7 +1,12 @@
 name: Build and Test
 
 # Trigger the workflow on push or pull request
-on: [push, pull_request]
+on:
+   # Run every hour
+  schedule:
+    - cron: '0 * * * *'
+  push:
+  pull_request:
 
 env:
   GOPROXY: https://proxy.golang.org/
