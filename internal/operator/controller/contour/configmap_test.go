@@ -18,10 +18,16 @@ import (
 )
 
 func TestDesiredDNSConfigmap(t *testing.T) {
-	expectedCfgfile := `#
+	expectedCfgfile := `
+#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
+#
+# Specify the service-apis Gateway Contour should watch.
+# gateway:
+#   name: contour
+#   namespace: projectcontour
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -29,16 +35,29 @@ func TestDesiredDNSConfigmap(t *testing.T) {
 # path to kubeconfig (if not running inside a k8s cluster)
 # kubeconfig: /path/to/.kube/config
 #
-# disable HTTPProxy permitInsecure field
+# Disable RFC-compliant behavior to strip "Content-Length" header if
+# "Tranfer-Encoding: chunked" is also set.
+# disableAllowChunkedLength: false
+# Disable HTTPProxy permitInsecure field
 disablePermitInsecure: false
 tls:
 # minimum TLS version that Contour will negotiate
-# minimum-protocol-version: "1.1"
+# minimum-protocol-version: "1.2"
+# TLS ciphers to be supported by Envoy TLS listeners when negotiating
+# TLS 1.2.
+# cipher-suites:
+# - '[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]'
+# - '[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]'
+# - 'ECDHE-ECDSA-AES256-GCM-SHA384'
+# - 'ECDHE-RSA-AES256-GCM-SHA384'
 # Defines the Kubernetes name/namespace matching a secret to use
 # as the fallback certificate when requests which don't match the
 # SNI defined for a vhost.
   fallback-certificate:
 #   name: fallback-secret-name
+#   namespace: projectcontour
+  envoy-client-certificate:
+#   name: envoy-client-cert-secret-name
 #   namespace: projectcontour
 # The following config shows the defaults for the leader election.
 # leaderelection:
@@ -86,6 +105,7 @@ accesslog-format: envoy
 #   connection-idle-timeout: 60s
 #   stream-idle-timeout: 5m
 #   max-connection-duration: infinity
+#   delayed-close-timeout: 1s
 #   connection-shutdown-grace-period: 5s
 #
 # Envoy cluster settings.
@@ -93,6 +113,12 @@ accesslog-format: envoy
 #   configure the cluster dns lookup family
 #   valid options are: auto (default), v4, v6
 #   dns-lookup-family: auto
+#
+# Envoy network settings.
+# network:
+#   Configure the number of additional ingress proxy hops from the
+#   right side of the x-forwarded-for HTTP header to trust.
+#   num-trusted-hops: 0
 `
 	if cm, err := desiredConfigMap(cntr); err != nil {
 		t.Errorf("invalid contour configmap: %v", err)
