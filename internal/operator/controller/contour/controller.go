@@ -63,6 +63,7 @@ type reconciler struct {
 // +kubebuilder:rbac:groups="",resources=namespaces;secrets;serviceaccounts;services,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses;gateways,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses/status;gateways/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch
@@ -104,31 +105,28 @@ func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
 // enqueueRequestForOwningContour returns an event handler that maps events to
 // objects containing Contour owner labels.
 func (r *reconciler) enqueueRequestForOwningContour() handler.EventHandler {
-	return &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-			labels := a.Meta.GetLabels()
-			ns, nsFound := labels[operatorv1alpha1.OwningContourNsLabel]
-			name, nameFound := labels[operatorv1alpha1.OwningContourNameLabel]
-			if nsFound && nameFound {
-				r.log.Info("queueing contour", "namespace", ns, "name", name, "related", a.Meta.GetSelfLink())
-				return []reconcile.Request{
-					{
-						NamespacedName: types.NamespacedName{
-							Namespace: ns,
-							Name:      name,
-						},
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		labels := a.GetLabels()
+		ns, nsFound := labels[operatorv1alpha1.OwningContourNsLabel]
+		name, nameFound := labels[operatorv1alpha1.OwningContourNameLabel]
+		if nsFound && nameFound {
+			r.log.Info("queueing contour", "namespace", ns, "name", name, "related", a.GetSelfLink())
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: ns,
+						Name:      name,
 					},
-				}
+				},
 			}
-			return []reconcile.Request{}
-		}),
-	}
+		}
+		return []reconcile.Request{}
+	})
 }
 
 // Reconcile reconciles watched objects and attempts to make the current state of
 // the object match the desired state.
-func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = r.log.WithValues("contour", req.NamespacedName)
 
 	r.log.Info("reconciling", "request", req)

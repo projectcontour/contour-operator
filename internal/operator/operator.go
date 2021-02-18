@@ -14,16 +14,18 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
 
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // Operator is the scaffolding for the contour operator. It sets up dependencies
@@ -37,21 +39,13 @@ type Operator struct {
 
 // New creates a new operator from cliCfg and opCfg.
 func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1a1.GatewayClass{}, &gatewayv1a1.Gateway{}}
 	mgrOpts := manager.Options{
-		Scheme:             GetOperatorScheme(),
-		LeaderElection:     opCfg.LeaderElection,
-		LeaderElectionID:   opCfg.LeaderElectionID,
-		MetricsBindAddress: opCfg.MetricsBindAddress,
-		// Use a non-caching client everywhere. The default split client does not
-		// promise to invalidate the cache during writes (nor does it promise
-		// sequential create/get coherence), and we have code which (probably
-		// incorrectly) assumes a get immediately following a create/update will
-		// return the updated resource. All client consumers will need audited to
-		// ensure they are tolerant of stale data (or we need a cache or client that
-		// makes stronger coherence guarantees).
-		NewClient: func(_ cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-			return client.New(config, options)
-		},
+		Scheme:                GetOperatorScheme(),
+		LeaderElection:        opCfg.LeaderElection,
+		LeaderElectionID:      opCfg.LeaderElectionID,
+		MetricsBindAddress:    opCfg.MetricsBindAddress,
+		ClientDisableCacheFor: nonCached,
 	}
 	mgr, err := ctrl.NewManager(cliCfg, mgrOpts)
 	if err != nil {
@@ -74,15 +68,15 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 
 // Start starts the operator synchronously until a message is received
 // on the stop channel.
-func (o *Operator) Start(stop <-chan struct{}) error {
+func (o *Operator) Start(ctx context.Context) error {
 	errChan := make(chan error)
 	go func() {
-		errChan <- o.manager.Start(stop)
+		errChan <- o.manager.Start(ctx)
 	}()
 
 	// Wait for the manager to exit or an explicit stop.
 	select {
-	case <-stop:
+	case <-ctx.Done():
 		return nil
 	case err := <-errChan:
 		return err

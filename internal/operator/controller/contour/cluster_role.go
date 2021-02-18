@@ -28,7 +28,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	svcapisv1a1 "sigs.k8s.io/service-apis/apis/v1alpha1"
+	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // ensureClusterRole ensures a ClusterRole resource exists with the provided name
@@ -60,7 +60,7 @@ func (r *reconciler) ensureClusterRole(ctx context.Context, name string, contour
 func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
 	groupNet := []string{networkingv1.GroupName}
-	groupSvcAPIs := []string{svcapisv1a1.GroupName}
+	groupGateway := []string{gatewayv1a1.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{projectcontourv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
@@ -91,14 +91,14 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		APIGroups: groupExt,
 		Resources: []string{"customresourcedefinitions"},
 	}
-	svcAPI := rbacv1.PolicyRule{
+	gateway := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
-		APIGroups: groupSvcAPIs,
+		APIGroups: groupGateway,
 		Resources: []string{"gatewayclasses", "gateways"},
 	}
-	svcAPIStatus := rbacv1.PolicyRule{
+	gatewayStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
-		APIGroups: groupSvcAPIs,
+		APIGroups: groupGateway,
 		Resources: []string{"gatewayclasses/status", "gateways/status"},
 	}
 	ing := rbacv1.PolicyRule{
@@ -127,7 +127,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, svcAPI, svcAPIStatus, ing, ingStatus, cntr, cntrStatus, crd}
+	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd}
 	return cr
 }
 
