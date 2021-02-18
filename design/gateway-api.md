@@ -1,14 +1,14 @@
-# Service APIs
+# Gateway API
 
-This document outlines a design for implementing [Service APIs][1] in Contour Operator.
+This document outlines a design for implementing [Gateway API][1] in Contour Operator.
 
 ## Goals
 
-- Manage Contour and dependent resources using Service APIs.
+- Manage Contour and dependent resources using Gateway API.
 
 ## Non Goals
 
-- Support application-level Service APIs, i.e. xRoute. These APIs will be supported by Contour directly according to
+- Support application-level Gateway APIs, i.e. xRoute. These APIs will be supported by Contour directly according to
   Issue [2809][2].
 
 ## Definitions
@@ -16,11 +16,11 @@ This document outlines a design for implementing [Service APIs][1] in Contour Op
 - A Contour instance or an instance of Contour defines a fully functional Contour deployment that runs on a Kubernetes
   cluster, i.e. `kubectl apply -f https://projectcontour.io/quickstart/contour.yaml`.
 
-### Service APIs
+### Gateway API
 
-Service APIs is an open source project managed by the Kubernetes SIG-NETWORK community. The project's goal is to evolve
-service networking APIs within the Kubernetes ecosystem. Service APIs provide interfaces to expose Kubernetes
-applications- Services, Ingress, and more.
+Gateway API is an open source project managed by the Kubernetes SIG-NETWORK community. The project's goal is to evolve
+service networking APIs within the Kubernetes ecosystem. Gateway API consists of multiple APIs that provide interfaces
+to expose Kubernetes applications- Services, Ingress, and more.
 
 ## Background
 
@@ -28,12 +28,12 @@ Contour Operator manages Contour using the `contours.operator.projectcontour.io`
 Contour custom resource provides the user interface for managing an instance of Contour and is handled by the Kubernetes
 API just like built-in objects. Contour Operator monitors the Contour custom resource and provides status on whether the
 actual state matches the desired state of the object. Contour Operator will continue supporting the CRD to manage
-Contour. Adding support for Service APIs will provide users an alternative approach to managing Contour.
+Contour. Adding Gateway API support will provide users an alternative approach to managing Contour.
 
 ## High-Level Design
 
-Contour Operator will manage Contour using the GatewayClass, Gateway, and Contour custom resources. Service API xRoute
-resources, i.e. HTTPRoute, will be managed by Contour and NOT Contour Operator. Service APIs target different user
+Contour Operator will manage Contour using the GatewayClass, Gateway, and Contour custom resources. Gateway API xRoute
+resources, i.e. HTTPRoute, will be managed by Contour and NOT Contour Operator. The Gateway API targets different user
 personas that are responsible for defining and exposing an application in a Kubernetes cluster:
 
 - __Platform Provider__: The Platform Provider is responsible for the overall environment that the cluster runs in, i.e.
@@ -52,13 +52,13 @@ The following diagram illustrates the relationship between personas and resource
 __Note:__ The personas are meant to provide a framework to users; each environment may alter the persona-to-resource
 relationship based on individual requirements.
 
-Service APIs provide extension-points to allow linking of resources at various layers. This provides more granular
+Gateway API provides extension-points to allow linking of resources at various layers. This provides more granular
 customization at the appropriate places within the API structure. These extension-points will be used to expose
 Contour-specific configuration.
 
 ## Detailed Design
 
-Contour Operator will watch GatewayClass, Gateway, and Contour resources and instantiate an instance of Contour:
+Contour Operator will watch GatewayClass, Gateway, and Contour resources and provision an instance of Contour:
 
 <p align="center">
 <img src="./images/service_apis_operator_implementation_model.png" width="400" height="400"/>
@@ -72,7 +72,7 @@ GatewayClass. If the Contour exists and is valid for this GatewayClass, set the 
 condition. If the Contour does not exist or is invalid for this GatewayClass, set the "InvalidParameters" GatewayClass
 status condition. Finalize the Contour with `gatewayclass-exists-finalizer.operator.projectcontour.io`.
 4. Process a Gateway if `gateway.spec.gatewayClassName` matches a GatewayClass that is being managed by the operator,
-and if the GatewayClass is "Admitted". The presence of a Gateway will trigger the operator to instantiate a Contour
+and if the GatewayClass is "Admitted". The presence of a Gateway will trigger the operator to provision a Contour
 instance using the configuration from Contour and Gateway resources. __Note:__ Contour will read Gateway fields to
 construct its DAG, configure Envoy listeners, etc.
 5. Finalize the GatewayClass when the operator provisions the Contour instance.
@@ -116,7 +116,7 @@ used as the known namespace. If the referenced resource cannot be found, the ope
 
 The Contour custom resource will be used to provide a structured object for representing the configuration of a Contour
 instance. A Contour custom resource will be consumed by a GatewayClass. Since the Contour custom resource currently
-triggers the operator to instantiate a Contour instance, a field will be added to prevent this behavior and treat the
+triggers the operator to provision a Contour instance, a field will be added to prevent this behavior and treat the
 Contour as a configuration-only resource. The following data structure will be used to manage this behavior:
 
 ```go
@@ -125,14 +125,13 @@ type ContourSpec struct {
 	// GatewayClassRef is a reference to a GatewayClass name used for
 	// managing a Contour.
 	//
-	// +kubebuilder:default=None
-    GatewayClassRef string `json:"gatewayClassRef,omitempty"`
+	// +optional
+    GatewayClassRef *string `json:"gatewayClassRef,omitempty"`
 }
 ```
 
-The `gatewayClassRef` field is a reference to a GatewayClass used for managing the Contour. If unspecified, the field
-will default to "None", indicating a GatewayClass does not exist, and the operator should use the Contour resource to
-instantiate a Contour instance.
+The `gatewayClassRef` field is a reference to a GatewayClass used for managing the Contour. If unspecified, the operator
+will use the Contour resource to provision a Contour instance.
 
 The following is an example of a Contour resource that references a GatewayClass:
 ```yaml
@@ -156,11 +155,11 @@ from a client outside the cluster to a Service resource through a proxy such as 
 client traffic originating “outside” the cluster, this is not a requirement.
 
 A Gateway is 1:1 with the lifecycle of the infrastructure configuration. When a Gateway is created, the operator will
-create an instance of Contour. Gateway is the resource that triggers actions in Service APIs. Other Service API
+create an instance of Contour. Gateway is the resource that triggers actions in Gateway APIs. Other Gateway API
 resources represent structured configuration that are linked together by a Gateway.
 
-A Gateway MAY contain one or more Service APIs *Route references which serve to forward traffic to a specific service
-based on application-level rules. Note that Contour Operator is NOT responsible for managing *Route Service API
+A Gateway MAY contain one or more Gateway APIs *Route references which serve to forward traffic to a specific service
+based on application-level rules. Note that Contour Operator is NOT responsible for managing *Route Gateway API
 resources.
 
 The following is a Gateway example that listens for HTTP traffic on TCP port 80:
@@ -239,7 +238,7 @@ data:
 ```
 
 Gateway contains a `routes` field that specifies a schema for associating routes with the `listener` using Kubernetes
-selectors. A Route is a Service APIs resource capable of servicing a request and allows a user to expose a resource
+selectors. A Route is a Gateway APIs resource capable of servicing a request and allows a user to expose a resource
 (i.e. Service) by an externally-reachable URL, proxy traffic to the resource, and terminate SSL/TLS connections.
 
 The following example binds the Gateway to HTTPRoutes with an "app: example" label:
@@ -277,7 +276,7 @@ spec:
 ```
 
 The operator will pass the Gateway namespace/name to Contour when creating an instance of Contour. After the operator
-instantiates a Contour instance, the Contour controller will watch for xRoute resources such as the example HTTPRoute
+provisions a Contour instance, the Contour controller will watch for xRoute resources such as the example HTTPRoute
 above and bind the route based on rules of the `gateways` field.
 
 __Note:__ Contour is responsible for forwarding traffic based on routing rules defined in xRoute resources.
@@ -337,7 +336,7 @@ consist of the following workflow:
 
 ### Operator
 
-Update the operator to only instantiate a Contour instance if `contour.spec.gatewayClassRef` is "None".
+Update the operator to only provision a Contour instance if `contour.spec.gatewayClassRef` is "None".
 
 Create a controller that reconciles the GatewayClass resource and performs the following:
 
@@ -376,14 +375,14 @@ resources.
 - If `gatewayclass.spec.parametersRef` is unspecified, should the operator create a Contour instance with default
   settings or should the GatewayClass be considered invalid? The consensus achieved during 1/13/21 maintainers meeting
   is to create a Contour instance with default setting when `parametersRef` is unspecified.
-  settings or should the GatewayClass be considered invalid
 - `Contour` is a namespace-scoped resource. However, `gatewayclass.spec.parametersref` expects a reference to a
   cluster-scoped resource. Should `Contour` be updated to a cluster-scoped resource or should a separate cluster-scoped
   custom resource be created that is similar to `Contour`? The consensus achieved during the 1/13/21 maintainers meeting
   is to use the `Contour` resource, even though the field does not specify a namespace. The operator's namespace will be
-  used. The lack of namespace-scoped support is being addressed upstream in [Issue 524][4].
+  used. The lack of namespace-scoped support is being addressed upstream in [Issue 524][4]. Note v0.2.0 supports
+  namespace-scoped `gatewayclass.spec.parametersref`.
 
-[1]: https://github.com/kubernetes-sigs/service-apis
+[1]: https://github.com/kubernetes-sigs/gateway-api
 [2]: https://github.com/projectcontour/contour/issues/2809
 [3]: https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets
 [4]: https://github.com/kubernetes-sigs/service-apis/issues/524
