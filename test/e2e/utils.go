@@ -23,15 +23,17 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	objutil "github.com/projectcontour/contour-operator/internal/object"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,8 +60,9 @@ func newClient() (client.Client, error) {
 	return kubeClient, nil
 }
 
-func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
-	cntr := objutil.NewContour(name, ns, specNs, remove, pubType)
+// func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
+func newContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*operatorv1alpha1.Contour, error) {
+	cntr := objcontour.New(cfg)
 	if err := cl.Create(ctx, cntr); err != nil {
 		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
@@ -100,7 +103,32 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func newDeployment(ctx context.Context, cl client.Client, name, ns, image string, replicas int) error {
-	deploy := objutil.NewDeployment(name, ns, image, replicas)
+	replInt32 := int32(replicas)
+	container := corev1.Container{
+		Name:  name,
+		Image: image,
+	}
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+			Labels:    map[string]string{"app": name},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replInt32,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": name},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": name},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{container},
+				},
+			},
+		},
+	}
 	if err := cl.Create(ctx, deploy); err != nil {
 		return fmt.Errorf("failed to create deployment %s/%s: %v", deploy.Namespace, deploy.Name, err)
 	}
@@ -108,7 +136,22 @@ func newDeployment(ctx context.Context, cl client.Client, name, ns, image string
 }
 
 func newClusterIPService(ctx context.Context, cl client.Client, name, ns string, port, targetPort int) error {
-	svc := objutil.NewClusterIPService(ns, name, port, targetPort)
+	svcPort := corev1.ServicePort{
+		Port:       int32(port),
+		TargetPort: intstr.IntOrString{IntVal: int32(targetPort)},
+	}
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+			Labels:    map[string]string{"app": name},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports:    []corev1.ServicePort{svcPort},
+			Selector: map[string]string{"app": name},
+			Type:     corev1.ServiceTypeClusterIP,
+		},
+	}
 	if err := cl.Create(ctx, svc); err != nil {
 		return fmt.Errorf("failed to create service %s/%s: %v", svc.Namespace, svc.Name, err)
 	}
@@ -116,7 +159,23 @@ func newClusterIPService(ctx context.Context, cl client.Client, name, ns string,
 }
 
 func newIngress(ctx context.Context, cl client.Client, name, ns, backendName string, backendPort int) error {
-	ing := objutil.NewIngress(name, ns, backendName, backendPort)
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels:    map[string]string{"app": name},
+		},
+		Spec: networkingv1.IngressSpec{
+			DefaultBackend: &networkingv1.IngressBackend{
+				Service: &networkingv1.IngressServiceBackend{
+					Name: backendName,
+					Port: networkingv1.ServiceBackendPort{
+						Number: int32(backendPort),
+					},
+				},
+			},
+		},
+	}
 	if err := cl.Create(ctx, ing); err != nil {
 		return fmt.Errorf("failed to create ingress %s/%s: %v", ing.Namespace, ing.Name, err)
 	}
@@ -211,8 +270,17 @@ func waitForHTTPResponse(url string, timeout time.Duration) error {
 	return nil
 }
 
+// newNs makes a Namespace object using the provided name for the object's name.
+func newNs(name string) *corev1.Namespace {
+	return &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
+
 func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := objutil.NewNamespace(name)
+	ns := newNs(name)
 	if err := cl.Delete(ctx, ns); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
@@ -239,7 +307,7 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 }
 
 func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := objutil.NewNamespace(name)
+	ns := newNs(name)
 
 	key := types.NamespacedName{
 		Name: ns.Name,
@@ -289,8 +357,8 @@ func updateLbSvcIpAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 		return fmt.Errorf("invalid type %s for service %s/%s", svc.Spec.Type, ns, name)
 	}
 	svc.Spec.LoadBalancerIP = "127.0.0.1"
-	svc.Spec.Ports[0].NodePort = operatorconfig.EnvoyNodePortHTTPPort
-	svc.Spec.Ports[1].NodePort = operatorconfig.EnvoyNodePortHTTPSPort
+	svc.Spec.Ports[0].NodePort = objsvc.EnvoyNodePortHTTPPort
+	svc.Spec.Ports[1].NodePort = objsvc.EnvoyNodePortHTTPSPort
 	if err := cl.Update(ctx, svc); err != nil {
 		return err
 	}

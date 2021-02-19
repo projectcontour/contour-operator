@@ -23,7 +23,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/operator/config"
+	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,8 +41,8 @@ var (
 	operatorName = "contour-operator"
 	// operatorNs is the name of the operator's namespace.
 	operatorNs = "contour-operator"
-	// defaultContourNs is the default spec.namespace.name of a Contour.
-	defaultContourNs = config.DefaultContourSpecNs
+	// specNs is the spec.namespace.name of a Contour.
+	specNs = "projectcontour"
 	// testUrl is the url used to test e2e functionality.
 	testUrl = "http://local.projectcontour.io/"
 	// expectedDeploymentConditions are the expected status conditions of a
@@ -87,19 +87,24 @@ func TestOperatorDeploymentAvailable(t *testing.T) {
 
 func TestDefaultContour(t *testing.T) {
 	testName := "test-default-contour"
-	removeNs := false
-	lb := operatorv1alpha1.LoadBalancerServicePublishingType
-	cntr, err := newContour(ctx, kclient, testName, operatorNs, defaultContourNs, removeNs, lb)
+	cfg := objcontour.Config{
+		Name:        testName,
+		Namespace:   operatorNs,
+		SpecNs:      specNs,
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
 		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	svcName := "envoy"
-	if err := updateLbSvcIpAndNodePorts(ctx, kclient, 1*time.Minute, defaultContourNs, svcName); err != nil {
-		t.Fatalf("failed to update service %s/%s: %v", defaultContourNs, svcName, err)
+	if err := updateLbSvcIpAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
+		t.Fatalf("failed to update service %s/%s: %v", specNs, svcName, err)
 	}
-	t.Logf("updated service %s/%s loadbalancer IP and nodeports", defaultContourNs, svcName)
+	t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
 
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
@@ -108,25 +113,25 @@ func TestDefaultContour(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s",testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, defaultContourNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", defaultContourNs, appName, err)
+	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", defaultContourNs, appName)
+	t.Logf("created deployment %s/%s", specNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, defaultContourNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", defaultContourNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", defaultContourNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, defaultContourNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", defaultContourNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created service %s/%s", defaultContourNs, appName)
+	t.Logf("created service %s/%s", specNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, defaultContourNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", defaultContourNs, appName, err)
+	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", defaultContourNs, appName)
+	t.Logf("created ingress %s/%s", specNs, appName)
 
 	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
@@ -151,15 +156,21 @@ func TestDefaultContour(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, 5*time.Minute, defaultContourNs); err != nil {
-		t.Fatalf("failed to delete namespace %s: %v", defaultContourNs, err)
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
 	}
 }
 
 func TestContourNodePortService(t *testing.T) {
 	testName := "test-nodeport-contour"
-	nodePort := operatorv1alpha1.NodePortServicePublishingType
-	cntr, err := newContour(ctx, kclient, testName, operatorNs, defaultContourNs, false, nodePort)
+	cfg := objcontour.Config{
+		Name:        testName,
+		Namespace:   operatorNs,
+		SpecNs:      specNs,
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+	}
+	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
 		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
 	}
@@ -172,25 +183,25 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, defaultContourNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", defaultContourNs, appName, err)
+	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", defaultContourNs, appName)
+	t.Logf("created deployment %s/%s", specNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, defaultContourNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", defaultContourNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", defaultContourNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, defaultContourNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", defaultContourNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created service %s/%s", defaultContourNs, appName)
+	t.Logf("created service %s/%s", specNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, defaultContourNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", defaultContourNs, appName, err)
+	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", defaultContourNs, appName)
+	t.Logf("created ingress %s/%s", specNs, appName)
 
 	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
@@ -215,17 +226,21 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, 5*time.Minute, defaultContourNs); err != nil {
-		t.Fatalf("failed to delete namespace %s: %v", defaultContourNs, err)
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
 	}
 }
 
 func TestContourSpecNs(t *testing.T) {
 	testName := "test-user-contour"
-	specNs := fmt.Sprintf("%s-%s", defaultContourNs, testName)
-	removeNs := true
-	nodePort := operatorv1alpha1.NodePortServicePublishingType
-	cntr, err := newContour(ctx, kclient, testName, operatorNs, specNs, removeNs, nodePort)
+	cfg := objcontour.Config{
+		Name:        testName,
+		Namespace:   operatorNs,
+		SpecNs:      specNs,
+		RemoveNs:    true,
+		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+	}
+	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
 		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
 	}
