@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -41,11 +42,12 @@ import (
 
 // Define utility constants for object names, testing timeouts/durations intervals, etc.
 const (
-	testContourName        = "test-contour"
-	testOperatorNs         = "test-contour-operator"
-	defaultNamespace       = "projectcontour"
-	defaultGatewayClassRef = "None"
-	defaultReplicas        = int32(2)
+	testContourName  = "test-contour"
+	testOperatorNs   = "test-contour-operator"
+	defaultNamespace = "projectcontour"
+	defaultReplicas  = int32(2)
+
+	testGatewayClassName = "test-contour"
 
 	timeout  = time.Second * 10
 	interval = time.Millisecond * 250
@@ -58,6 +60,24 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testContourName,
 			Namespace: testOperatorNs,
+		},
+	}
+
+	gc = &gatewayv1a1.GatewayClass{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testGatewayClassName,
+			Namespace: testOperatorNs,
+		},
+		Spec: gatewayv1a1.GatewayClassSpec{
+			Controller: operatorv1alpha1.GatewayClassControllerRef,
+			ParametersRef: &gatewayv1a1.ParametersReference{
+				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
+				Scope:     "Namespace",
+				Namespace: testOperatorNs,
+				Name:      testContourName,
+			},
 		},
 	}
 
@@ -76,18 +96,21 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("Bootstrapping the test environment")
+	opCRD := filepath.Join("..", "..", "config", "crd", "bases")
+	contourCRDs := filepath.Join("..", "..", "config", "crd", "contour")
+	gatewayCRDs := filepath.Join("..", "..", "config", "crd", "gateway")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{opCRD, contourCRDs, gatewayCRDs},
 	}
 
 	cliCfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cliCfg).ToNot(BeNil())
 
-	opCfg := operatorconfig.NewConfig()
+	opCfg := operatorconfig.New()
 	operator, err = New(cliCfg, opCfg)
 	Expect(err).ToNot(HaveOccurred())
 	go func() {
@@ -154,13 +177,6 @@ var _ = Describe("Run controller", func() {
 				return f.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope
 			}, timeout, interval).Should(Equal(operatorv1alpha1.ExternalLoadBalancer))
 
-			By("Expecting default gatewayClassRef")
-			Eventually(func() string {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return f.Spec.GatewayClassRef
-			}, timeout, interval).Should(Equal(defaultGatewayClassRef))
-
 			// Update the contour
 			By("By updating a contour spec")
 			updated := &operatorv1alpha1.Contour{}
@@ -171,7 +187,12 @@ var _ = Describe("Run controller", func() {
 			updated.Spec.Replicas = updatedReplicas
 			updated.Spec.Namespace.Name = updatedNs
 			updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
+			updated.Spec.GatewayClassRef = &gc.Name
 			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
+
+			// Create the GatewayClass referenced by the test Contour.
+			By("By creating a gatewayclass")
+			Expect(operator.client.Create(ctx, gc)).Should(Succeed())
 
 			By("Expecting replicas to be updated")
 			Eventually(func() int32 {
@@ -193,6 +214,21 @@ var _ = Describe("Run controller", func() {
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.RemoveOnDeletion
 			}, timeout, interval).Should(Equal(updatedRemoveNs))
+
+			By("Expecting gatewayClassRef to be updated")
+			Eventually(func() string {
+				f := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
+				return *f.Spec.GatewayClassRef
+			}, timeout, interval).Should(Equal(gc.Name))
+
+			// Remove the GatewayClass reference
+			updated.Spec.GatewayClassRef = nil
+			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
+
+			// Delete the GatewayClass referenced by the test Contour.
+			By("By deleting a gatewayclass")
+			Expect(operator.client.Delete(ctx, gc)).Should(Succeed())
 
 			By("Expecting to delete contour successfully")
 			Eventually(func() error {

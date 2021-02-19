@@ -66,34 +66,31 @@ const (
 )
 
 // EnsureDeployment ensures a deployment using image exists for the given contour.
-func EnsureDeployment(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, image string) (*appsv1.Deployment, error) {
+func EnsureDeployment(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, image string) error {
 	desired := DesiredDeployment(contour, image)
-	current, err := currentDeployment(ctx, cli, contour)
+	current, err := CurrentDeployment(ctx, cli, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			updated, err := createDeployment(ctx, cli, desired)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+			if err := createDeployment(ctx, cli, desired); err != nil {
+				return fmt.Errorf("failed to create deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 			}
-			return updated, nil
+			return nil
 		}
-		return nil, fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	differ := equality.DeploymentSelectorsDiffer(current, desired)
 	if differ {
-		return nil, EnsureDeploymentDeleted(ctx, cli, contour)
+		return EnsureDeploymentDeleted(ctx, cli, contour)
 	}
-	updated, err := updateDeploymentIfNeeded(ctx, cli, contour, current, desired)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+	if err := updateDeploymentIfNeeded(ctx, cli, contour, current, desired); err != nil {
+		return fmt.Errorf("failed to update deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
-	return updated, nil
+	return nil
 }
 
 // EnsureDeploymentDeleted ensures the deployment for the provided contour
 // is deleted if Contour owner labels exist.
 func EnsureDeploymentDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	deploy, err := currentDeployment(ctx, cli, contour)
+	deploy, err := CurrentDeployment(ctx, cli, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -312,8 +309,8 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 	return deploy
 }
 
-// currentDeployment returns the current Deployment resource for the provided contour.
-func currentDeployment(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
+// CurrentDeployment returns the Deployment resource for the provided contour.
+func CurrentDeployment(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
 	deploy := &appsv1.Deployment{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
@@ -326,27 +323,27 @@ func currentDeployment(ctx context.Context, cli client.Client, contour *operator
 }
 
 // createDeployment creates a Deployment resource for the provided deploy.
-func createDeployment(ctx context.Context, cli client.Client, deploy *appsv1.Deployment) (*appsv1.Deployment, error) {
+func createDeployment(ctx context.Context, cli client.Client, deploy *appsv1.Deployment) error {
 	if err := cli.Create(ctx, deploy); err != nil {
-		return nil, fmt.Errorf("failed to create deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+		return fmt.Errorf("failed to create deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 	}
-	return deploy, nil
+	return nil
 }
 
 // updateDeploymentIfNeeded updates a Deployment if current does not match desired,
 // using contour to verify the existence of owner labels.
-func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
+func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.Deployment) error {
 	if !objcontour.OwnerLabelsExist(current, contour) {
-		return current, nil
+		return nil
 	}
 	deploy, updated := equality.DeploymentConfigChanged(current, desired)
 	if updated {
 		if err := cli.Update(ctx, deploy); err != nil {
-			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+			return fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 		}
-		return deploy, nil
+		return nil
 	}
-	return current, nil
+	return nil
 }
 
 // makeDeploymentLabels returns labels for a Contour deployment, using

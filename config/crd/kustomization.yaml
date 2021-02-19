@@ -4,6 +4,7 @@
 resources:
 - bases/operator.projectcontour.io_contours.yaml
 - contour/01-crds.yaml
+- gateway/01-crds.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
