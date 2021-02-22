@@ -44,8 +44,8 @@ type Config struct {
 	LeaderElectionID string
 }
 
-// NewConfig returns an operator config using default values.
-func NewConfig() *Config {
+// New returns an operator config using default values.
+func New() *Config {
 	return &Config{
 		ContourImage:       DefaultContourImage,
 		EnvoyImage:         DefaultEnvoyImage,

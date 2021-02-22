@@ -67,34 +67,29 @@ const (
 )
 
 // EnsureDaemonSet ensures a DaemonSet exists for the given contour.
-func EnsureDaemonSet(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, contourImage, envoyImage string) (*appsv1.DaemonSet, error) {
+func EnsureDaemonSet(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, contourImage, envoyImage string) error {
 	desired := DesiredDaemonSet(contour, contourImage, envoyImage)
-	current, err := currentDaemonSet(ctx, cli, contour)
+	current, err := CurrentDaemonSet(ctx, cli, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			updated, err := createDaemonSet(ctx, cli, desired)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
-			}
-			return updated, nil
+			return createDaemonSet(ctx, cli, desired)
 		}
-		return nil, fmt.Errorf("failed to get daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
+		return fmt.Errorf("failed to get daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	differ := equality.DaemonSetSelectorsDiffer(current, desired)
 	if differ {
-		return nil, EnsureDaemonSetDeleted(ctx, cli, contour)
+		return EnsureDaemonSetDeleted(ctx, cli, contour)
 	}
-	updated, err := updateDaemonSetIfNeeded(ctx, cli, contour, current, desired)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	if err := updateDaemonSetIfNeeded(ctx, cli, contour, current, desired); err != nil {
+		return fmt.Errorf("failed to update daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
-	return updated, nil
+	return nil
 }
 
 // EnsureDaemonSetDeleted ensures the DaemonSet for the provided contour is deleted
 // if Contour owner labels exist.
 func EnsureDaemonSetDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	ds, err := currentDaemonSet(ctx, cli, contour)
+	ds, err := CurrentDaemonSet(ctx, cli, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -359,8 +354,8 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 	return ds
 }
 
-// urrentDaemonSet returns the current DaemonSet resource for the provided contour.
-func currentDaemonSet(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
+// CurrentDaemonSet returns the current DaemonSet resource for the provided contour.
+func CurrentDaemonSet(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
@@ -373,26 +368,26 @@ func currentDaemonSet(ctx context.Context, cli client.Client, contour *operatorv
 }
 
 // createDaemonSet creates a DaemonSet resource for the provided ds.
-func createDaemonSet(ctx context.Context, cli client.Client, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+func createDaemonSet(ctx context.Context, cli client.Client, ds *appsv1.DaemonSet) error {
 	if err := cli.Create(ctx, ds); err != nil {
-		return nil, fmt.Errorf("failed to create daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
+		return fmt.Errorf("failed to create daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 	}
-	return ds, nil
+	return nil
 }
 
 // updateDaemonSetIfNeeded updates a DaemonSet if current does not match desired,
 // using contour to verify the existence of owner labels.
-func updateDaemonSetIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+func updateDaemonSetIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.DaemonSet) error {
 	if objcontour.OwnerLabelsExist(current, contour) {
 		ds, updated := equality.DaemonsetConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, ds); err != nil {
-				return nil, fmt.Errorf("failed to update daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
+				return fmt.Errorf("failed to update daemonset %s/%s: %w", ds.Namespace, ds.Name, err)
 			}
-			return ds, nil
+			return nil
 		}
 	}
-	return current, nil
+	return nil
 }
 
 // EnvoyDaemonSetPodSelector returns a label selector using "app: envoy" as the

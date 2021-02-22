@@ -8,6 +8,11 @@ Operator. The following sections describe the purpose of each subdirectory.
 An example instance of the `Contour` custom resource. **Note:** You must first
 run Contour Operator using the manifest from the `operator` directory.
 
+## `gateway`
+
+Example manifests for managing Contour using [Gateway API](https://gateway-api.sigs.k8s.io/). **Note:** You must first
+run Contour Operator using the manifest from the `operator` directory.
+
 ## `operator`
 
 A single manifest rendered from individual `config` manifests suitable for

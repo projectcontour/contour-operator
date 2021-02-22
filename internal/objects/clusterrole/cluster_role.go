@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	svcapisv1a1 "sigs.k8s.io/service-apis/apis/v1alpha1"
+	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // EnsureClusterRole ensures a ClusterRole resource exists with the provided name
@@ -60,7 +60,7 @@ func EnsureClusterRole(ctx context.Context, cli client.Client, name string, cont
 func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
 	groupNet := []string{networkingv1.GroupName}
-	groupSvcAPIs := []string{svcapisv1a1.GroupName}
+	groupGateway := []string{gatewayv1a1.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{projectcontourv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
@@ -91,15 +91,16 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		APIGroups: groupExt,
 		Resources: []string{"customresourcedefinitions"},
 	}
-	svcAPI := rbacv1.PolicyRule{
+	gateway := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
-		APIGroups: groupSvcAPIs,
-		Resources: []string{"gatewayclasses", "gateways"},
+		APIGroups: groupGateway,
+		Resources: []string{"gatewayclasses", "gateways", "backendpolicies", "httproutes", "tlsroutes"},
 	}
-	svcAPIStatus := rbacv1.PolicyRule{
+	gatewayStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
-		APIGroups: groupSvcAPIs,
-		Resources: []string{"gatewayclasses/status", "gateways/status"},
+		APIGroups: groupGateway,
+		Resources: []string{"gatewayclasses/status", "gateways/status", "backendpolicies/status", "httproutes/status",
+			"tlsroutes/status"},
 	}
 	ing := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
@@ -134,7 +135,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, svcAPI, svcAPIStatus, ing, ingStatus, cntr, cntrStatus, crd}
+	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd}
 	return cr
 }
 

@@ -131,3 +131,23 @@ func OwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
 		},
 	}
 }
+
+// GatewayClassRefsExist returns a list of Contours that reference a GatewayClass
+// named name.
+func GatewayClassRefsExist(ctx context.Context, cli client.Client, name string) ([]operatorv1alpha1.Contour, error) {
+	var found []operatorv1alpha1.Contour
+	contours := &operatorv1alpha1.ContourList{}
+	if err := cli.List(ctx, contours); err != nil {
+		return found, err
+	}
+	if len(contours.Items) > 0 {
+		for i, c := range contours.Items {
+			if c.Spec.GatewayClassRef != nil {
+				if *c.Spec.GatewayClassRef == name {
+					found = append(found, contours.Items[i])
+				}
+			}
+		}
+	}
+	return found, nil
+}

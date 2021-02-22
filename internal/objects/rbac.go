@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -80,7 +79,7 @@ func EnsureRBAC(ctx context.Context, cli client.Client, contour *operatorv1alpha
 func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	ns := contour.Spec.Namespace.Name
-	objectsToDelete := []runtime.Object{}
+	objectsToDelete := []client.Object{}
 	contoursExist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
 	if err != nil {
 		return fmt.Errorf("failed to verify if contours contoursExist in namespace %s: %w",

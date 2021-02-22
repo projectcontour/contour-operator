@@ -1,4 +1,4 @@
-// Copyright Project ValidateContour Authors
+// Copyright Project Contour Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -137,7 +137,7 @@ func TestValidContour(t *testing.T) {
 		if tc.ports != nil {
 			cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = tc.ports
 		}
-		err := ValidateContour(cntr)
+		err := Contour(cntr)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}

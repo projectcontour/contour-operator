@@ -79,6 +79,16 @@ rules:
   - update
   - watch
 - apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - networking.k8s.io
   resources:
   - ingressclasses
@@ -98,8 +108,11 @@ rules:
 - apiGroups:
   - networking.x-k8s.io
   resources:
+  - backendpolicies
   - gatewayclasses
   - gateways
+  - httproutes
+  - tlsroutes
   verbs:
   - get
   - list
@@ -107,8 +120,11 @@ rules:
 - apiGroups:
   - networking.x-k8s.io
   resources:
+  - backendpolicies/status
   - gatewayclasses/status
   - gateways/status
+  - httproutes/status
+  - tlsroutes/status
   verbs:
   - create
   - get

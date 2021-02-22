@@ -82,8 +82,9 @@ type ContourSpec struct {
 	// GatewayClassRef is a reference to a GatewayClass name used for
 	// managing a Contour.
 	//
-	// +kubebuilder:default=None
-	GatewayClassRef string `json:"gatewayClassRef,omitempty"`
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	GatewayClassRef *string `json:"gatewayClassRef,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.

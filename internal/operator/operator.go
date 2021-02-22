@@ -14,16 +14,19 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
+	gccontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gatewayclass"
 
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // Operator is the scaffolding for the contour operator. It sets up dependencies
@@ -35,23 +38,35 @@ type Operator struct {
 	manager manager.Manager
 }
 
+// +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours/status,verbs=get;update;patch
+// cert-gen needs create/update secrets.
+// +kubebuilder:rbac:groups="",resources=namespaces;secrets;serviceaccounts;services,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses;gateways;backendpolicies;httproutes;tlsroutes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses/status;gateways/status;backendpolicies/status;httproutes/status;tlsroutes/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations;extensionservices,verbs=get;list;watch
+// +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies/status;extensionservices/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;delete;create;update;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete;create;update
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list
+
 // New creates a new operator from cliCfg and opCfg.
 func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1a1.GatewayClass{}, &gatewayv1a1.Gateway{}}
 	mgrOpts := manager.Options{
-		Scheme:             GetOperatorScheme(),
-		LeaderElection:     opCfg.LeaderElection,
-		LeaderElectionID:   opCfg.LeaderElectionID,
-		MetricsBindAddress: opCfg.MetricsBindAddress,
-		// Use a non-caching client everywhere. The default split client does not
-		// promise to invalidate the cache during writes (nor does it promise
-		// sequential create/get coherence), and we have code which (probably
-		// incorrectly) assumes a get immediately following a create/update will
-		// return the updated resource. All client consumers will need audited to
-		// ensure they are tolerant of stale data (or we need a cache or client that
-		// makes stronger coherence guarantees).
-		NewClient: func(_ cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-			return client.New(config, options)
-		},
+		Scheme:                GetOperatorScheme(),
+		LeaderElection:        opCfg.LeaderElection,
+		LeaderElectionID:      opCfg.LeaderElectionID,
+		MetricsBindAddress:    opCfg.MetricsBindAddress,
+		ClientDisableCacheFor: nonCached,
 	}
 	mgr, err := ctrl.NewManager(cliCfg, mgrOpts)
 	if err != nil {
@@ -66,6 +81,11 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 		return nil, fmt.Errorf("failed to create contour controller: %w", err)
 	}
 
+	// Create and register the gatewayclass controller with the operator manager.
+	if _, err := gccontroller.New(mgr); err != nil {
+		return nil, fmt.Errorf("failed to create gatewayclass controller: %w", err)
+	}
+
 	return &Operator{
 		manager: mgr,
 		client:  mgr.GetClient(),
@@ -74,15 +94,15 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 
 // Start starts the operator synchronously until a message is received
 // on the stop channel.
-func (o *Operator) Start(stop <-chan struct{}) error {
+func (o *Operator) Start(ctx context.Context) error {
 	errChan := make(chan error)
 	go func() {
-		errChan <- o.manager.Start(stop)
+		errChan <- o.manager.Start(ctx)
 	}()
 
 	// Wait for the manager to exit or an explicit stop.
 	select {
-	case <-stop:
+	case <-ctx.Done():
 		return nil
 	case err := <-errChan:
 		return err
