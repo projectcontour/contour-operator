@@ -65,7 +65,7 @@ type reconciler struct {
 }
 
 // New creates the contour controller from mgr and cfg. The controller will be pre-configured
-// to watch for Contour custom resources across all namespaces.
+// to watch for Contour objects across all namespaces.
 func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
 	r := &reconciler{
 		config: cfg,

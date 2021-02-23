@@ -14,12 +14,17 @@
 package validation
 
 import (
+	"context"
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
+	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const gatewayClassNamespacedParamRef = "Namespace"
@@ -59,12 +64,12 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 }
 
 // GatewayClass returns true if gc is a valid GatewayClass.
-func GatewayClass(gc *gatewayv1a1.GatewayClass) error {
+func GatewayClass(gc *gatewayv1alpha1.GatewayClass) error {
 	return parameterRef(gc)
 }
 
 // parameterRef returns true if parametersRef of gc is valid.
-func parameterRef(gc *gatewayv1a1.GatewayClass) error {
+func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	if gc.Spec.ParametersRef == nil {
 		return nil
 	}
@@ -78,6 +83,81 @@ func parameterRef(gc *gatewayv1a1.GatewayClass) error {
 	kind := gc.Spec.ParametersRef.Kind
 	if kind != operatorv1alpha1.GatewayClassParamsRefKind {
 		return fmt.Errorf("invalid kind %q", kind)
+	}
+	return nil
+}
+
+// Gateway returns an error if gw is an invalid Gateway.
+func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
+	var errs []error
+
+	if _, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName); err != nil {
+		errs = append(errs, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err))
+	}
+	if err := gatewayListeners(gw); err != nil {
+		errs = append(errs, fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err))
+	}
+	if err := gatewayAddresses(gw); err != nil {
+		errs = append(errs, fmt.Errorf("failed to validate addresses for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err))
+	}
+	if len(errs) != 0 {
+		return retryable.NewMaybeRetryableAggregate(errs)
+	}
+	return nil
+}
+
+// gatewayListeners returns an error if the listeners of the provided gw are invalid.
+// TODO [danehans]: Refactor when more than 2 listeners are supported.
+func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
+	listeners := gw.Spec.Listeners
+	if len(listeners) != 2 {
+		return fmt.Errorf("%d is an invalid number of listeners", len(gw.Spec.Listeners))
+	}
+	if listeners[0].Port == listeners[1].Port {
+		return fmt.Errorf("invalid listeners, port %v is non-unique", listeners[0].Port)
+	}
+	for _, listener := range listeners {
+		if listener.Protocol != gatewayv1alpha1.HTTPProtocolType && listener.Protocol != gatewayv1alpha1.HTTPSProtocolType {
+			return fmt.Errorf("invalid listener protocol %s", listener.Protocol)
+		}
+		// TODO [danehans]: Enable TLS validation for HTTPS/TLS listeners.
+		// xref: https://github.com/projectcontour/contour-operator/issues/214
+		empty := gatewayv1alpha1.Hostname("")
+		wildcard := gatewayv1alpha1.Hostname("*")
+		if listener.Hostname != nil {
+			if listener.Hostname != &empty || listener.Hostname != &wildcard {
+				hostname := string(*listener.Hostname)
+				// According to the Gateway spec, a listener hostname cannot be an IP address.
+				if ip := validation.IsValidIP(hostname); ip == nil {
+					return fmt.Errorf("invalid listener hostname %s", hostname)
+				}
+				if parsed := validation.IsDNS1123Subdomain(hostname); parsed != nil {
+					return fmt.Errorf("invalid listener hostname %s", hostname)
+				}
+			}
+		}
+	}
+	// TODO [danehans]: Validate routes of a gateway.
+	// xref: https://github.com/projectcontour/contour-operator/issues/215
+
+	return nil
+}
+
+// gatewayAddresses returns an error if any gw addresses are invalid.
+// TODO [danehans]: Refactor when named addresses are supported.
+func gatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
+	if len(gw.Spec.Addresses) > 0 {
+		for _, a := range gw.Spec.Addresses {
+			if a.Type != gatewayv1alpha1.IPAddressType {
+				return fmt.Errorf("invalid address type %v", a.Type)
+			}
+			if ip := validation.IsValidIP(a.Value); ip != nil {
+				return fmt.Errorf("invalid address value %s", a.Value)
+			}
+		}
 	}
 	return nil
 }

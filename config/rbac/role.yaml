@@ -116,6 +116,7 @@ rules:
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - networking.x-k8s.io

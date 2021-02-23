@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // clock is to enable unit testing
@@ -135,7 +135,7 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 // upon the GatewayClass status specification.
 func computeGatewayClassAdmittedCondition(owned, valid bool) metav1.Condition {
 	c := metav1.Condition{
-		Type:    string(gatewayv1a1.GatewayClassConditionStatusAdmitted),
+		Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
 		Status:  metav1.ConditionFalse,
 		Reason:  "NotOwned",
 		Message: "Not owned by Contour Operator.",
@@ -149,6 +149,36 @@ func computeGatewayClassAdmittedCondition(owned, valid bool) metav1.Condition {
 		c.Status = metav1.ConditionTrue
 		c.Reason = "Owned"
 		c.Message = "Owned by Contour Operator."
+	}
+	return c
+}
+
+// computeGatewayReadyCondition computes the Ready status condition based
+// on the availability of the associated GatewayClass and Contour.
+func computeGatewayReadyCondition(gcExists, gcAdmitted, cntrAvailable bool) metav1.Condition {
+	c := metav1.Condition{
+		Type:    string(gatewayv1alpha1.GatewayConditionReady),
+		Status:  metav1.ConditionFalse,
+		Reason:  "GatewayClassAndContourUnavailable",
+		Message: "The associated GatewayClass and Contour are not available.",
+	}
+	switch {
+	case !gcExists:
+		c.Status = metav1.ConditionFalse
+		c.Reason = "NonExistentGatewayClass"
+		c.Message = "The GatewayClass does not exist."
+	case !gcAdmitted:
+		c.Status = metav1.ConditionFalse
+		c.Reason = "GatewayClassNotAdmitted"
+		c.Message = "The GatewayClass is not admitted."
+	case !cntrAvailable:
+		c.Status = metav1.ConditionFalse
+		c.Reason = "ContourNotAvailable"
+		c.Message = "The Contour is not available."
+	default:
+		c.Status = metav1.ConditionTrue
+		c.Reason = "GatewayReady"
+		c.Message = "The Gateway is ready to serve routes."
 	}
 	return c
 }
@@ -186,4 +216,18 @@ func mergeConditions(conditions []metav1.Condition, updates ...metav1.Condition)
 
 func conditionChanged(a, b metav1.Condition) bool {
 	return a.Status != b.Status || a.Reason != b.Reason || a.Message != b.Message
+}
+
+// removeGatewayCondition returns a newly created []metav1.Condition that contains all items
+// from conditions that are not equal to condition type t.
+func removeGatewayCondition(conditions []metav1.Condition, t gatewayv1alpha1.GatewayConditionType) []metav1.Condition {
+	var new []metav1.Condition
+	if len(conditions) > 0 {
+		for _, c := range conditions {
+			if c.Type != string(t) {
+				new = append(new, c)
+			}
+		}
+	}
+	return new
 }

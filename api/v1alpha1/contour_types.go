@@ -66,8 +66,12 @@ type ContourSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// Namespace defines the schema of a Contour namespace.
-	// See each field for additional details.
+	// Namespace defines the schema of a Contour namespace. See each field for
+	// additional details. Namespace name should be the same namespace as the
+	// Gateway when GatewayClassRef is set.
+	//
+	// TODO [danehans]: Ignore Namespace when GatewayClassRef is set.
+	// xref: https://github.com/projectcontour/contour-operator/issues/212
 	//
 	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
 	Namespace NamespaceSpec `json:"namespace,omitempty"`

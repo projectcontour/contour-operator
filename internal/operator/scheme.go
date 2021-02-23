@@ -18,7 +18,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 var (
@@ -38,7 +38,7 @@ func init() {
 	if err := operatorv1alpha1.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
-	if err := gatewayv1a1.AddToScheme(scheme); err != nil {
+	if err := gatewayv1alpha1.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
 }

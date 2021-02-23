@@ -47,7 +47,7 @@ spec:
                 default:
                   name: projectcontour
                   removeOnDeletion: false
-                description: Namespace defines the schema of a Contour namespace. See each field for additional details.
+                description: "Namespace defines the schema of a Contour namespace. See each field for additional details. Namespace name should be the same namespace as the Gateway when GatewayClassRef is set. \n TODO [danehans]: Ignore Namespace when GatewayClassRef is set. xref: https://github.com/projectcontour/contour-operator/issues/212"
                 properties:
                   name:
                     default: projectcontour

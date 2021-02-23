@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -63,15 +63,15 @@ var (
 		},
 	}
 
-	gc = &gatewayv1a1.GatewayClass{
+	gc = &gatewayv1alpha1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testGatewayClassName,
 			Namespace: testOperatorNs,
 		},
-		Spec: gatewayv1a1.GatewayClassSpec{
+		Spec: gatewayv1alpha1.GatewayClassSpec{
 			Controller: operatorv1alpha1.GatewayClassControllerRef,
-			ParametersRef: &gatewayv1a1.ParametersReference{
+			ParametersRef: &gatewayv1alpha1.ParametersReference{
 				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
 				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
 				Scope:     "Namespace",

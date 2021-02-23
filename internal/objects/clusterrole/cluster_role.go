@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // EnsureClusterRole ensures a ClusterRole resource exists with the provided name
@@ -60,11 +60,12 @@ func EnsureClusterRole(ctx context.Context, cli client.Client, name string, cont
 func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
 	groupNet := []string{networkingv1.GroupName}
-	groupGateway := []string{gatewayv1a1.GroupName}
+	groupGateway := []string{gatewayv1alpha1.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{projectcontourv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
 	verbGLW := []string{"get", "list", "watch"}
+	verbGLWU := []string{"get", "list", "watch", "update"}
 
 	cfgMap := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
@@ -92,7 +93,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		Resources: []string{"customresourcedefinitions"},
 	}
 	gateway := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
+		Verbs:     verbGLWU,
 		APIGroups: groupGateway,
 		Resources: []string{"gatewayclasses", "gateways", "backendpolicies", "httproutes", "tlsroutes"},
 	}

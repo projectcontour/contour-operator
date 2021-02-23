@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 var (
@@ -55,6 +56,10 @@ var (
 	expectedContourConditions = []metav1.Condition{
 		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
 		// TODO [danehans]: Update when additional status conditions are added to Contour.
+	}
+	// expectedGatewayClassConditions are the expected status conditions of a GatewayClass.
+	expectedGatewayClassConditions = []metav1.Condition{
+		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionTrue},
 	}
 	// testAppName is the name of the application used for e2e testing.
 	testAppName = "kuard"
@@ -299,4 +304,101 @@ func TestContourSpecNs(t *testing.T) {
 		t.Fatalf("failed to observe the deletion of namespace %s: %v", specNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", specNs)
+}
+
+func TestGateway(t *testing.T) {
+	testName := "test-gateway"
+	contourName := fmt.Sprintf("%s-contour", testName)
+	gcName := "test-gatewayclass"
+	gwNs := fmt.Sprintf("%s-ns", testName)
+	cfg := objcontour.Config{
+		Name:         contourName,
+		Namespace:    operatorNs,
+		SpecNs:       gwNs,
+		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
+		GatewayClass: &gcName,
+	}
+
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, contourName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	if err := newGatewayClass(ctx, kclient, gcName, operatorNs, contourName); err != nil {
+		t.Fatalf("failed to create gatewayclass %s: %v", gcName, err)
+	}
+	t.Logf("created gatewayclass %s", gcName)
+
+	// The gatewayclass should now report admitted.
+	if err := waitForGatewayClassStatusConditions(ctx, kclient, 1*time.Minute, gcName, expectedGatewayClassConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
+	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+
+	// Create gateway namespace.
+	if err := newNs(ctx, kclient, gwNs); err != nil {
+		t.Fatalf("failed to create namespace %s: %v", gwNs, err)
+	}
+	t.Logf("created namespace %s", gwNs)
+
+	// Create the gateway.
+	gwName := fmt.Sprintf("%s-gateway", testName)
+	if err := newGateway(ctx, kclient, gwNs, gwName, gcName, "app", "kuard"); err != nil {
+		t.Fatalf("failed to create gateway %s/%s: %v", gwNs, gwName, err)
+	}
+	t.Logf("created gateway %s/%s", gwNs, gwName)
+
+	// TODO [danehans]: Check gateway status conditions before proceeding.
+	// xref: https://github.com/projectcontour/contour-operator/issues/211
+
+	// Create a sample workload for e2e testing.
+	appName := fmt.Sprintf("%s-%s",testAppName, testName)
+	if err:= newDeployment(ctx, kclient, appName, gwNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", gwNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", gwNs, appName)
+
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, gwNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", gwNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", gwNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, gwNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", gwNs, appName, err)
+	}
+	t.Logf("created service %s/%s", gwNs, appName)
+
+	if err := newHTTPRouteToSvc(ctx, kclient, appName, gwNs, appName, "app", "kuard", "*.projectcontour.io", int32(80)); err != nil {
+		t.Fatalf("failed to create httproute %s/%s: %v", gwNs, appName, err)
+	}
+	t.Logf("created httproute %s/%s", gwNs, appName)
+
+	if err := waitForHTTPResponse(testUrl, 3*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	}
+	t.Logf("received http response for %q", testUrl)
+
+	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
+	// xref: https://github.com/projectcontour/contour-operator/issues/211
+
+	// Ensure the gateway can be deleted and clean-up.
+	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, gwNs); err != nil {
+		t.Fatalf("failed to delete gateway %s/%s: %v", gwNs, gwName, err)
+	}
+
+	// Ensure the gatewayclass can be deleted and clean-up.
+	if err := deleteGatewayClass(ctx, kclient, 3*time.Minute, gcName); err != nil {
+		t.Fatalf("failed to delete gatewayclass %s: %v", gcName, err)
+	}
+
+	// Ensure the contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
+	}
 }
