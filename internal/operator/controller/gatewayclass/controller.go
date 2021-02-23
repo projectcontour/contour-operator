@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -46,7 +46,7 @@ type reconciler struct {
 }
 
 // New creates the gatewayclass controller from mgr. The controller will be pre-configured
-// to watch for GatewayClass custom resources.
+// to watch for GatewayClass objects.
 func New(mgr manager.Manager) (controller.Controller, error) {
 	r := &reconciler{
 		client: mgr.GetClient(),
@@ -56,7 +56,7 @@ func New(mgr manager.Manager) (controller.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Watch(&source.Kind{Type: &gatewayv1a1.GatewayClass{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -67,7 +67,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.log.Info("reconciling", "request", req)
 
-	gc := &gatewayv1a1.GatewayClass{}
+	gc := &gatewayv1alpha1.GatewayClass{}
 	key := types.NamespacedName{Name: req.Name}
 	var errs []error
 	if err := r.client.Get(ctx, key, gc); err != nil {

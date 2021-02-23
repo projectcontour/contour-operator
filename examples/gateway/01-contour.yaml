@@ -1,7 +1,0 @@
-apiVersion: operator.projectcontour.io/v1alpha1
-kind: Contour
-metadata:
-  name: contour-gateway-sample
-  namespace: contour-operator
-spec:
-  gatewayClassRef: sample-gatewayclass

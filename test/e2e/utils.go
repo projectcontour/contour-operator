@@ -38,6 +38,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 var (
@@ -47,6 +48,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
+	_ = gatewayv1alpha1.AddToScheme(scheme)
 }
 
 func newClient() (client.Client, error) {
@@ -98,6 +100,66 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for contour %s/%s to be deleted: %v", cntr.Namespace, cntr.Name, err)
+	}
+	return nil
+}
+
+func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
+	gw := &gatewayv1alpha1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+	}
+	if err := cl.Delete(ctx, gw); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete gateway %s/%s: %v", gw.Namespace, gw.Name, err)
+		}
+	}
+
+	key := types.NamespacedName{
+		Name:      gw.Name,
+		Namespace: gw.Namespace,
+	}
+
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.Get(ctx, key, gw); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for gateway %s/%s to be deleted: %v", gw.Namespace, gw.Name, err)
+	}
+	return nil
+}
+
+func deleteGatewayClass(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
+	gc := &gatewayv1alpha1.GatewayClass{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+	}
+	if err := cl.Delete(ctx, gc); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete gatewayclass %s: %v", gc.Name, err)
+		}
+	}
+
+	key := types.NamespacedName{Name: gc.Name}
+
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.Get(ctx, key, gc); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for gatewayclass %s to be deleted: %v", gc.Name, err)
 	}
 	return nil
 }
@@ -182,6 +244,41 @@ func newIngress(ctx context.Context, cl client.Client, name, ns, backendName str
 	return nil
 }
 
+func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
+	rootPrefix := gatewayv1alpha1.HTTPPathMatch{
+		Type:  gatewayv1alpha1.PathMatchPrefix,
+		Value: "/",
+	}
+	fwdPort := gatewayv1alpha1.PortNumber(svcPort)
+	svcFwd := gatewayv1alpha1.HTTPRouteForwardTo{
+		ServiceName: &svc,
+		Port:        &fwdPort,
+	}
+	match := gatewayv1alpha1.HTTPRouteMatch{
+		Path: rootPrefix,
+	}
+	httpRule := gatewayv1alpha1.HTTPRouteRule{
+		Matches:   []gatewayv1alpha1.HTTPRouteMatch{match},
+		ForwardTo: []gatewayv1alpha1.HTTPRouteForwardTo{svcFwd},
+	}
+	h := gatewayv1alpha1.Hostname(hostname)
+	route := &gatewayv1alpha1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels:    map[string]string{k: v},
+		},
+		Spec: gatewayv1alpha1.HTTPRouteSpec{
+			Hostnames: []gatewayv1alpha1.Hostname{h},
+			Rules:     []gatewayv1alpha1.HTTPRouteRule{httpRule},
+		},
+	}
+	if err := cl.Create(ctx, route); err != nil {
+		return fmt.Errorf("failed to create httproute %s/%s: %v", ns, name, err)
+	}
+	return nil
+}
+
 func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string, conditions ...metav1.Condition) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
@@ -192,9 +289,22 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeo
 		if err := cl.Get(ctx, nsName, cntr); err != nil {
 			return false, nil
 		}
-		expected := contourConditionMap(conditions...)
-		current := contourConditionMap(cntr.Status.Conditions...)
-		return contourConditionsMatchExpected(expected, current), nil
+		expected := conditionMap(conditions...)
+		current := conditionMap(cntr.Status.Conditions...)
+		return conditionsMatchExpected(expected, current), nil
+	})
+}
+
+func waitForGatewayClassStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name string, conditions ...metav1.Condition) error {
+	nsName := types.NamespacedName{Name: name}
+	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		gc := &gatewayv1alpha1.GatewayClass{}
+		if err := cl.Get(ctx, nsName, gc); err != nil {
+			return false, nil
+		}
+		expected := conditionMap(conditions...)
+		current := conditionMap(gc.Status.Conditions...)
+		return conditionsMatchExpected(expected, current), nil
 	})
 }
 
@@ -214,7 +324,7 @@ func waitForDeploymentStatusConditions(ctx context.Context, cl client.Client, ti
 	})
 }
 
-func contourConditionMap(conditions ...metav1.Condition) map[string]string {
+func conditionMap(conditions ...metav1.Condition) map[string]string {
 	conds := map[string]string{}
 	for _, cond := range conditions {
 		conds[cond.Type] = string(cond.Status)
@@ -230,7 +340,7 @@ func deploymentConditionMap(conditions ...appsv1.DeploymentCondition) map[appsv1
 	return conds
 }
 
-func contourConditionsMatchExpected(expected, actual map[string]string) bool {
+func conditionsMatchExpected(expected, actual map[string]string) bool {
 	filtered := map[string]string{}
 	for k := range actual {
 		if _, comparable := expected[k]; comparable {
@@ -270,17 +380,25 @@ func waitForHTTPResponse(url string, timeout time.Duration) error {
 	return nil
 }
 
-// newNs makes a Namespace object using the provided name for the object's name.
-func newNs(name string) *corev1.Namespace {
-	return &corev1.Namespace{
+// newNs creates a Namespace object using the provided name for the object's name.
+func newNs(ctx context.Context, cl client.Client, name string) error {
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
+	if err := cl.Create(ctx, ns); err != nil {
+		return fmt.Errorf("failed to create namespace %s: %v", ns.Name, err)
+	}
+	return nil
 }
 
 func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := newNs(name)
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
 	if err := cl.Delete(ctx, ns); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
@@ -307,7 +425,11 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 }
 
 func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := newNs(name)
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
 
 	key := types.NamespacedName{
 		Name: ns.Name,
@@ -361,6 +483,68 @@ func updateLbSvcIpAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 	svc.Spec.Ports[1].NodePort = objsvc.EnvoyNodePortHTTPSPort
 	if err := cl.Update(ctx, svc); err != nil {
 		return err
+	}
+	return nil
+}
+
+// newGatewayClass creates a GatewayClass object using the provided name for the object's
+// name and contourNs/contourName for the referenced Contour.
+func newGatewayClass(ctx context.Context, cl client.Client, name, contourNs, contourName string) error {
+	gc := &gatewayv1alpha1.GatewayClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: gatewayv1alpha1.GatewayClassSpec{
+			Controller:    operatorv1alpha1.GatewayClassControllerRef,
+			ParametersRef: &gatewayv1alpha1.ParametersReference{
+				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
+				Name:      contourName,
+				Scope:     "Namespace",
+				Namespace: contourNs,
+			},
+		},
+	}
+	if err := cl.Create(ctx, gc); err != nil {
+		return fmt.Errorf("failed to create gatewayclass %s: %v", name, err)
+	}
+	return nil
+}
+
+// newGateway creates a Gateway object using the provided ns/name for the object's
+// ns/name, gc for the gatewayClassName, and k/v for the key-value pair used for
+// route selection. The Gateway will contain an HTTP listener on port 80 and an
+// HTTPS listener on port 443.
+func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string) error {
+	routes := metav1.LabelSelector{
+		MatchLabels: map[string]string{k: v},
+	}
+	http := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(80)),
+		Protocol: gatewayv1alpha1.HTTPProtocolType,
+		Routes:   gatewayv1alpha1.RouteBindingSelector{
+			Selector: routes,
+		},
+	}
+	https := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(443)),
+		Protocol: gatewayv1alpha1.HTTPSProtocolType,
+		Routes:   gatewayv1alpha1.RouteBindingSelector{
+			Selector: routes,
+		},
+	}
+	gw := &gatewayv1alpha1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: gatewayv1alpha1.GatewaySpec{
+			GatewayClassName: gc,
+			Listeners: []gatewayv1alpha1.Listener{http, https},
+		},
+	}
+	if err := cl.Create(ctx, gw); err != nil {
+		return fmt.Errorf("failed to create gateway %s/%s: %v", ns, name, err)
 	}
 	return nil
 }

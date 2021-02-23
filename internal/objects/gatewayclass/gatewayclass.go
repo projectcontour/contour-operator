@@ -22,12 +22,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // Get returns a GatewayClass named name, if it exists.
-func Get(ctx context.Context, cli client.Client, name string) (*gatewayv1a1.GatewayClass, error) {
-	gc := &gatewayv1a1.GatewayClass{}
+func Get(ctx context.Context, cli client.Client, name string) (*gatewayv1alpha1.GatewayClass, error) {
+	gc := &gatewayv1alpha1.GatewayClass{}
 	key := types.NamespacedName{Name: name}
 	if err := cli.Get(ctx, key, gc); err != nil {
 		return nil, fmt.Errorf("failed to get gatewayclass %s: %w", name, err)
@@ -43,7 +43,7 @@ func Admitted(ctx context.Context, cli client.Client, name string) (bool, error)
 	}
 	if gc != nil {
 		for _, c := range gc.Status.Conditions {
-			if c.Type == string(gatewayv1a1.ConditionRouteAdmitted) && c.Status == metav1.ConditionTrue {
+			if c.Type == string(gatewayv1alpha1.ConditionRouteAdmitted) && c.Status == metav1.ConditionTrue {
 				return true, nil
 			}
 		}
@@ -52,14 +52,14 @@ func Admitted(ctx context.Context, cli client.Client, name string) (bool, error)
 }
 
 // IsController returns true if the operator is the controller for gc.
-func IsController(gc *gatewayv1a1.GatewayClass) bool {
+func IsController(gc *gatewayv1alpha1.GatewayClass) bool {
 	return gc.Spec.Controller == operatorv1alpha1.GatewayClassControllerRef
 }
 
 // ParameterRefExists returns true if a GatewayClass exists with a parametersRef
 // ns/name that matches the provided ns/name.
-func ParameterRefExists(ctx context.Context, cli client.Client, name, ns string) (*gatewayv1a1.GatewayClass, bool, error) {
-	gcList := &gatewayv1a1.GatewayClassList{}
+func ParameterRefExists(ctx context.Context, cli client.Client, name, ns string) (*gatewayv1alpha1.GatewayClass, bool, error) {
+	gcList := &gatewayv1alpha1.GatewayClassList{}
 	if err := cli.List(ctx, gcList); err != nil {
 		return nil, false, err
 	}

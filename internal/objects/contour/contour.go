@@ -20,24 +20,25 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Config is the configuration of a Contour.
 type Config struct {
-	Name        string
-	Namespace   string
-	SpecNs      string
-	RemoveNs    bool
-	NetworkType operatorv1alpha1.NetworkPublishingType
+	Name         string
+	Namespace    string
+	SpecNs       string
+	RemoveNs     bool
+	NetworkType  operatorv1alpha1.NetworkPublishingType
+	GatewayClass *string
 }
 
 // New makes a Contour object using the provided ns/name for the object's
 // namespace/name, pubType for the network publishing type of Envoy, and
 // Envoy container ports 8080/8443.
-// func New(name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) *operatorv1alpha1.Contour {
 func New(cfg Config) *operatorv1alpha1.Contour {
-	return &operatorv1alpha1.Contour{
+	cntr := &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cfg.Namespace,
 			Name:      cfg.Name,
@@ -64,6 +65,23 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 			},
 		},
 	}
+	if cfg.GatewayClass != nil {
+		cntr.Spec.GatewayClassRef = cfg.GatewayClass
+	}
+	return cntr
+}
+
+// CurrentContour returns the current Contour for the provided ns/name.
+func CurrentContour(ctx context.Context, cli client.Client, ns, name string) (*operatorv1alpha1.Contour, error) {
+	cntr := &operatorv1alpha1.Contour{}
+	key := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	if err := cli.Get(ctx, key, cntr); err != nil {
+		return nil, err
+	}
+	return cntr, nil
 }
 
 // OwnerLabelsExist returns true if obj contains Contour owner labels.

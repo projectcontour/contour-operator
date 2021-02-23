@@ -22,14 +22,16 @@ import (
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // syncContourStatus computes the current status of contour and updates status upon
@@ -110,10 +112,10 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 
 // SyncGatewayClass computes the current status of gc and updates status upon
 // any changes since last sync.
-func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1a1.GatewayClass, owned, valid bool) error {
+func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, owned, valid bool) error {
 	var errs []error
 
-	latest := &gatewayv1a1.GatewayClass{}
+	latest := &gatewayv1alpha1.GatewayClass{}
 	key := types.NamespacedName{
 		Namespace: gc.Namespace,
 		Name:      gc.Name,
@@ -132,6 +134,74 @@ func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1a1.Ga
 	if equality.GatewayClassStatusChanged(latest.Status, updated.Status) {
 		if err := cli.Status().Update(ctx, updated); err != nil {
 			errs = append(errs, fmt.Errorf("failed to update gatewayclass %s status: %w", latest.Name, err))
+		}
+	}
+
+	return retryable.NewMaybeRetryableAggregate(errs)
+}
+
+// SyncGateway computes the current status of gw and updates status based on
+// any changes since last sync.
+func SyncGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
+	var errs []error
+
+	latest := &gatewayv1alpha1.Gateway{}
+	key := types.NamespacedName{
+		Namespace: gw.Namespace,
+		Name:      gw.Name,
+	}
+	if err := cli.Get(ctx, key, latest); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to sync status for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+	}
+
+	updated := latest.DeepCopy()
+
+	gcName := latest.Spec.GatewayClassName
+	gcExists := false
+	_, err := objgc.Get(ctx, cli, gcName)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get gatewayclass %s: %w", gcName, err))
+	} else {
+		gcExists = true
+	}
+	gcAdmitted := false
+	gcAdmitted, err = objgc.Admitted(ctx, cli, gcName)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s is admitted: %w", gcName, err))
+	} else {
+		gcAdmitted = true
+	}
+
+	cntrAvailable := false
+	cntr, err := objgw.ContourForGateway(ctx, cli, gw)
+	switch {
+	case err != nil:
+		errs = append(errs, fmt.Errorf("failed to get contour for gateway %s/%s: %w",
+			latest.Namespace, latest.Name, err))
+	case cntr.Status.Conditions != nil:
+		for _, c := range cntr.Status.Conditions {
+			if c.Type == operatorv1alpha1.ContourAvailableConditionType && c.Status == metav1.ConditionTrue {
+				cntrAvailable = true
+			}
+		}
+	default:
+		errs = append(errs, fmt.Errorf("unable to determine contour availability for gateway %s/%s",
+			latest.Namespace, latest.Name))
+	}
+
+	// Gateway's contain a default status condition that must be removed when reconciled by a controller.
+	updated.Status.Conditions = removeGatewayCondition(updated.Status.Conditions, gatewayv1alpha1.GatewayConditionScheduled)
+	updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
+		computeGatewayReadyCondition(gcExists, gcAdmitted, cntrAvailable))
+
+	updated.Status.Addresses = []gatewayv1alpha1.GatewayAddress{}
+	if equality.GatewayStatusChanged(latest.Status, updated.Status) {
+		if err := cli.Status().Update(ctx, updated); err != nil {
+			errs = append(errs, fmt.Errorf("failed to update gateway %s/%s status: %w", latest.Namespace,
+				latest.Name, err))
 		}
 	}
 

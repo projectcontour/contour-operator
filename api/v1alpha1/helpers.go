@@ -17,11 +17,24 @@ const (
 	// GatewayClassControllerRef identifies contour operator as the managing controller
 	// of a GatewayClass.
 	GatewayClassControllerRef = "projectcontour.io/contour-operator"
+
 	// GatewayClassParamsRefGroup identifies contour operator as the group name of a
 	// GatewayClass.
 	GatewayClassParamsRefGroup = "operator.projectcontour.io"
+
 	// GatewayClassParamsRefKind identifies Contour as the kind name of a GatewayClass.
 	GatewayClassParamsRefKind = "Contour"
+
+	// GatewayFinalizer is the name of the finalizer used for a Gateway.
+	GatewayFinalizer = "gateway.networking.x-k8s.io/finalizer"
+
+	// OwningGatewayNameLabel is the owner reference label used for a Gateway
+	// managed by the operator. The value should be the name of the Gateway.
+	OwningGatewayNameLabel = "contour.operator.projectcontour.io/owning-gateway-name"
+
+	// OwningGatewayNsLabel is the owner reference label used for a Gateway
+	// managed by the operator. The value should be the namespace of the Gateway.
+	OwningGatewayNsLabel = "contour.operator.projectcontour.io/owning-gateway-namespace"
 )
 
 // IsFinalized returns true if Contour is finalized.

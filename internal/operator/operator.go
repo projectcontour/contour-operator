@@ -20,13 +20,14 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
+	gwcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gateway"
 	gccontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gatewayclass"
 
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	gatewayv1a1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // Operator is the scaffolding for the contour operator. It sets up dependencies
@@ -45,7 +46,7 @@ type Operator struct {
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses;gateways;backendpolicies;httproutes;tlsroutes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses;gateways;backendpolicies;httproutes;tlsroutes,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses/status;gateways/status;backendpolicies/status;httproutes/status;tlsroutes/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
@@ -60,7 +61,7 @@ type Operator struct {
 
 // New creates a new operator from cliCfg and opCfg.
 func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
-	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1a1.GatewayClass{}, &gatewayv1a1.Gateway{}}
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha1.GatewayClass{}, &gatewayv1alpha1.Gateway{}}
 	mgrOpts := manager.Options{
 		Scheme:                GetOperatorScheme(),
 		LeaderElection:        opCfg.LeaderElection,
@@ -84,6 +85,14 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 	// Create and register the gatewayclass controller with the operator manager.
 	if _, err := gccontroller.New(mgr); err != nil {
 		return nil, fmt.Errorf("failed to create gatewayclass controller: %w", err)
+	}
+
+	// Create and register the gateway controller with the operator manager.
+	if _, err := gwcontroller.New(mgr, gwcontroller.Config{
+		ContourImage: opCfg.ContourImage,
+		EnvoyImage:   opCfg.EnvoyImage,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to create gateway controller: %w", err)
 	}
 
 	return &Operator{
