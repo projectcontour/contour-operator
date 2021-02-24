@@ -20,9 +20,11 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcm "github.com/projectcontour/contour-operator/internal/objects/configmap"
+	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
 	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
+	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
@@ -113,6 +115,25 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 			if err := r.ensureGateway(ctx, gw); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get ensure gateway %s/%s: %w", req.Namespace, req.Name, err)
+			}
+			// The gateway is valid, so finalize dependent resources of gateway.
+			gc, err := objgc.Get(ctx, r.client, gw.Spec.GatewayClassName)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to get gatewayclass %s: %w", gw.Spec.GatewayClassName, err))
+			} else {
+				if err := objgc.EnsureFinalizer(ctx, r.client, gc); err != nil {
+					errs = append(errs, fmt.Errorf("failed to finalize gatewayclass %s: %w", gc.Name, err))
+				}
+			}
+			cntr, err := objgw.ContourForGateway(ctx, r.client, gw)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to get contour for gateway %s/%s: %w",
+					gw.Namespace, gw.Name, err))
+			} else {
+				if err := objcontour.EnsureFinalizer(ctx, r.client, cntr); err != nil {
+					errs = append(errs, fmt.Errorf("failed to finalize contour %s/%s: %w",
+						cntr.Namespace, cntr.Name, err))
+				}
 			}
 			if err := status.SyncGateway(ctx, r.client, gw); err != nil {
 				errs = append(errs, fmt.Errorf("failed to sync status for gateway %s/%s: %w", gw.Namespace, gw.Name, err))
@@ -257,11 +278,42 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 	}
 
 	if len(errs) == 0 {
-		if err := objgw.EnsureFinalizerRemoved(ctx, cli, gw); err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove finalizer from contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("removed finalizer from contour", "namespace", contour.Namespace, "name", contour.Name)
+		// Remove finalizer from dependent resources of gateway.
+		cntr, err := objgw.ContourForGateway(ctx, r.client, gw)
+		if err != nil {
+			return fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 		}
+		gc, err := objgc.Get(ctx, r.client, gw.Spec.GatewayClassName)
+		if err != nil {
+			return fmt.Errorf("failed to get gatewayclass %s: %w", gw.Spec.GatewayClassName, err)
+		}
+		otherClasses, err := objgc.OtherGatewayClassesRefContour(ctx, r.client, gc, cntr)
+		switch {
+		case err != nil:
+			return fmt.Errorf("failed to verify if other gatewayclassess reference contour %s/%s: %w", gc.Namespace, gc.Name, err)
+		case !otherClasses:
+			// Remove the finalizer from the dependent contour since no other gatewayclasses reference it.
+			if err := objcontour.EnsureFinalizerRemoved(ctx, r.client, cntr); err != nil {
+				return fmt.Errorf("failed to remove finalizer from contour %s/%s: %w", cntr.Namespace, cntr.Name, err)
+			}
+			r.log.Info("removed finalizer from contour", "namespace", cntr.Namespace, "name", cntr.Name)
+		}
+		otherGateways, err := objgw.OtherGatewaysRefGatewayClass(ctx, r.client, gw)
+		switch {
+		case err != nil:
+			return fmt.Errorf("failed to verify if other gateways reference gatewayclass %s: %w", gc.Name, err)
+		case !otherGateways:
+			// Remove the finalizer from the dependent gatewayclass since no other contours reference it.
+			if err := objgc.EnsureFinalizerRemoved(ctx, r.client, gc); err != nil {
+				return fmt.Errorf("failed to remove finalizer from gatewayclass %s: %w", gc.Name, err)
+			}
+			r.log.Info("removed finalizer from gatewayclass", "name", gc.Name)
+		}
+		// Remove finalizer from gateway.
+		if err := objgw.EnsureFinalizerRemoved(ctx, cli, gw); err != nil {
+			return fmt.Errorf("failed to remove finalizer from gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+		}
+		r.log.Info("removed finalizer from gateway", "namespace", gw.Namespace, "name", gw.Name)
 	}
 	return utilerrors.NewAggregate(errs)
 }
