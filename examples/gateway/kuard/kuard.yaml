@@ -45,7 +45,7 @@ metadata:
     app: kuard
 spec:
   hostnames:
-    - "*.projectcontour.io"
+    - "local.projectcontour.io"
   rules:
     - matches:
         - path:
