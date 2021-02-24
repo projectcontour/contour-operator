@@ -105,3 +105,23 @@ func ContourForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alph
 	}
 	return cntr, nil
 }
+
+// OtherGatewaysRefGatewayClass returns true if other gateways have the same
+// gatewayClassName as gw.
+func OtherGatewaysRefGatewayClass(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (bool, error) {
+	gwList, err := OtherGatewaysExist(ctx, cli, gw)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify if gateways other than %s/%s exist: %v", gw.Namespace, gw.Name, err)
+	}
+	if gwList != nil {
+		for _, g := range gwList.Items {
+			switch {
+			case g.Namespace == gw.Namespace && g.Name == gw.Name:
+				continue
+			case g.Spec.GatewayClassName == gw.Spec.GatewayClassName:
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}

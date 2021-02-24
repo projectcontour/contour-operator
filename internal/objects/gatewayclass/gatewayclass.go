@@ -70,3 +70,27 @@ func ParameterRefExists(ctx context.Context, cli client.Client, name, ns string)
 	}
 	return nil, false, nil
 }
+
+// OtherGatewayClassesRefContour returns true if GatewayClasses other than gc reference contour.
+func OtherGatewayClassesRefContour(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, contour *operatorv1alpha1.Contour) (bool, error) {
+	gcList := &gatewayv1alpha1.GatewayClassList{}
+	if err := cli.List(ctx, gcList); err != nil {
+		return false, fmt.Errorf("failed to list gateways")
+	}
+	if gcList != nil {
+		for _, g := range gcList.Items {
+			if g.Spec.ParametersRef != nil {
+				switch {
+				case g.Name == gc.Name && g.Namespace == gc.Namespace:
+					continue
+				case g.Spec.ParametersRef.Namespace == contour.Namespace &&
+					g.Spec.ParametersRef.Name == contour.Name &&
+					g.Spec.ParametersRef.Scope == "Namespace" &&
+					g.Spec.ParametersRef.Kind == contour.Kind:
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
