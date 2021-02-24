@@ -13,7 +13,7 @@ This section describes how to build Contour Operator from source.
 
 ### Prerequisites
 
-1. [Go 1.15][1] or later. We also assume that you're familiar with Go's
+1. [Go 1.16][1] or later. We also assume that you're familiar with Go's
    [`GOPATH` workspace][3] convention and have the appropriate environment variables set.
 2. [Kustomize](https://kustomize.io/)
 3. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
