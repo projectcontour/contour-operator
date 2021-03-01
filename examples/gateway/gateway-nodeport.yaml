@@ -52,7 +52,7 @@ spec:
     - protocol: HTTPS
       port: 443
       routes:
-        kind: HTTPSRoute
+        kind: HTTPRoute
         selector:
           matchLabels:
             app: kuard
