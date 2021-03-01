@@ -19,7 +19,7 @@ spec:
       - command:
         - /contour-operator
         - --contour-image
-        - docker.io/projectcontour/contour:v1.13.0
+        - docker.io/projectcontour/contour:v1.13.1
         - --envoy-image
         - docker.io/envoyproxy/envoy:v1.17.0
         args:
