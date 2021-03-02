@@ -16,10 +16,11 @@ package validation
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
-	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -89,22 +90,16 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 
 // Gateway returns an error if gw is an invalid Gateway.
 func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
-	var errs []error
-
 	if _, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName); err != nil {
-		errs = append(errs, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err))
+		return fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
 	if err := gatewayListeners(gw); err != nil {
-		errs = append(errs, fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err))
+		return fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err)
 	}
 	if err := gatewayAddresses(gw); err != nil {
-		errs = append(errs, fmt.Errorf("failed to validate addresses for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err))
-	}
-	if len(errs) != 0 {
-		return retryable.NewMaybeRetryableAggregate(errs)
+		return fmt.Errorf("failed to validate addresses for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err)
 	}
 	return nil
 }
@@ -120,28 +115,25 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 		return fmt.Errorf("invalid listeners, port %v is non-unique", listeners[0].Port)
 	}
 	for _, listener := range listeners {
-		if listener.Protocol != gatewayv1alpha1.HTTPProtocolType && listener.Protocol != gatewayv1alpha1.HTTPSProtocolType {
-			return fmt.Errorf("invalid listener protocol %s", listener.Protocol)
-		}
-		// TODO [danehans]: Enable TLS validation for HTTPS/TLS listeners.
-		// xref: https://github.com/projectcontour/contour-operator/issues/214
-		empty := gatewayv1alpha1.Hostname("")
-		wildcard := gatewayv1alpha1.Hostname("*")
 		if listener.Hostname != nil {
-			if listener.Hostname != &empty || listener.Hostname != &wildcard {
-				hostname := string(*listener.Hostname)
+			hostname := string(*listener.Hostname)
+			if hostname != "" && hostname != "*" {
 				// According to the Gateway spec, a listener hostname cannot be an IP address.
-				if ip := validation.IsValidIP(hostname); ip == nil {
-					return fmt.Errorf("invalid listener hostname %s", hostname)
+				if ip := net.ParseIP(hostname); ip != nil {
+					return fmt.Errorf("hostname %q must be a DNS name, not an IP address", hostname)
 				}
-				if parsed := validation.IsDNS1123Subdomain(hostname); parsed != nil {
-					return fmt.Errorf("invalid listener hostname %s", hostname)
+				if strings.Contains(hostname, "*") {
+					if err := validation.IsWildcardDNS1123Subdomain(hostname); err != nil {
+						return fmt.Errorf("hostname %q must be a DNS name: %v", hostname, err)
+					}
+				} else {
+					if err := validation.IsDNS1123Subdomain(hostname); err != nil {
+						return fmt.Errorf("hostname %q must be a DNS name: %v", hostname, err)
+					}
 				}
 			}
 		}
 	}
-	// TODO [danehans]: Validate routes of a gateway.
-	// xref: https://github.com/projectcontour/contour-operator/issues/215
 
 	return nil
 }

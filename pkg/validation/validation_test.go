@@ -18,8 +18,10 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/pkg/slice"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -138,6 +140,295 @@ func TestValidContour(t *testing.T) {
 			cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = tc.ports
 		}
 		err := Contour(cntr)
+		if err != nil && tc.expected {
+			t.Fatalf("%q: failed with error: %#v", tc.description, err)
+		}
+		if err == nil && !tc.expected {
+			t.Fatalf("%q: expected to fail but received no error", tc.description)
+		}
+	}
+}
+
+func TestValidGatewayListeners(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(gw *gatewayv1alpha1.Gateway)
+		expected    bool
+	}{
+		{
+			description: "default settings",
+			mutate:      func(_ *gatewayv1alpha1.Gateway) {},
+			expected:    true,
+		},
+		{
+			description: "empty hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Listeners[0].Hostname = nil
+				gw.Spec.Listeners[1].Hostname = nil
+			},
+			expected: true,
+		},
+		{
+			description: "wildcard as hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("*")
+				gw.Spec.Listeners[0].Hostname = &host
+				gw.Spec.Listeners[1].Hostname = &host
+			},
+			expected: true,
+		},
+		{
+			description: "wildcard in hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("*.projectcontour.io")
+				gw.Spec.Listeners[0].Hostname = &host
+				gw.Spec.Listeners[1].Hostname = &host
+			},
+			expected: true,
+		},
+		{
+			description: "empty string as hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("")
+				gw.Spec.Listeners[0].Hostname = &host
+				gw.Spec.Listeners[1].Hostname = &host
+			},
+			expected: true,
+		},
+		{
+			description: "IPv4 address for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("1.2.3.4")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "IPv4 address and port for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("1.2.3.4:8080")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "Invalid IPv4 address for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("1.2..3.4")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "IPv6 address for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("1.2.3.4")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "IPv6 address for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("2001:db8::68")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "IPv6 link-local address for hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("fe80::/10")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "multiple wildcards in hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("*.foo.*.com")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "wildcard not as prefix in hostname",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				host := gatewayv1alpha1.Hostname("foo.*.com")
+				gw.Spec.Listeners[0].Hostname = &host
+			},
+			expected: false,
+		},
+		{
+			description: "one listener",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				l := slice.RemoveGatewayListener(gw.Spec.Listeners, gw.Spec.Listeners[0])
+				gw.Spec.Listeners = l
+			},
+			expected: false,
+		},
+		{
+			description: "three listeners",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				l := gatewayv1alpha1.Listener{
+					Hostname: gw.Spec.Listeners[0].Hostname,
+					Port:     gatewayv1alpha1.PortNumber(int32(8443)),
+					Protocol: gw.Spec.Listeners[0].Protocol,
+					TLS:      gw.Spec.Listeners[0].TLS,
+					Routes:   gw.Spec.Listeners[0].Routes,
+				}
+				gw.Spec.Listeners = append(gw.Spec.Listeners, l)
+			},
+			expected: false,
+		},
+		{
+			description: "identical listener ports",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Listeners[0].Port = gw.Spec.Listeners[1].Port
+			},
+			expected: false,
+		},
+	}
+
+	hostname := gatewayv1alpha1.Hostname("test.local.host")
+	listeners := []gatewayv1alpha1.Listener{
+		{
+			Hostname: &hostname,
+			Port:     gatewayv1alpha1.PortNumber(int32(80)),
+			Protocol: gatewayv1alpha1.HTTPProtocolType,
+			Routes: gatewayv1alpha1.RouteBindingSelector{
+				Namespaces: gatewayv1alpha1.RouteNamespaces{
+					From: gatewayv1alpha1.RouteSelectSame,
+				},
+			},
+		},
+		{
+			Hostname: &hostname,
+			Port:     gatewayv1alpha1.PortNumber(int32(443)),
+			Protocol: gatewayv1alpha1.HTTPSProtocolType,
+			Routes: gatewayv1alpha1.RouteBindingSelector{
+				Namespaces: gatewayv1alpha1.RouteNamespaces{
+					From: gatewayv1alpha1.RouteSelectSame,
+				},
+			},
+		},
+	}
+	gwName := "test-gateway-listeners"
+	gcName := "test-gatewayclass"
+	gw := &gatewayv1alpha1.Gateway{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      gwName,
+			Namespace: fmt.Sprintf("%s-ns", gwName),
+		},
+		Spec: gatewayv1alpha1.GatewaySpec{
+			GatewayClassName: gcName,
+			Listeners:        listeners,
+		},
+	}
+
+	for _, tc := range testCases {
+		copy := gw.DeepCopy()
+		tc.mutate(copy)
+		err := gatewayListeners(copy)
+		if err != nil && tc.expected {
+			t.Fatalf("%q: failed with error: %#v", tc.description, err)
+		}
+		if err == nil && !tc.expected {
+			t.Fatalf("%q: expected to fail but received no error", tc.description)
+		}
+	}
+}
+
+func TestValidGatewayAddresses(t *testing.T) {
+	testCases := []struct {
+		description string
+		mutate      func(gw *gatewayv1alpha1.Gateway)
+		expected    bool
+	}{
+		{
+			description: "one valid IPv4 address",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Addresses = []gatewayv1alpha1.GatewayAddress{
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "1.2.3.4",
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			description: "invalid address type",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Addresses = []gatewayv1alpha1.GatewayAddress{
+					{
+						Type:  gatewayv1alpha1.NamedAddressType,
+						Value: "my-named-address",
+					},
+				}
+			},
+			expected: false,
+		},
+		{
+			description: "one invalid IPv4 address",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Addresses = []gatewayv1alpha1.GatewayAddress{
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "1.2.3..4",
+					},
+				}
+			},
+			expected: false,
+		},
+		{
+			description: "two valid IPv4 addresses",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Addresses = []gatewayv1alpha1.GatewayAddress{
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "1.2.3.4",
+					},
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "5.6.7.8",
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			description: "mix of valid and invalid IPv4 addresses",
+			mutate: func(gw *gatewayv1alpha1.Gateway) {
+				gw.Spec.Addresses = []gatewayv1alpha1.GatewayAddress{
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "1.2.3.4",
+					},
+					{
+						Type:  gatewayv1alpha1.IPAddressType,
+						Value: "5.6.7.*",
+					},
+				}
+			},
+			expected: false,
+		},
+	}
+
+	gwName := "test-gateway-addresses"
+	gw := &gatewayv1alpha1.Gateway{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      gwName,
+			Namespace: fmt.Sprintf("%s-ns", gwName),
+		},
+	}
+
+	for _, tc := range testCases {
+		copy := gw.DeepCopy()
+		tc.mutate(copy)
+		err := gatewayAddresses(copy)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}

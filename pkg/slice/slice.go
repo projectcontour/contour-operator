@@ -13,20 +13,31 @@
 
 package slice
 
+import (
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+)
+
 // RemoveString returns a newly created []string that contains all items from slice that
 // are not equal to s.
 func RemoveString(slice []string, s string) []string {
-	newSlice := make([]string, 0)
+	var newSlice []string
 	for _, item := range slice {
-		if item == s {
-			continue
+		if item != s {
+			newSlice = append(newSlice, item)
 		}
-		newSlice = append(newSlice, item)
 	}
-	if len(newSlice) == 0 {
-		// Sanitize for unit tests so we don't need to distinguish empty array
-		// and nil.
-		newSlice = nil
+	return newSlice
+}
+
+// RemoveGatewayListener returns a newly created []gatewayv1alpha1.Listener
+// that contains all items from slice that are not equal to l.
+func RemoveGatewayListener(slice []gatewayv1alpha1.Listener, l gatewayv1alpha1.Listener) []gatewayv1alpha1.Listener {
+	var newSlice []gatewayv1alpha1.Listener
+	for _, item := range slice {
+		if !apiequality.Semantic.DeepEqual(item, l) {
+			newSlice = append(newSlice, item)
+		}
 	}
 	return newSlice
 }
