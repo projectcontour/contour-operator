@@ -69,7 +69,7 @@ func checkDeploymentHasLabels(t *testing.T, deploy *appsv1.Deployment, expected 
 	t.Errorf("deployment has unexpected %q labels", deploy.Labels)
 }
 
-func checkContainerHasArg(t *testing.T, container corev1.Container, arg string) {
+func checkContainerHasArg(t *testing.T, container *corev1.Container, arg string) {
 	t.Helper()
 
 	for _, a := range container.Args {
@@ -120,18 +120,14 @@ func TestDesiredDeployment(t *testing.T) {
 	checkDeploymentHasEnvVar(t, deploy, contourPodEnvVar)
 	checkDeploymentHasLabels(t, deploy, deploy.Labels)
 
-	for _, c := range deploy.Spec.Template.Spec.Containers {
-		if c.Name == contourContainerName {
-			for _, port := range container.Ports {
-				if port.Name == "http" && port.ContainerPort != insecurePort {
-					arg := fmt.Sprintf("--envoy-service-http-port=%d", port.ContainerPort)
-					checkContainerHasArg(t, c, arg)
-				}
-				if port.Name == "https" && port.ContainerPort != securePort {
-					arg := fmt.Sprintf("--envoy-service-https-port=%d", port.ContainerPort)
-					checkContainerHasArg(t, c, arg)
-				}
-			}
+	for _, port := range container.Ports {
+		if port.Name == "http" && port.ContainerPort != insecurePort {
+			arg := fmt.Sprintf("--envoy-service-http-port=%d", port.ContainerPort)
+			checkContainerHasArg(t, container, arg)
+		}
+		if port.Name == "https" && port.ContainerPort != securePort {
+			arg := fmt.Sprintf("--envoy-service-https-port=%d", port.ContainerPort)
+			checkContainerHasArg(t, container, arg)
 		}
 	}
 }
