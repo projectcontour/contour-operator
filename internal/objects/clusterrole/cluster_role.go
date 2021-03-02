@@ -77,6 +77,11 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		APIGroups: groupAll,
 		Resources: []string{"endpoints"},
 	}
+	ns := rbacv1.PolicyRule{
+		Verbs:     verbGLW,
+		APIGroups: groupAll,
+		Resources: []string{"namespaces"},
+	}
 	secret := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupAll,
@@ -136,7 +141,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd}
+	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd, ns}
 	return cr
 }
 
