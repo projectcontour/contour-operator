@@ -11,14 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package validation
+package validation_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	operatorclient "github.com/projectcontour/contour-operator/internal/operator/client"
 	"github.com/projectcontour/contour-operator/pkg/slice"
+	"github.com/projectcontour/contour-operator/pkg/validation"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
@@ -139,7 +142,7 @@ func TestValidContour(t *testing.T) {
 		if tc.ports != nil {
 			cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = tc.ports
 		}
-		err := Contour(cntr)
+		err := validation.Contour(cntr)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}
@@ -270,7 +273,7 @@ func TestValidGatewayListeners(t *testing.T) {
 		{
 			description: "invalid route kind for http listener",
 			mutate: func(gw *gatewayv1alpha1.Gateway) {
-				gw.Spec.Listeners[0].Routes.Kind = routeKindTLS
+				gw.Spec.Listeners[0].Routes.Kind = validation.RouteKindTLS
 			},
 			expected: false,
 		},
@@ -278,7 +281,7 @@ func TestValidGatewayListeners(t *testing.T) {
 			description: "invalid route kind for https listener",
 			mutate: func(gw *gatewayv1alpha1.Gateway) {
 				gw.Spec.Listeners[0].Protocol = gatewayv1alpha1.HTTPSProtocolType
-				gw.Spec.Listeners[0].Routes.Kind = routeKindTLS
+				gw.Spec.Listeners[0].Routes.Kind = validation.RouteKindTLS
 			},
 			expected: false,
 		},
@@ -296,20 +299,22 @@ func TestValidGatewayListeners(t *testing.T) {
 				},
 				Selector: metav1.LabelSelector{},
 				Group:    gatewayv1alpha1.GroupName,
-				Kind:     routeKindHTTP,
+				Kind:     validation.RouteKindHTTP,
 			},
 		},
 		{
 			Hostname: &hostname,
 			Port:     gatewayv1alpha1.PortNumber(int32(443)),
-			Protocol: gatewayv1alpha1.HTTPSProtocolType,
+			// TODO [danehans]: Testing HTTPS requires mocking api server to get the
+			//  secret referenced by certificateRef.
+			Protocol: gatewayv1alpha1.HTTPProtocolType,
 			Routes: gatewayv1alpha1.RouteBindingSelector{
 				Namespaces: gatewayv1alpha1.RouteNamespaces{
 					From: gatewayv1alpha1.RouteSelectSame,
 				},
 				Selector: metav1.LabelSelector{},
 				Group:    gatewayv1alpha1.GroupName,
-				Kind:     routeKindHTTP,
+				Kind:     validation.RouteKindHTTP,
 			},
 		},
 	}
@@ -327,10 +332,15 @@ func TestValidGatewayListeners(t *testing.T) {
 		},
 	}
 
+	cli, err := operatorclient.New()
+	if err != nil {
+		t.Fatalf("failed to create operator client: %v", err)
+	}
+
 	for _, tc := range testCases {
 		copy := gw.DeepCopy()
 		tc.mutate(copy)
-		err := gatewayListeners(copy)
+		err := validation.GatewayListeners(context.TODO(), cli, copy)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}
@@ -428,7 +438,7 @@ func TestValidGatewayAddresses(t *testing.T) {
 	for _, tc := range testCases {
 		copy := gw.DeepCopy()
 		tc.mutate(copy)
-		err := gatewayAddresses(copy)
+		err := validation.GatewayAddresses(copy)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}

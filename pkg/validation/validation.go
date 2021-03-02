@@ -15,12 +15,16 @@ package validation
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
+	objsecret "github.com/projectcontour/contour-operator/internal/objects/secret"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
@@ -28,10 +32,16 @@ import (
 
 const (
 	gatewayClassNamespacedParamRef = "Namespace"
-	// routeKindHTTP is a route of kind HTTPRoute.
-	routeKindHTTP = "HTTPRoute"
-	// routeKindTLS is a route of kind TLSRoute.
-	routeKindTLS = "TLSRoute"
+	// RouteKindHTTP is a route of kind HTTPRoute.
+	RouteKindHTTP = "HTTPRoute"
+	// RouteKindTLS is a route of kind TLSRoute.
+	RouteKindTLS = "TLSRoute"
+	// kindSecret is a certificateRef of kind Secret.
+	kindSecret = "Secret"
+	// groupCore is a certificateRef of group core.
+	groupCore = "core"
+	// certPEMBlock is the type taken from the preamble of a PEM-encoded structure.
+	certPEMBlock = "CERTIFICATE"
 )
 
 // Contour returns true if contour is valid.
@@ -97,20 +107,20 @@ func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway
 	if _, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName); err != nil {
 		return fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
-	if err := gatewayListeners(gw); err != nil {
+	if err := GatewayListeners(ctx, cli, gw); err != nil {
 		return fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,
 			gw.Name, err)
 	}
-	if err := gatewayAddresses(gw); err != nil {
+	if err := GatewayAddresses(gw); err != nil {
 		return fmt.Errorf("failed to validate addresses for gateway %s/%s: %w", gw.Namespace,
 			gw.Name, err)
 	}
 	return nil
 }
 
-// gatewayListeners returns an error if the listeners of the provided gw are invalid.
+// GatewayListeners returns an error if the listeners of the provided gw are invalid.
 // TODO [danehans]: Refactor when more than 2 listeners are supported.
-func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
+func GatewayListeners(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
 	listeners := gw.Spec.Listeners
 	if len(listeners) != 2 {
 		return fmt.Errorf("%d is an invalid number of listeners", len(gw.Spec.Listeners))
@@ -125,8 +135,42 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 			listener.Protocol != gatewayv1alpha1.TLSProtocolType {
 			return fmt.Errorf("invalid listener protocol %s", listener.Protocol)
 		}
-		// TODO [danehans]: Enable TLS validation for HTTPS/TLS listeners.
-		// xref: https://github.com/projectcontour/contour-operator/issues/214
+		if (listener.Protocol == gatewayv1alpha1.HTTPSProtocolType ||
+			listener.Protocol == gatewayv1alpha1.TLSProtocolType) &&
+			listener.TLS == nil {
+			return fmt.Errorf("invalid listener; TLS configuration required with protocol %s", listener.Protocol)
+		}
+		if listener.TLS != nil {
+			mode := listener.TLS.Mode
+			if mode == gatewayv1alpha1.TLSModeTerminate && listener.TLS.CertificateRef == nil {
+				return fmt.Errorf("invalid listener; certificateRef is required for mode %s", mode)
+			}
+			if listener.TLS.CertificateRef != nil {
+				certKind := listener.TLS.CertificateRef.Kind
+				if certKind != kindSecret {
+					return fmt.Errorf("invalid certificateRef kind %s; only kind %s is supported", certKind,
+						kindSecret)
+				}
+				certGroup := listener.TLS.CertificateRef.Group
+				if certGroup != groupCore && certGroup != corev1.GroupName {
+					return fmt.Errorf("invalid certificateRef group %s; only group %s or group %s are supported",
+						certGroup, groupCore, corev1.GroupName)
+				}
+				certName := listener.TLS.CertificateRef.Name
+				secret, err := objsecret.Get(ctx, cli, gw.Namespace, certName)
+				if err != nil {
+					return fmt.Errorf("failed to get secret %s/%s: %w", gw.Namespace, certName, err)
+				}
+				if secret.Type != corev1.SecretTypeTLS {
+					return fmt.Errorf("invalid type for secret %s/%s; only type %s is supported",
+						secret.Namespace, secret.Name, corev1.SecretTypeTLS)
+				}
+				if err := secretCertData(secret); err != nil {
+					return fmt.Errorf("failed to validate certificate data for secret %s/%s: %v",
+						secret.Namespace, secret.Name, err)
+				}
+			}
+		}
 		if listener.Hostname != nil {
 			hostname := string(*listener.Hostname)
 			if hostname != "" && hostname != "*" {
@@ -145,17 +189,17 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 			return fmt.Errorf("invalid route group %s; only %s is supported", listener.Routes.Group,
 				gatewayv1alpha1.GroupName)
 		}
-		if listener.Routes.Kind != routeKindHTTP && listener.Routes.Kind != routeKindTLS {
+		if listener.Routes.Kind != RouteKindHTTP && listener.Routes.Kind != RouteKindTLS {
 			return fmt.Errorf("invalid route kind %s; only %s and %s are supported", listener.Routes.Kind,
-				routeKindHTTP, routeKindTLS)
+				RouteKindHTTP, RouteKindTLS)
 		}
 		if (listener.Protocol == gatewayv1alpha1.HTTPProtocolType ||
 			listener.Protocol == gatewayv1alpha1.HTTPSProtocolType) &&
-			listener.Routes.Kind != routeKindHTTP {
+			listener.Routes.Kind != RouteKindHTTP {
 			return fmt.Errorf("invalid route kind %s for listener protocol %s", listener.Routes.Kind,
 				listener.Protocol)
 		}
-		if listener.Protocol == gatewayv1alpha1.TLSProtocolType && listener.Routes.Kind != routeKindTLS {
+		if listener.Protocol == gatewayv1alpha1.TLSProtocolType && listener.Routes.Kind != RouteKindTLS {
 			return fmt.Errorf("invalid route kind %s for listener protocol %s", listener.Routes.Kind,
 				listener.Protocol)
 		}
@@ -165,13 +209,12 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 			return fmt.Errorf("invalid route namespace selection; selector must be specified")
 		}
 	}
-
 	return nil
 }
 
-// gatewayAddresses returns an error if any gw addresses are invalid.
+// GatewayAddresses returns an error if any gw addresses are invalid.
 // TODO [danehans]: Refactor when named addresses are supported.
-func gatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
+func GatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
 	if len(gw.Spec.Addresses) > 0 {
 		for _, a := range gw.Spec.Addresses {
 			if a.Type != gatewayv1alpha1.IPAddressType {
@@ -180,6 +223,48 @@ func gatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
 			if ip := validation.IsValidIP(a.Value); ip != nil {
 				return fmt.Errorf("invalid address value %s", a.Value)
 			}
+		}
+	}
+	return nil
+}
+
+// secretCertData validates that secret contains a certificate/key pair.
+// The secret must contain valid PEM encoded certificates.
+func secretCertData(secret *corev1.Secret) error {
+	certKey := corev1.TLSCertKey
+	if _, ok := secret.Data[certKey]; !ok {
+		return fmt.Errorf("secret %s/%s is missing data key %s", secret.Namespace, secret.Name, certKey)
+	}
+	if _, ok := secret.Data[corev1.TLSPrivateKeyKey]; !ok {
+		return fmt.Errorf("secret %s/%s is missing data key %s", secret.Namespace, secret.Name,
+			corev1.TLSPrivateKeyKey)
+	}
+	certData := secret.Data[certKey]
+	if len(certData) == 0 {
+		return fmt.Errorf("secret %s/%s data key %s is empty", secret.Namespace, secret.Name, certKey)
+	}
+	if err := certificateData(certData); err != nil {
+		return fmt.Errorf("failed parsing certificate data from secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+	return nil
+}
+
+// certificateData decodes certData, ensuring each PEM block is type
+// "CERTIFICATE" and the block can be parsed as an x509 certificate.
+func certificateData(certData []byte) error {
+	var block *pem.Block
+	for len(certData) != 0 {
+		block, certData = pem.Decode(certData)
+		if block == nil {
+			return fmt.Errorf("failed to parse certificate PEM")
+		}
+		if block.Type != certPEMBlock {
+			return fmt.Errorf("invalid certificate PEM, must be of type %s", certPEMBlock)
+
+		}
+		_, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse certificate: %w", err)
 		}
 	}
 	return nil

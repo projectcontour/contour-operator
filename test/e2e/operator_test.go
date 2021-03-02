@@ -24,6 +24,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	operatorclient "github.com/projectcontour/contour-operator/internal/operator/client"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -73,7 +74,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	cl, err := newClient()
+	cl, err := operatorclient.New()
 	if err != nil {
 		os.Exit(1)
 	}
