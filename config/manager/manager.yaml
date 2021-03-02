@@ -21,7 +21,7 @@ spec:
         - --contour-image
         - docker.io/projectcontour/contour:main
         - --envoy-image
-        - docker.io/envoyproxy/envoy:v1.17.0
+        - docker.io/envoyproxy/envoy:v1.17.1
         args:
         - --enable-leader-election
         image: contour-operator
