@@ -106,7 +106,7 @@ uninstall: manifests
 
 deploy: ## Deploy the operator to a Kubernetes cluster. This assumes a kubeconfig in ~/.kube/config
 deploy: manifests
-	cd config/manager && kustomize edit set image contour-operator=${IMAGE}:${VERSION}
+	cd config/manager
 	kustomize build config/default | kubectl apply -f -
 
 load-image: ## Load the operator image to a kind cluster
@@ -120,7 +120,7 @@ undeploy:
 
 example: ## Generate the example operator manifest.
 example:
-	cd config/manager && kustomize edit set image contour-operator=${IMAGE}:${VERSION}
+	cd config/manager
 	kustomize build config/default > examples/operator/operator.yaml
 
 test-example: ## Test the example Contour.
