@@ -258,7 +258,8 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 			r.log.Info("ensured contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType ||
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.ClusterIPServicePublishingType {
 			if err := objsvc.EnsureEnvoyService(ctx, cli, contour); err != nil {
 				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
 					contour.Namespace, contour.Name, err))

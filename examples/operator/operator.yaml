@@ -418,10 +418,16 @@ spec:
                           using a Kubernetes NodePort Service. \n In this configuration,
                           Envoy network endpoints use container networking. A Kubernetes
                           NodePort Service is created to publish the network endpoints.
-                          \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
+                          \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+                          \n * ClusterIPService \n Publishes Envoy network endpoints
+                          using a Kubernetes ClusterIP Service. \n In this configuration,
+                          Envoy network endpoints use container networking. A Kubernetes
+                          ClusterIP Service is created to publish the network endpoints.
+                          \n See: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types"
                         enum:
                         - LoadBalancerService
                         - NodePortService
+                        - ClusterIPService
                         type: string
                     type: object
                 type: object

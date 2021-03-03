@@ -51,6 +51,10 @@ var (
 	expectedDeploymentConditions = []appsv1.DeploymentCondition{
 		{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
 	}
+	// expectedPodConditions are the expected status conditions of a pod.
+	expectedPodConditions = []corev1.PodCondition{
+		{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
+	}
 	// expectedContourConditions are the expected status conditions of a
 	// contour.
 	expectedContourConditions = []metav1.Condition{
@@ -240,6 +244,99 @@ func TestContourNodePortService(t *testing.T) {
 	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
+func TestContourClusterIPService(t *testing.T) {
+	testName := "test-clusterip-contour"
+	cfg := objcontour.Config{
+		Name:        testName,
+		Namespace:   operatorNs,
+		SpecNs:      specNs,
+		RemoveNs:    true,
+		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
+	}
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
+
+	// Create a sample workload for e2e testing.
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", specNs, appName)
+
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
+	}
+	t.Logf("created service %s/%s", specNs, appName)
+
+	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+	}
+	t.Logf("created ingress %s/%s", specNs, appName)
+
+	// Create the client Pod.
+	cliName := "test-client"
+	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
+	if err != nil {
+		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
+	}
+	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
+		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
+	}
+	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
+
+	// Get the Envoy ClusterIP to curl.
+	svcName := "envoy"
+	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
+	if err != nil {
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
+	}
+
+	// Curl the ingress from the client pod.
+	url := fmt.Sprintf("http://%s/", ip)
+	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
+	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
+	resp := "200"
+	if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+		t.Fatalf("failed to parse pod %s/%s: %v", specNs, cliName, err)
+	}
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+
+	// Scrape the operator logs for error messages.
+	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// Ensure the default contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
+	}
+
+	// Verify the user-defined namespace was removed by the operator.
+	if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to observe the deletion of namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
+}
+
 func TestContourSpecNs(t *testing.T) {
 	testName := "test-user-contour"
 	cfg := objcontour.Config{
@@ -406,4 +503,11 @@ func TestGateway(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
 	}
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }

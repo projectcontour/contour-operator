@@ -246,13 +246,16 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
-			Ports:                 ports,
-			Selector:              objds.EnvoyDaemonSetPodSelector().MatchLabels,
-			SessionAffinity:       corev1.ServiceAffinityNone,
+			Ports:           ports,
+			Selector:        objds.EnvoyDaemonSetPodSelector().MatchLabels,
+			SessionAffinity: corev1.ServiceAffinityNone,
 		},
 	}
 	epType := contour.Spec.NetworkPublishing.Envoy.Type
+	if epType == operatorv1alpha1.LoadBalancerServicePublishingType ||
+		epType == operatorv1alpha1.NodePortServicePublishingType {
+		svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+	}
 	switch epType {
 	case operatorv1alpha1.LoadBalancerServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
@@ -272,6 +275,8 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		svc.Spec.Type = corev1.ServiceTypeNodePort
 		svc.Spec.Ports[0].NodePort = EnvoyNodePortHTTPPort
 		svc.Spec.Ports[1].NodePort = EnvoyNodePortHTTPSPort
+	case operatorv1alpha1.ClusterIPServicePublishingType:
+		svc.Spec.Type = corev1.ServiceTypeClusterIP
 	}
 	return svc
 }
@@ -334,6 +339,8 @@ func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour 
 		switch contour.Spec.NetworkPublishing.Envoy.Type {
 		case operatorv1alpha1.NodePortServicePublishingType:
 			_, updated = equality.NodePortServiceChanged(current, desired)
+		case operatorv1alpha1.ClusterIPServicePublishingType:
+			_, updated = equality.ClusterIPServiceChanged(current, desired)
 		// Add additional network publishing types as they are introduced.
 		default:
 			// LoadBalancerService is the default network publishing type.
