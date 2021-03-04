@@ -99,6 +99,8 @@ func TestDesiredDeployment(t *testing.T) {
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
+	icName := "test-ic"
+	cntr.Spec.IngressClassName = &icName
 	// Change the default ports to test Envoy service port args.
 	insecurePort := objcfg.EnvoyInsecureContainerPort
 	securePort := objcfg.EnvoySecureContainerPort
@@ -130,4 +132,7 @@ func TestDesiredDeployment(t *testing.T) {
 			checkContainerHasArg(t, container, arg)
 		}
 	}
+
+	arg := fmt.Sprintf("--ingress-class-name=%s", *cntr.Spec.IngressClassName)
+	checkContainerHasArg(t, container, arg)
 }

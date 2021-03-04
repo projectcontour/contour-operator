@@ -132,6 +132,9 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			args = append(args, fmt.Sprintf("--envoy-service-https-port=%d", port.PortNumber))
 		}
 	}
+	if contour.Spec.IngressClassName != nil {
+		args = append(args, fmt.Sprintf("--ingress-class-name=%s", *contour.Spec.IngressClassName))
+	}
 	container := corev1.Container{
 		Name:            contourContainerName,
 		Image:           image,
