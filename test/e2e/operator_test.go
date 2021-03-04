@@ -310,11 +310,10 @@ func TestGateway(t *testing.T) {
 	testName := "test-gateway"
 	contourName := fmt.Sprintf("%s-contour", testName)
 	gcName := "test-gatewayclass"
-	gwNs := fmt.Sprintf("%s-ns", testName)
 	cfg := objcontour.Config{
 		Name:         contourName,
 		Namespace:    operatorNs,
-		SpecNs:       gwNs,
+		SpecNs:       specNs,
 		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
 		GatewayClass: &gcName,
 	}
@@ -341,43 +340,44 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
-	// Create gateway namespace.
-	if err := newNs(ctx, kclient, gwNs); err != nil {
-		t.Fatalf("failed to create namespace %s: %v", gwNs, err)
+	// Create the gateway namespace if it doesn't exist.
+	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
 	}
-	t.Logf("created namespace %s", gwNs)
+	t.Logf("created namespace %s", cfg.SpecNs)
 
-	// Create the gateway.
-	gwName := fmt.Sprintf("%s-gateway", testName)
-	if err := newGateway(ctx, kclient, gwNs, gwName, gcName, "app", "kuard"); err != nil {
-		t.Fatalf("failed to create gateway %s/%s: %v", gwNs, gwName, err)
+	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
+	// https://github.com/projectcontour/contour-operator/issues/241
+	gwName := "contour"
+	appName := fmt.Sprintf("%s-%s",testAppName, testName)
+	if err := newGateway(ctx, kclient, cfg.SpecNs, gwName, gcName, "app", appName); err != nil {
+		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
-	t.Logf("created gateway %s/%s", gwNs, gwName)
+	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// TODO [danehans]: Check gateway status conditions before proceeding.
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
 
 	// Create a sample workload for e2e testing.
-	appName := fmt.Sprintf("%s-%s",testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, gwNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", gwNs, appName, err)
+	if err:= newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", gwNs, appName)
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, gwNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", gwNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", gwNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, gwNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", gwNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created service %s/%s", gwNs, appName)
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newHTTPRouteToSvc(ctx, kclient, appName, gwNs, appName, "app", "kuard", "*.projectcontour.io", int32(80)); err != nil {
-		t.Fatalf("failed to create httproute %s/%s: %v", gwNs, appName, err)
+	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created httproute %s/%s", gwNs, appName)
+	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
 
 	if err := waitForHTTPResponse(testUrl, 3*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
@@ -388,8 +388,8 @@ func TestGateway(t *testing.T) {
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
 
 	// Ensure the gateway can be deleted and clean-up.
-	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, gwNs); err != nil {
-		t.Fatalf("failed to delete gateway %s/%s: %v", gwNs, gwName, err)
+	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
 
 	// Ensure the gatewayclass can be deleted and clean-up.
