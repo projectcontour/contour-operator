@@ -388,7 +388,9 @@ func newNs(ctx context.Context, cl client.Client, name string) error {
 		},
 	}
 	if err := cl.Create(ctx, ns); err != nil {
-		return fmt.Errorf("failed to create namespace %s: %v", ns.Name, err)
+		if !errors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create namespace %s: %v", ns.Name, err)
+		}
 	}
 	return nil
 }
@@ -523,6 +525,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 		Port:     gatewayv1alpha1.PortNumber(int32(80)),
 		Protocol: gatewayv1alpha1.HTTPProtocolType,
 		Routes:   gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
 			Selector: routes,
 		},
 	}
@@ -530,6 +533,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 		Port:     gatewayv1alpha1.PortNumber(int32(443)),
 		Protocol: gatewayv1alpha1.HTTPSProtocolType,
 		Routes:   gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
 			Selector: routes,
 		},
 	}
