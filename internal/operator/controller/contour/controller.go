@@ -161,18 +161,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
 		}
 		switch {
-		case contour.IsFinalized():
-			r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
-			if err := r.ensureContour(ctx, contour); err != nil {
-				switch e := err.(type) {
-				case retryable.Error:
-					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-					return ctrl.Result{RequeueAfter: e.After()}, nil
-				default:
-					return ctrl.Result{}, err
-				}
-			}
-			r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
 		case contour.GatewayClassSet():
 			if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
 				switch e := err.(type) {
@@ -184,12 +172,26 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 			}
 		default:
-			// Before doing anything with the contour, ensure it has a finalizer
-			// so it can cleaned-up later.
-			if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
-				return ctrl.Result{}, err
+			if !contour.IsFinalized() {
+				// Before doing anything with the contour, ensure it has a finalizer
+				// so it can cleaned-up later.
+				if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
+					return ctrl.Result{}, err
+				}
+				r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
+			} else {
+				r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
+				if err := r.ensureContour(ctx, contour); err != nil {
+					switch e := err.(type) {
+					case retryable.Error:
+						r.log.Error(e, "got retryable error; requeueing", "after", e.After())
+						return ctrl.Result{RequeueAfter: e.After()}, nil
+					default:
+						return ctrl.Result{}, err
+					}
+				}
+				r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
 			}
-			r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	} else {
 		switch {
@@ -276,7 +278,7 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 // ensureContourForGatewayClass ensures all necessary resources exist for the given contour
 // when the contour is being managed by a GatewayClass.
 func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	if contour.Spec.GatewayClassRef == nil {
+	if !contour.GatewayClassSet() {
 		return fmt.Errorf("gatewayclass not set for contour %s/%s", contour.Namespace, contour.Name)
 	}
 	var errs []error
