@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	equality "github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -102,7 +103,8 @@ func createRole(ctx context.Context, cli client.Client, role *rbacv1.Role) (*rba
 // updateRoleIfNeeded updates a Role resource if current does not match desired,
 // using contour to verify the existence of owner labels.
 func updateRoleIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *rbacv1.Role) (*rbacv1.Role, error) {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(current, labels) {
 		role, updated := equality.RoleConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, role); err != nil {

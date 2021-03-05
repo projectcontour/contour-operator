@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	utilequality "github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -95,7 +96,8 @@ func createServiceAccount(ctx context.Context, cli client.Client, sa *corev1.Ser
 // updateSvcAcctIfNeeded updates a ServiceAccount resource if current does not match desired,
 // using contour to verify the existence of owner labels.
 func updateSvcAcctIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.ServiceAccount) (*corev1.ServiceAccount, error) {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(current, labels) {
 		sa, updated := utilequality.ServiceAccountConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, sa); err != nil {

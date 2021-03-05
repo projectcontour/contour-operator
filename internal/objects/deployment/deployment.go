@@ -25,6 +25,7 @@ import (
 	objcm "github.com/projectcontour/contour-operator/internal/objects/configmap"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
+	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -98,7 +99,8 @@ func EnsureDeploymentDeleted(ctx context.Context, cli client.Client, contour *op
 		return err
 	}
 
-	if objcontour.OwnerLabelsExist(deploy, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(deploy, labels) {
 		if err := cli.Delete(ctx, deploy); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -333,7 +335,8 @@ func createDeployment(ctx context.Context, cli client.Client, deploy *appsv1.Dep
 // updateDeploymentIfNeeded updates a Deployment if current does not match desired,
 // using contour to verify the existence of owner labels.
 func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.Deployment) error {
-	if !objcontour.OwnerLabelsExist(current, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(current, labels) {
 		return nil
 	}
 	deploy, updated := equality.DeploymentConfigChanged(current, desired)

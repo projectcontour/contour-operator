@@ -23,6 +23,7 @@ import (
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/internal/operator/config"
+	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +76,8 @@ func EnsureJobDeleted(ctx context.Context, cli client.Client, contour *operatorv
 		}
 		return err
 	}
-	if objcontour.OwnerLabelsExist(job, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(job, labels) {
 		if err := cli.Delete(ctx, job); err != nil {
 			if !errors.IsNotFound(err) {
 				return err
@@ -176,7 +178,8 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 // recreateJobIfNeeded recreates a Job if current doesn't match desired,
 // using contour to verify the existence of owner labels.
 func recreateJobIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *batchv1.Job) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(current, labels) {
 		updated, changed := equality.JobConfigChanged(current, desired)
 		if !changed {
 			return nil

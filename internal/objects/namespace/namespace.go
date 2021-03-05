@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +73,8 @@ func EnsureNamespaceDeleted(ctx context.Context, cli client.Client, contour *ope
 		}
 		return err
 	}
-	if objcontour.OwnerLabelsExist(ns, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(ns, labels) {
 		contoursExist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
 		if err != nil {
 			return fmt.Errorf("failed to verify if contours exist in namespace %s: %w", name, err)
@@ -125,7 +127,8 @@ func currentSpecNsName(ctx context.Context, cli client.Client, name string) (*co
 // updateNamespaceIfNeeded updates a Namespace if current does not match desired,
 // using contour to verify the existence of owner labels.
 func updateNamespaceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Namespace) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	labels := objcontour.OwnerLabels(contour)
+	if labelutil.Exist(current, labels) {
 		ns, updated := equality.NamespaceConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, ns); err != nil {
