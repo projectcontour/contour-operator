@@ -23,6 +23,7 @@ import (
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
+	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -148,7 +149,7 @@ func EnsureContourServiceDeleted(ctx context.Context, cli client.Client, contour
 		}
 		return err
 	}
-	if objcontour.OwnerLabelsExist(svc, contour) {
+	if labels.Exist(svc, objcontour.OwnerLabels(contour)) {
 		if err := cli.Delete(ctx, svc); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -169,7 +170,7 @@ func EnsureEnvoyServiceDeleted(ctx context.Context, cli client.Client, contour *
 		}
 		return err
 	}
-	if objcontour.OwnerLabelsExist(svc, contour) {
+	if labels.Exist(svc, objcontour.OwnerLabels(contour)) {
 		if err := cli.Delete(ctx, svc); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -319,7 +320,7 @@ func createService(ctx context.Context, cli client.Client, svc *corev1.Service) 
 
 // updateContourServiceIfNeeded updates a Contour Service if current does not match desired.
 func updateContourServiceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
 		_, updated := equality.ClusterIPServiceChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, desired); err != nil {
@@ -334,7 +335,7 @@ func updateContourServiceIfNeeded(ctx context.Context, cli client.Client, contou
 // updateEnvoyServiceIfNeeded updates an Envoy Service if current does not match desired,
 // using contour to verify the existence of owner labels.
 func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
 		updated := false
 		switch contour.Spec.NetworkPublishing.Envoy.Type {
 		case operatorv1alpha1.NodePortServicePublishingType:

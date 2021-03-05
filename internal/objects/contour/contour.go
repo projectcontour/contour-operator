@@ -84,31 +84,6 @@ func CurrentContour(ctx context.Context, cli client.Client, ns, name string) (*o
 	return cntr, nil
 }
 
-// OwnerLabelsExist returns true if obj contains Contour owner labels.
-func OwnerLabelsExist(obj metav1.Object, contour *operatorv1alpha1.Contour) bool {
-	labels := obj.GetLabels()
-	nameFound := false
-	nsFound := false
-	if labels == nil {
-		return false
-	}
-	for l, v := range labels {
-		switch {
-		case nameFound && nsFound:
-			return true
-		case l == operatorv1alpha1.OwningContourNameLabel && v == contour.Name:
-			nameFound = true
-		case l == operatorv1alpha1.OwningContourNsLabel && v == contour.Namespace:
-			nsFound = true
-		}
-	}
-	if nameFound && nsFound {
-		return true
-	}
-	// no contour owning name and ns labels found.
-	return false
-}
-
 // OtherContoursExist lists Contour objects in all namespaces, returning the list
 // and true if any exist other than contour.
 func OtherContoursExist(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (bool, *operatorv1alpha1.ContourList, error) {
@@ -168,4 +143,12 @@ func GatewayClassRefsExist(ctx context.Context, cli client.Client, name string) 
 		}
 	}
 	return found, nil
+}
+
+// OwnerLabels returns owner labels for the provided contour.
+func OwnerLabels(contour *operatorv1alpha1.Contour) map[string]string {
+	return map[string]string{
+		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+	}
 }
