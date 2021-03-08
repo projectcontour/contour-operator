@@ -158,12 +158,14 @@ func TestDefaultContour(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
 	}
+	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
 	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
 	}
+	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
 func TestContourNodePortService(t *testing.T) {
@@ -228,12 +230,14 @@ func TestContourNodePortService(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
 	}
+	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
 	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
 	}
+	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
 func TestContourSpecNs(t *testing.T) {
@@ -298,6 +302,7 @@ func TestContourSpecNs(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
 	}
+	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Verify the user-defined namespace was removed by the operator.
 	if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, specNs); err != nil {
