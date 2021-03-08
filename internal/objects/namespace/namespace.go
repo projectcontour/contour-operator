@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +31,7 @@ import (
 )
 
 // namespaceCoreList is a list of namespace names that should not be removed.
-var namespaceCoreList = []string{"contour-operator", "default", "kube-system"}
+var namespaceCoreList = []string{operatorconfig.DefaultNamespace, "default", "kube-system"}
 
 // EnsureNamespace ensures the namespace for the provided name exists.
 func EnsureNamespace(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {

@@ -30,95 +30,67 @@ import (
 var clock utilclock.Clock = utilclock.RealClock{}
 
 // computeContourAvailableCondition computes the contour Available status condition
-// type based on deployment, ds, set, exists and admitted.
-func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet, set, exists, admitted bool) metav1.Condition {
-	switch {
-	case set:
+// type based on the status of deployment and ds.
+func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet) metav1.Condition {
+	if deployment == nil {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ContourUnavailable",
+			Message: "Contour deployment does not exist.",
+		}
+	}
+	if ds == nil {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ContourUnavailable",
+			Message: "Envoy daemonset does not exist.",
+		}
+	}
+	dsAvailable := ds.Status.NumberAvailable > 0
+	for _, cond := range deployment.Status.Conditions {
+		if cond.Type != appsv1.DeploymentAvailable {
+			continue
+		}
 		switch {
-		case !exists:
-			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "GatewayClassNonExistent",
-				Message: "The referenced GatewayClass does not exist.",
-			}
-		case !admitted:
-			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "GatewayClassNotAdmitted",
-				Message: "The referenced GatewayClass is not admitted.",
-			}
-		default:
-			// The referenced gatewayclass exists and is admitted.
-			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionTrue,
-				Reason:  "GatewayClassAdmitted",
-				Message: "The referenced GatewayClass is admitted.",
-			}
-		}
-	default:
-		if deployment == nil {
-			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "ContourUnavailable",
-				Message: "Contour deployment does not exist.",
-			}
-		}
-		if ds == nil {
-			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "ContourUnavailable",
-				Message: "Envoy daemonset does not exist.",
-			}
-		}
-		dsAvailable := ds.Status.NumberAvailable > 0
-		for _, cond := range deployment.Status.Conditions {
-			if cond.Type != appsv1.DeploymentAvailable {
-				continue
-			}
-			switch {
-			case cond.Status == corev1.ConditionTrue:
-				if dsAvailable {
-					return metav1.Condition{
-						Type:    operatorv1alpha1.ContourAvailableConditionType,
-						Status:  metav1.ConditionTrue,
-						Reason:  "ContourAvailable",
-						Message: "Contour has minimum availability.",
-					}
+		case cond.Status == corev1.ConditionTrue:
+			if dsAvailable {
+				return metav1.Condition{
+					Type:    operatorv1alpha1.ContourAvailableConditionType,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ContourAvailable",
+					Message: "Contour has minimum availability.",
 				}
+			}
+			return metav1.Condition{
+				Type:    operatorv1alpha1.ContourAvailableConditionType,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ContourUnavailable",
+				Message: "Envoy daemonset does not have minimum availability.",
+			}
+		case cond.Status == corev1.ConditionFalse:
+			if dsAvailable {
 				return metav1.Condition{
 					Type:    operatorv1alpha1.ContourAvailableConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ContourUnavailable",
-					Message: "Envoy daemonset does not have minimum availability.",
+					Message: fmt.Sprintf("Contour %s", strings.ToLower(cond.Message)),
 				}
-			case cond.Status == corev1.ConditionFalse:
-				if dsAvailable {
-					return metav1.Condition{
-						Type:    operatorv1alpha1.ContourAvailableConditionType,
-						Status:  metav1.ConditionFalse,
-						Reason:  "ContourUnavailable",
-						Message: fmt.Sprintf("Contour %s", strings.ToLower(cond.Message)),
-					}
-				}
-				return metav1.Condition{
-					Type:   operatorv1alpha1.ContourAvailableConditionType,
-					Status: metav1.ConditionFalse,
-					Reason: "ContourUnavailable",
-					Message: fmt.Sprintf("Envoy daemonset does not have minimum availability. Contour %s",
-						strings.ToLower(cond.Message)),
-				}
-			case cond.Status == corev1.ConditionUnknown:
-				return metav1.Condition{
-					Type:    operatorv1alpha1.ContourAvailableConditionType,
-					Status:  metav1.ConditionUnknown,
-					Reason:  fmt.Sprintf("ContourUnknown: %s", cond.Message),
-					Message: fmt.Sprintf("Contour status unknown. %s", cond.Message),
-				}
+			}
+			return metav1.Condition{
+				Type:   operatorv1alpha1.ContourAvailableConditionType,
+				Status: metav1.ConditionFalse,
+				Reason: "ContourUnavailable",
+				Message: fmt.Sprintf("Envoy daemonset does not have minimum availability. Contour %s",
+					strings.ToLower(cond.Message)),
+			}
+		case cond.Status == corev1.ConditionUnknown:
+			return metav1.Condition{
+				Type:    operatorv1alpha1.ContourAvailableConditionType,
+				Status:  metav1.ConditionUnknown,
+				Reason:  fmt.Sprintf("ContourUnknown: %s", cond.Message),
+				Message: fmt.Sprintf("Contour status unknown. %s", cond.Message),
 			}
 		}
 	}
@@ -131,26 +103,51 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 	}
 }
 
-// computeGatewayClassAdmittedCondition computes the Available status condition based
-// upon the GatewayClass status specification.
-func computeGatewayClassAdmittedCondition(owned, valid bool) metav1.Condition {
-	c := metav1.Condition{
+// computeContourAdmittedCondition computes the contour Admitted status condition
+// type based on gcExists and refsContour.
+func computeContourAdmittedCondition(gcExists, refsContour bool) metav1.Condition {
+	if !gcExists {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAdmittedConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "GatewayClassNonExistent",
+			Message: "Referenced GatewayClass does not exist.",
+		}
+	}
+	if !refsContour {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAdmittedConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "NotReferencedbyGatewayClass",
+			Message: "Contour not referenced by GatewayClass.",
+		}
+	}
+	// The referenced gatewayclass exists and references the contour.
+	return metav1.Condition{
+		Type:    operatorv1alpha1.ContourAdmittedConditionType,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ReferencedbyGatewayClass",
+		Message: "Contour referenced by GatewayClass.",
+	}
+}
+
+// computeGatewayClassAdmittedCondition computes the Admitted status condition based
+// on whether gc is valid.
+func computeGatewayClassAdmittedCondition(valid bool) metav1.Condition {
+	if valid {
+		return metav1.Condition{
+			Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+			Status:  metav1.ConditionTrue,
+			Reason:  "Valid",
+			Message: "GatewayClass is valid.",
+		}
+	}
+	return metav1.Condition{
 		Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
 		Status:  metav1.ConditionFalse,
-		Reason:  "NotOwned",
-		Message: "Not owned by Contour Operator.",
+		Reason:  "Invalid",
+		Message: "GatewayClass is invalid.",
 	}
-	switch {
-	case !valid:
-		c.Status = metav1.ConditionFalse
-		c.Reason = "Invalid"
-		c.Message = "Invalid GatewayClass."
-	case owned:
-		c.Status = metav1.ConditionTrue
-		c.Reason = "Owned"
-		c.Message = "Owned by Contour Operator."
-	}
-	return c
 }
 
 // computeGatewayReadyCondition computes the Ready status condition based

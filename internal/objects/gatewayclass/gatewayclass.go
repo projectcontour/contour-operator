@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,4 +94,24 @@ func OtherGatewayClassesRefContour(ctx context.Context, cli client.Client, gc *g
 		}
 	}
 	return false, nil
+}
+
+// GatewaysRefClass returns a list of Gateways that reference a GatewayClass named name.
+func GatewaysRefClass(ctx context.Context, cli client.Client, name string) ([]gatewayv1alpha1.Gateway, error) {
+	var found []gatewayv1alpha1.Gateway
+	gateways := &gatewayv1alpha1.GatewayList{}
+	if err := cli.List(ctx, gateways); err != nil {
+		if errors.IsNotFound(err) {
+			return found, nil
+		}
+		return found, err
+	}
+	if len(gateways.Items) > 0 {
+		for i, g := range gateways.Items {
+			if g.Spec.GatewayClassName == name {
+				found = append(found, gateways.Items[i])
+			}
+		}
+	}
+	return found, nil
 }

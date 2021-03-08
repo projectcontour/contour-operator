@@ -38,7 +38,6 @@ import (
 func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
 	var err error
 	var errs []error
-	var gcExists, admitted bool
 
 	latest := &operatorv1alpha1.Contour{}
 	key := types.NamespacedName{
@@ -55,34 +54,35 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 
 	updated := latest.DeepCopy()
 
-	set := latest.GatewayClassSet()
-	if set {
-		gcRef := *latest.Spec.GatewayClassRef
-		gc, err := objgc.Get(ctx, cli, gcRef)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s exists: %w", gcRef, err))
-		}
-		gcExists = gc != nil
-		admitted, err = objgc.Admitted(ctx, cli, gcRef)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s is admitted: %w", gcRef, err))
-		}
-	}
 	deploy, err := objdeploy.CurrentDeployment(ctx, cli, latest)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to get deployment for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
+		updated.Status.AvailableContours = int32(0)
 	} else {
 		updated.Status.AvailableContours = deploy.Status.AvailableReplicas
 	}
 	ds, err := objds.CurrentDaemonSet(ctx, cli, latest)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to get daemonset for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
+		updated.Status.AvailableEnvoys = int32(0)
 	} else {
 		updated.Status.AvailableEnvoys = ds.Status.NumberAvailable
 	}
 
 	updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
-		computeContourAvailableCondition(deploy, ds, set, gcExists, admitted))
+		computeContourAvailableCondition(deploy, ds))
+	gcSet := latest.GatewayClassSet()
+	var gcExists, refsContour bool
+	if gcSet {
+		gcRef := *latest.Spec.GatewayClassRef
+		if _, err := objgc.Get(ctx, cli, gcRef); err == nil {
+			gcExists = true
+			_, refsContour, err = objgc.ParameterRefExists(ctx, cli, contour.Name, contour.Namespace)
+			if err != nil {
+				return fmt.Errorf("failed to verify if gatewayclass %s exists: %w", gcRef, err)
+			}
+		}
+		updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
+			computeContourAdmittedCondition(gcExists, refsContour))
+	}
 
 	if equality.ContourStatusChanged(latest.Status, updated.Status) {
 		if err := cli.Status().Update(ctx, updated); err != nil {
@@ -106,9 +106,9 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 	return retryable.NewMaybeRetryableAggregate(errs)
 }
 
-// SyncGatewayClass computes the current status of gc and updates status upon
-// any changes since last sync.
-func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, owned, valid bool) error {
+// SyncGatewayClass computes the current status of gc based on whether gc is valid
+// and updates status upon any changes since last sync.
+func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, valid bool) error {
 	var errs []error
 
 	latest := &gatewayv1alpha1.GatewayClass{}
@@ -125,7 +125,7 @@ func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha
 
 	updated := latest.DeepCopy()
 
-	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeGatewayClassAdmittedCondition(owned, valid))
+	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeGatewayClassAdmittedCondition(valid))
 
 	if equality.GatewayClassStatusChanged(latest.Status, updated.Status) {
 		if err := cli.Status().Update(ctx, updated); err != nil {

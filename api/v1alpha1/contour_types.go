@@ -300,6 +300,11 @@ type ContainerPort struct {
 const (
 	// Available indicates that the contour is running and available.
 	ContourAvailableConditionType = "Available"
+
+	// Admitted is a condition type set when contour references a GatewayClass.
+	// This condition is set to true if the referenced GatewayClass exists and
+	// references the contour.
+	ContourAdmittedConditionType = "Admitted"
 )
 
 // ContourStatus defines the observed state of Contour.

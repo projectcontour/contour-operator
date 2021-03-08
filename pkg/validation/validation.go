@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
+	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
@@ -74,17 +75,18 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 }
 
 // GatewayClass returns true if gc is a valid GatewayClass.
-func GatewayClass(gc *gatewayv1alpha1.GatewayClass) error {
-	return parameterRef(gc)
+func GatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) error {
+	return parameterRef(ctx, cli, gc)
 }
 
 // parameterRef returns true if parametersRef of gc is valid.
-func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
+func parameterRef(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) error {
 	if gc.Spec.ParametersRef == nil {
 		return nil
 	}
 	if gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
-		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped referecnes are supported", gc.Name)
+		return fmt.Errorf("invalid parametersRef for gateway class %s, scope %s is required",
+			gc.Name, gatewayClassNamespacedParamRef)
 	}
 	group := gc.Spec.ParametersRef.Group
 	if group != operatorv1alpha1.GatewayClassParamsRefGroup {
@@ -93,6 +95,16 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	kind := gc.Spec.ParametersRef.Kind
 	if kind != operatorv1alpha1.GatewayClassParamsRefKind {
 		return fmt.Errorf("invalid kind %q", kind)
+	}
+	ns := gc.Spec.ParametersRef.Namespace
+	defaultNs := operatorconfig.DefaultNamespace
+	if ns != defaultNs {
+		return fmt.Errorf("invalid namespace %q; only namespace %s is supported", ns, defaultNs)
+	}
+	name := gc.Spec.ParametersRef.Name
+	_, err := objcontour.CurrentContour(ctx, cli, ns, name)
+	if err != nil {
+		return fmt.Errorf("failed to get contour %s/%s for gatewayclass %s: %w", ns, name, gc.Name, err)
 	}
 	return nil
 }

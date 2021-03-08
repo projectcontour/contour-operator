@@ -15,6 +15,7 @@ package operator
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -43,7 +44,6 @@ import (
 // Define utility constants for object names, testing timeouts/durations intervals, etc.
 const (
 	testContourName  = "test-contour"
-	testOperatorNs   = "test-contour-operator"
 	defaultNamespace = "projectcontour"
 	defaultReplicas  = int32(2)
 
@@ -54,6 +54,8 @@ const (
 )
 
 var (
+	testOperatorNs = fmt.Sprintf("test-%s", operatorconfig.DefaultNamespace)
+
 	testEnv *envtest.Environment
 
 	cntr = &operatorv1alpha1.Contour{

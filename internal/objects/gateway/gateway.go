@@ -22,9 +22,20 @@ import (
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
+
+// Get returns a Gateway named ns/name, if it exists.
+func Get(ctx context.Context, cli client.Client, ns, name string) (*gatewayv1alpha1.Gateway, error) {
+	gw := &gatewayv1alpha1.Gateway{}
+	key := types.NamespacedName{Namespace: ns, Name: name}
+	if err := cli.Get(ctx, key, gw); err != nil {
+		return nil, fmt.Errorf("failed to get gateway %s/%s: %w", ns, name, err)
+	}
+	return gw, nil
+}
 
 // OtherGatewaysExist lists Gateway objects in all namespaces, returning the list
 // if any exist other than gw.

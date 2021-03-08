@@ -14,6 +14,7 @@
 package config
 
 const (
+	DefaultNamespace              = "contour-operator"
 	DefaultContourImage           = "docker.io/projectcontour/contour:main"
 	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.17.1"
 	DefaultMetricsAddr            = ":8080"

@@ -55,15 +55,29 @@ var (
 	expectedPodConditions = []corev1.PodCondition{
 		{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
 	}
-	// expectedContourConditions are the expected status conditions of a
-	// contour.
+	// expectedContourAvailableCondition is the expected status conditions of an
+	// available contour.
+	expectedContourAvailableCondition = []metav1.Condition{
+		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
+	}
+	// expectedContourAdmittedCondition is the expected status conditions of an
+	// admitted contour.
+	expectedContourAdmittedCondition = []metav1.Condition{
+		{Type: operatorv1alpha1.ContourAdmittedConditionType, Status: metav1.ConditionTrue},
+		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionFalse},
+	}
+	// expectedContourConditions are the expected status conditions of a contour.
 	expectedContourConditions = []metav1.Condition{
 		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
-		// TODO [danehans]: Update when additional status conditions are added to Contour.
+		{Type: operatorv1alpha1.ContourAdmittedConditionType, Status: metav1.ConditionTrue},
 	}
 	// expectedGatewayClassConditions are the expected status conditions of a GatewayClass.
 	expectedGatewayClassConditions = []metav1.Condition{
 		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionTrue},
+	}
+	// expectedGatewayConditions are the expected status conditions of a Gateway.
+	expectedGatewayConditions = []metav1.Condition{
+		{Type: string(gatewayv1alpha1.GatewayConditionReady), Status: metav1.ConditionTrue},
 	}
 	// testAppName is the name of the application used for e2e testing.
 	testAppName = "kuard"
@@ -115,7 +129,7 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
 
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourAvailableCondition...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
@@ -187,7 +201,7 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourAvailableCondition...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
@@ -352,7 +366,7 @@ func TestContourSpecNs(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourAvailableCondition...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
@@ -485,11 +499,11 @@ func TestGateway(t *testing.T) {
 		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
 	}
 
-	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	// The contour should now report admitted.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, cfg.Name, cfg.Namespace, expectedContourAdmittedCondition...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
 
 	// Create the gateway namespace if it doesn't exist.
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
@@ -506,8 +520,17 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
-	// TODO [danehans]: Check gateway status conditions before proceeding.
-	// xref: https://github.com/projectcontour/contour-operator/issues/211
+	// The contour should now report admitted and available.
+	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
+
+	// The gateway should now report available.
+	if err := waitForGatewayStatusConditions(ctx, kclient, 1*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+	t.Logf("observed expected status conditions for gateway %s/%s", cfg.SpecNs, gwName)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {

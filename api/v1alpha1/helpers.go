@@ -13,6 +13,8 @@
 
 package v1alpha1
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 const (
 	// GatewayClassControllerRef identifies contour operator as the managing controller
 	// of a GatewayClass.
@@ -50,4 +52,16 @@ func (c *Contour) IsFinalized() bool {
 // GatewayClassSet returns true if gatewayClassRef is set for Contour.
 func (c *Contour) GatewayClassSet() bool {
 	return c.Spec.GatewayClassRef != nil
+}
+
+// Admitted returns true if the Contour "Admitted" status condition is true.
+func (c *Contour) Admitted() bool {
+	if len(c.Status.Conditions) > 0 {
+		for _, c := range c.Status.Conditions {
+			if c.Type == ContourAdmittedConditionType && c.Status == metav1.ConditionTrue {
+				return true
+			}
+		}
+	}
+	return false
 }
