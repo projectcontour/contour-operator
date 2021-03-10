@@ -30,8 +30,24 @@ import (
 var clock utilclock.Clock = utilclock.RealClock{}
 
 // computeContourAvailableCondition computes the contour Available status condition
-// type based on the status of deployment and ds.
-func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet) metav1.Condition {
+// type based on the status of deployment and ds and whether Contour is valid.
+func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet, valid bool) metav1.Condition {
+	if !valid {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  operatorv1alpha1.ContourInvalidConditionReason,
+			Message: "Contour is invalid.",
+		}
+	}
+	if deployment == nil && ds == nil {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ContourUnavailable",
+			Message: "Contour deployment and Envoy daemonset do not exist.",
+		}
+	}
 	if deployment == nil {
 		return metav1.Condition{
 			Type:    operatorv1alpha1.ContourAvailableConditionType,
@@ -110,43 +126,78 @@ func computeContourAdmittedCondition(gcExists, refsContour bool) metav1.Conditio
 		return metav1.Condition{
 			Type:    operatorv1alpha1.ContourAdmittedConditionType,
 			Status:  metav1.ConditionFalse,
-			Reason:  "GatewayClassNonExistent",
-			Message: "Referenced GatewayClass does not exist.",
+			Reason:  "NonExistentGatewayClass",
+			Message: "Referenced gatewayclass does not exist.",
 		}
 	}
 	if !refsContour {
 		return metav1.Condition{
 			Type:    operatorv1alpha1.ContourAdmittedConditionType,
 			Status:  metav1.ConditionFalse,
-			Reason:  "NotReferencedbyGatewayClass",
-			Message: "Contour not referenced by GatewayClass.",
+			Reason:  "GatewayClassNotReferenced",
+			Message: "Contour is not referenced by gatewayclass.",
 		}
 	}
 	// The referenced gatewayclass exists and references the contour.
 	return metav1.Condition{
 		Type:    operatorv1alpha1.ContourAdmittedConditionType,
 		Status:  metav1.ConditionTrue,
-		Reason:  "ReferencedbyGatewayClass",
-		Message: "Contour referenced by GatewayClass.",
+		Reason:  "GatewayClassReferenced",
+		Message: "Contour is referenced by gatewayclass.",
 	}
 }
 
 // computeGatewayClassAdmittedCondition computes the Admitted status condition based
 // on whether gc is valid.
-func computeGatewayClassAdmittedCondition(valid bool) metav1.Condition {
-	if valid {
+func computeGatewayClassAdmittedCondition(gcValid, cntrValid bool) metav1.Condition {
+	if !gcValid && !cntrValid {
 		return metav1.Condition{
 			Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
-			Status:  metav1.ConditionTrue,
-			Reason:  "Valid",
-			Message: "GatewayClass is valid.",
+			Status:  metav1.ConditionFalse,
+			Reason:  string(gatewayv1alpha1.GatewayClassNotAdmittedInvalidParameters),
+			Message: "GatewayClass and referenced contour are invalid.",
+		}
+	}
+	if !gcValid {
+		return metav1.Condition{
+			Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(gatewayv1alpha1.GatewayClassNotAdmittedInvalidParameters),
+			Message: "GatewayClass is invalid.",
+		}
+	}
+	if !cntrValid {
+		return metav1.Condition{
+			Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(gatewayv1alpha1.GatewayClassNotAdmittedInvalidParameters),
+			Message: "Referenced contour is invalid.",
 		}
 	}
 	return metav1.Condition{
 		Type:    string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
-		Status:  metav1.ConditionFalse,
-		Reason:  "Invalid",
-		Message: "GatewayClass is invalid.",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Valid",
+		Message: "GatewayClass is valid.",
+	}
+}
+
+// computeGatewayClassAvailableCondition computes the Available status condition based
+// on whether cntr is available.
+func computeGatewayClassAvailableCondition(cntr bool) metav1.Condition {
+	if !cntr {
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ContourUnavailable",
+			Message: "Referenced contour is not available.",
+		}
+	}
+	return metav1.Condition{
+		Type:    operatorv1alpha1.ContourAvailableConditionType,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ContourAvailable",
+		Message: "Referenced contour is available.",
 	}
 }
 
@@ -157,25 +208,25 @@ func computeGatewayReadyCondition(gcExists, gcAdmitted, cntrAvailable bool) meta
 		Type:    string(gatewayv1alpha1.GatewayConditionReady),
 		Status:  metav1.ConditionFalse,
 		Reason:  "GatewayClassAndContourUnavailable",
-		Message: "The associated GatewayClass and Contour are not available.",
+		Message: "Referenced gatewayclass and contour are not available.",
 	}
 	switch {
 	case !gcExists:
 		c.Status = metav1.ConditionFalse
 		c.Reason = "NonExistentGatewayClass"
-		c.Message = "The GatewayClass does not exist."
+		c.Message = "Referenced gatewayclass does not exist."
 	case !gcAdmitted:
 		c.Status = metav1.ConditionFalse
 		c.Reason = "GatewayClassNotAdmitted"
-		c.Message = "The GatewayClass is not admitted."
+		c.Message = "Referenced gatewayclass is not admitted."
 	case !cntrAvailable:
 		c.Status = metav1.ConditionFalse
 		c.Reason = "ContourNotAvailable"
-		c.Message = "The Contour is not available."
+		c.Message = "Associated contour is not available."
 	default:
 		c.Status = metav1.ConditionTrue
 		c.Reason = "GatewayReady"
-		c.Message = "The Gateway is ready to serve routes."
+		c.Message = "Gateway is ready to serve routes."
 	}
 	return c
 }

@@ -66,11 +66,6 @@ var (
 		{Type: operatorv1alpha1.ContourAdmittedConditionType, Status: metav1.ConditionTrue},
 		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionFalse},
 	}
-	// expectedContourConditions are the expected status conditions of a contour.
-	expectedContourConditions = []metav1.Condition{
-		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
-		{Type: operatorv1alpha1.ContourAdmittedConditionType, Status: metav1.ConditionTrue},
-	}
 	// expectedGatewayClassConditions are the expected status conditions of a GatewayClass.
 	expectedGatewayClassConditions = []metav1.Condition{
 		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionTrue},
@@ -273,7 +268,7 @@ func TestContourClusterIPService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourAvailableCondition...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
@@ -438,7 +433,7 @@ func TestMultipleContours(t *testing.T) {
 		}
 		t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-		if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+		if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourAvailableCondition...); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
@@ -521,7 +516,7 @@ func TestGateway(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// The contour should now report admitted and available.
-	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourAvailableCondition...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)

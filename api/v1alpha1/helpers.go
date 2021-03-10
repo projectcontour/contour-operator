@@ -54,13 +54,24 @@ func (c *Contour) GatewayClassSet() bool {
 	return c.Spec.GatewayClassRef != nil
 }
 
-// Admitted returns true if the Contour "Admitted" status condition is true.
-func (c *Contour) Admitted() bool {
-	if len(c.Status.Conditions) > 0 {
-		for _, c := range c.Status.Conditions {
-			if c.Type == ContourAdmittedConditionType && c.Status == metav1.ConditionTrue {
-				return true
-			}
+// Valid returns false if contour's Available status condition is false with an
+// "InvalidContour" reason.
+func (c *Contour) Valid() bool {
+	for _, c := range c.Status.Conditions {
+		if c.Type == ContourAvailableConditionType &&
+			c.Status == metav1.ConditionFalse &&
+			c.Reason == ContourInvalidConditionReason {
+			return false
+		}
+	}
+	return true
+}
+
+// Available returns true if contour contains the Available=True status condition.
+func (c *Contour) Available() bool {
+	for _, condition := range c.Status.Conditions {
+		if condition.Type == ContourAvailableConditionType && condition.Status == metav1.ConditionTrue {
+			return true
 		}
 	}
 	return false

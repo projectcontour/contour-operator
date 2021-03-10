@@ -17,7 +17,7 @@ import (
 	"context"
 	"fmt"
 
-	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -56,10 +57,51 @@ func New(mgr manager.Manager) (controller.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	// Only enqueue GatewayClass objects that specify the operator as the controller.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, r.enqueueRequestForGatewayClass()); err != nil {
+		return nil, err
+	}
+	// Watch Contour objects to properly surface GatewayClass status conditions.
+	if err := c.Watch(&source.Kind{Type: &operatorv1alpha1.Contour{}}, r.enqueueRequestForGatewayClassRef()); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// enqueueRequestForGatewayClass returns an event handler that maps events to
+// GatewayClass objects owned by the operator.
+func (r *reconciler) enqueueRequestForGatewayClass() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gc := a.(*gatewayv1alpha1.GatewayClass)
+		if objgc.IsController(gc.Spec.Controller) {
+			name := gc.Name
+			r.log.Info("queueing gatewayclass", "name", name)
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{Name: name},
+				},
+			}
+		}
+		return []reconcile.Request{}
+	})
+}
+
+// enqueueRequestForGatewayClassRef returns an event handler that maps events
+// to Contour objects that contain a gatewayClassRef.
+func (r *reconciler) enqueueRequestForGatewayClassRef() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		contour := a.(*operatorv1alpha1.Contour)
+		if contour.Spec.GatewayClassRef != nil {
+			name := *contour.Spec.GatewayClassRef
+			r.log.Info("queueing contour for gatewayclass", "name", name)
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{Name: name},
+				},
+			}
+		}
+		return []reconcile.Request{}
+	})
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -72,20 +114,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var errs []error
 	if err := r.client.Get(ctx, key, gc); err != nil {
 		if errors.IsNotFound(err) {
-			// Sync contour status if this gatewayclass is referenced by any contour.
-			cntrs, err := objcontour.GatewayClassRefsExist(ctx, r.client, req.Name)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to verify if any contours reference gatewayclass %s: %w",
-					req.Name, err)
-			}
-			if len(cntrs) > 0 {
-				for i, cntr := range cntrs {
-					if err := status.SyncContour(ctx, r.client, &cntrs[i]); err != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", cntr.Namespace, cntr.Name, err)
-					}
-					r.log.Info("synced contour for gatewayclass", "name", gc.Name)
-				}
-			}
 			// This means the gatewayclass was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related
 			// resource that got deleted async).
@@ -98,31 +126,21 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The gatewayclass is safe to process.
 	desired := gc.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
-		owned := objgc.IsController(gc)
-		valid := false
-		if owned {
-			if err := validation.GatewayClass(ctx, r.client, gc); err == nil {
-				valid = true
-			}
-			if err := status.SyncGatewayClass(ctx, r.client, gc, valid); err != nil {
-				errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w", gc.Name, err))
-			} else {
-				r.log.Info("synced status for gatewayclass", "name", gc.Name)
-			}
+		gcValid := false
+		cntrValid := false
+		cntrAvailable := false
+		cntr, err := validation.GatewayClass(ctx, r.client, gc)
+		if err == nil {
+			gcValid = true
 		}
-		// Sync status for contours that reference this gatewayclass.
-		cntrs, err := objcontour.GatewayClassRefsExist(ctx, r.client, gc.Name)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to verify if any contours reference gatewayclass %s: %w",
-				req.Name, err)
+		if cntr != nil {
+			cntrAvailable = cntr.Available()
+			cntrValid = cntr.Valid()
 		}
-		if len(cntrs) > 0 {
-			for i, cntr := range cntrs {
-				if err := status.SyncContour(ctx, r.client, &cntrs[i]); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", cntr.Namespace, cntr.Name, err)
-				}
-				r.log.Info("synced status for contour", "namespace", cntr.Namespace, "name", cntr.Name)
-			}
+		if err := status.SyncGatewayClass(ctx, r.client, gc, gcValid, cntrValid, cntrAvailable); err != nil {
+			errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w", gc.Name, err))
+		} else {
+			r.log.Info("synced status for gatewayclass", "name", gc.Name)
 		}
 	}
 	return ctrl.Result{}, retryable.NewMaybeRetryableAggregate(errs)

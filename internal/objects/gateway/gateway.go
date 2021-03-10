@@ -22,30 +22,29 @@ import (
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
-// Get returns a Gateway named ns/name, if it exists.
-func Get(ctx context.Context, cli client.Client, ns, name string) (*gatewayv1alpha1.Gateway, error) {
-	gw := &gatewayv1alpha1.Gateway{}
-	key := types.NamespacedName{Namespace: ns, Name: name}
-	if err := cli.Get(ctx, key, gw); err != nil {
-		return nil, fmt.Errorf("failed to get gateway %s/%s: %w", ns, name, err)
-	}
-	return gw, nil
-}
-
 // OtherGatewaysExist lists Gateway objects in all namespaces, returning the list
 // if any exist other than gw.
 func OtherGatewaysExist(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*gatewayv1alpha1.GatewayList, error) {
-	gwList := &gatewayv1alpha1.GatewayList{}
-	if err := cli.List(ctx, gwList); err != nil {
-		return nil, fmt.Errorf("failed to list gateways: %w", err)
+	gwList, err := GatewaysExist(ctx, cli)
+	if err != nil {
+		return nil, err
 	}
 	if len(gwList.Items) == 0 || len(gwList.Items) == 1 && gwList.Items[0].Name == gw.Name {
 		return nil, nil
+	}
+	return gwList, nil
+}
+
+// GatewaysExist lists Gateway objects in all namespaces, returning the list
+// if any exist.
+func GatewaysExist(ctx context.Context, cli client.Client) (*gatewayv1alpha1.GatewayList, error) {
+	gwList := &gatewayv1alpha1.GatewayList{}
+	if err := cli.List(ctx, gwList); err != nil {
+		return nil, fmt.Errorf("failed to list gateways: %w", err)
 	}
 	return gwList, nil
 }
@@ -78,18 +77,35 @@ func OwningSelector(gw *gatewayv1alpha1.Gateway) *metav1.LabelSelector {
 	}
 }
 
-// ContourForGateway returns the Contour associated to gw, if one exists.
+// ContourForGateway returns the Contour associated to gw, if one exists
+// and is owned by the operator.
 func ContourForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*operatorv1alpha1.Contour, error) {
+	gc, err := ClassForGateway(ctx, cli, gw)
+	switch {
+	case err != nil:
+		return nil, err
+	case gc != nil:
+		cntr, err := objcontour.CurrentContour(ctx, cli, gc.Spec.ParametersRef.Namespace, gc.Spec.ParametersRef.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
+		}
+		return cntr, nil
+	}
+	return nil, nil
+}
+
+// ClassForGateway returns the GatewayClass referenced by gw, if one exists and is
+// managed by the operator.
+func ClassForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*gatewayv1alpha1.GatewayClass, error) {
 	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify if gatewayclass %s exists for gateway %s/%s",
 			gw.Spec.GatewayClassName, gw.Namespace, gw.Name)
 	}
-	cntr, err := objcontour.CurrentContour(ctx, cli, gc.Spec.ParametersRef.Namespace, gc.Spec.ParametersRef.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
+	if owned := objgc.IsController(gc.Spec.Controller); owned {
+		return gc, nil
 	}
-	return cntr, nil
+	return nil, nil
 }
 
 // OtherGatewaysRefGatewayClass returns true if other gateways have the same

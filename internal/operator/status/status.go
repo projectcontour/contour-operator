@@ -33,9 +33,9 @@ import (
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
-// syncContourStatus computes the current status of contour and updates status upon
-// any changes since last sync.
-func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+// syncContourStatus computes the current status of contour based on whether contour
+// is valid and updates status upon any changes since last sync.
+func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, valid bool) error {
 	var err error
 	var errs []error
 
@@ -68,10 +68,10 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 	}
 
 	updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
-		computeContourAvailableCondition(deploy, ds))
+		computeContourAvailableCondition(deploy, ds, valid))
 	gcSet := latest.GatewayClassSet()
-	var gcExists, refsContour bool
 	if gcSet {
+		var gcExists, refsContour bool
 		gcRef := *latest.Spec.GatewayClassRef
 		if _, err := objgc.Get(ctx, cli, gcRef); err == nil {
 			gcExists = true
@@ -92,7 +92,7 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 				return retryable.NewMaybeRetryableAggregate(errs)
 			case strings.Contains(err.Error(), "the object has been modified"):
 				// Retry if the object was modified during status sync.
-				if err := SyncContour(ctx, cli, updated); err != nil {
+				if err := SyncContour(ctx, cli, updated, valid); err != nil {
 					errs = append(errs, fmt.Errorf("failed to update contour %s/%s status: %w", latest.Namespace,
 						latest.Name, err))
 				}
@@ -108,7 +108,7 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 
 // SyncGatewayClass computes the current status of gc based on whether gc is valid
 // and updates status upon any changes since last sync.
-func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, valid bool) error {
+func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass, gcValid, cntrValid, cntrAvailable bool) error {
 	var errs []error
 
 	latest := &gatewayv1alpha1.GatewayClass{}
@@ -125,7 +125,8 @@ func SyncGatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha
 
 	updated := latest.DeepCopy()
 
-	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeGatewayClassAdmittedCondition(valid))
+	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeGatewayClassAdmittedCondition(gcValid, cntrValid))
+	updated.Status.Conditions = mergeConditions(updated.Status.Conditions, computeGatewayClassAvailableCondition(cntrAvailable))
 
 	if equality.GatewayClassStatusChanged(latest.Status, updated.Status) {
 		if err := cli.Status().Update(ctx, updated); err != nil {
@@ -157,35 +158,25 @@ func SyncGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gat
 
 	gcName := latest.Spec.GatewayClassName
 	gcExists := false
-	_, err := objgc.Get(ctx, cli, gcName)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to get gatewayclass %s: %w", gcName, err))
-	} else {
-		gcExists = true
-	}
 	gcAdmitted := false
-	gcAdmitted, err = objgc.Admitted(ctx, cli, gcName)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s is admitted: %w", gcName, err))
-	} else {
-		gcAdmitted = true
+	gc, err := objgc.Get(ctx, cli, gcName)
+	if err == nil {
+		gcExists = true
+		if len(gc.Status.Conditions) > 0 {
+			for _, c := range gc.Status.Conditions {
+				if c.Type == string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted) &&
+					c.Status == metav1.ConditionTrue {
+					gcAdmitted = true
+					break
+				}
+			}
+		}
 	}
 
 	cntrAvailable := false
 	cntr, err := objgw.ContourForGateway(ctx, cli, gw)
-	switch {
-	case err != nil:
-		errs = append(errs, fmt.Errorf("failed to get contour for gateway %s/%s: %w",
-			latest.Namespace, latest.Name, err))
-	case cntr.Status.Conditions != nil:
-		for _, c := range cntr.Status.Conditions {
-			if c.Type == operatorv1alpha1.ContourAvailableConditionType && c.Status == metav1.ConditionTrue {
-				cntrAvailable = true
-			}
-		}
-	default:
-		errs = append(errs, fmt.Errorf("unable to determine contour availability for gateway %s/%s",
-			latest.Namespace, latest.Name))
+	if err == nil {
+		cntrAvailable = cntr.Available()
 	}
 
 	// Gateway's contain a default status condition that must be removed when reconciled by a controller.

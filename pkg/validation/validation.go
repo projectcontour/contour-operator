@@ -74,48 +74,62 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 	return fmt.Errorf("http and https container ports are unspecified")
 }
 
-// GatewayClass returns true if gc is a valid GatewayClass.
-func GatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) error {
-	return parameterRef(ctx, cli, gc)
+// GatewayClass returns nil if gc is a valid GatewayClass. If gc references a
+// Contour, it's returned.
+func GatewayClass(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) (*operatorv1alpha1.Contour, error) {
+	cntr, err := parameterRef(ctx, cli, gc)
+	if err != nil {
+		return nil, err
+	}
+	return cntr, nil
 }
 
-// parameterRef returns true if parametersRef of gc is valid.
-func parameterRef(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) error {
+// parameterRef returns nil if parametersRef of gc is valid. If gc references a
+// Contour, it's returned.
+func parameterRef(ctx context.Context, cli client.Client, gc *gatewayv1alpha1.GatewayClass) (*operatorv1alpha1.Contour, error) {
 	if gc.Spec.ParametersRef == nil {
-		return nil
+		return nil, nil
 	}
 	if gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
-		return fmt.Errorf("invalid parametersRef for gateway class %s, scope %s is required",
+		return nil, fmt.Errorf("invalid parametersRef for gateway class %s, scope %s is required",
 			gc.Name, gatewayClassNamespacedParamRef)
 	}
 	group := gc.Spec.ParametersRef.Group
 	if group != operatorv1alpha1.GatewayClassParamsRefGroup {
-		return fmt.Errorf("invalid group %q", group)
+		return nil, fmt.Errorf("invalid group %q", group)
 	}
 	kind := gc.Spec.ParametersRef.Kind
 	if kind != operatorv1alpha1.GatewayClassParamsRefKind {
-		return fmt.Errorf("invalid kind %q", kind)
+		return nil, fmt.Errorf("invalid kind %q", kind)
 	}
 	ns := gc.Spec.ParametersRef.Namespace
 	defaultNs := operatorconfig.DefaultNamespace
 	if ns != defaultNs {
-		return fmt.Errorf("invalid namespace %q; only namespace %s is supported", ns, defaultNs)
+		return nil, fmt.Errorf("invalid namespace %q; only namespace %s is supported", ns, defaultNs)
 	}
 	name := gc.Spec.ParametersRef.Name
-	_, err := objcontour.CurrentContour(ctx, cli, ns, name)
+	cntr, err := objcontour.CurrentContour(ctx, cli, ns, name)
 	if err != nil {
-		return fmt.Errorf("failed to get contour %s/%s for gatewayclass %s: %w", ns, name, gc.Name, err)
+		return nil, fmt.Errorf("failed to get contour %s/%s for gatewayclass %s: %w", ns, name, gc.Name, err)
 	}
-	return nil
+	return cntr, nil
 }
 
 // Gateway returns an error if gw is an invalid Gateway.
 func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
 	var errs []error
 
-	if _, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName); err != nil {
-		errs = append(errs, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err))
+	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w",
+			gw.Namespace, gw.Name, err))
+	}
+	admitted, err := objgc.Admitted(ctx, cli, gc.Name)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if !admitted {
+		errs = append(errs, fmt.Errorf("gatewayclass %s is not admitted", gc.Name))
 	}
 	if err := gatewayListeners(gw); err != nil {
 		errs = append(errs, fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,

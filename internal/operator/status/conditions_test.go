@@ -42,6 +42,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 		description      string
 		deployConditions []appsv1.DeploymentCondition
 		dsAvailable      int32
+		valid            bool
 		expect           metav1.Condition
 	}{
 		{
@@ -50,6 +51,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				{Type: appsv1.DeploymentProgressing, Status: corev1.ConditionTrue},
 			},
 			dsAvailable: int32(0),
+			valid:       true,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAvailableConditionType,
 				Status: metav1.ConditionUnknown,
@@ -61,6 +63,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				{Type: appsv1.DeploymentReplicaFailure, Status: corev1.ConditionTrue},
 			},
 			dsAvailable: int32(0),
+			valid:       true,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAvailableConditionType,
 				Status: metav1.ConditionUnknown,
@@ -72,6 +75,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
 			},
 			dsAvailable: int32(0),
+			valid:       true,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAvailableConditionType,
 				Status: metav1.ConditionFalse,
@@ -83,6 +87,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionFalse},
 			},
 			dsAvailable: int32(1),
+			valid:       true,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAvailableConditionType,
 				Status: metav1.ConditionFalse,
@@ -94,9 +99,44 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
 			},
 			dsAvailable: int32(1),
+			valid:       true,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAvailableConditionType,
 				Status: metav1.ConditionTrue,
+			},
+		},
+		{
+			description:      "nil deployment invalid contour",
+			deployConditions: nil,
+			dsAvailable:      int32(0),
+			valid:            false,
+			expect: metav1.Condition{
+				Type:   operatorv1alpha1.ContourAvailableConditionType,
+				Status: metav1.ConditionFalse,
+			},
+		},
+		{
+			description: "deployment available invalid contour",
+			deployConditions: []appsv1.DeploymentCondition{
+				{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
+			},
+			dsAvailable: int32(0),
+			valid:       false,
+			expect: metav1.Condition{
+				Type:   operatorv1alpha1.ContourAvailableConditionType,
+				Status: metav1.ConditionFalse,
+			},
+		},
+		{
+			description: "deployment and daemonset available invalid contour",
+			deployConditions: []appsv1.DeploymentCondition{
+				{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
+			},
+			dsAvailable: int32(1),
+			valid:       false,
+			expect: metav1.Condition{
+				Type:   operatorv1alpha1.ContourAvailableConditionType,
+				Status: metav1.ConditionFalse,
 			},
 		},
 	}
@@ -120,7 +160,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 			},
 		}
 
-		actual := computeContourAvailableCondition(deploy, ds)
+		actual := computeContourAvailableCondition(deploy, ds, tc.valid)
 		if !apiequality.Semantic.DeepEqual(actual.Type, tc.expect.Type) ||
 			!apiequality.Semantic.DeepEqual(actual.Status, tc.expect.Status) {
 			t.Fatalf("%q: expected %#v, got %#v", tc.description, tc.expect, actual)
@@ -138,6 +178,15 @@ func TestComputeContourAdmittedCondition(t *testing.T) {
 		{
 			description: "gatewayclass exists but not admitted",
 			gcExists:    true,
+			gcAdmitted:  false,
+			expect: metav1.Condition{
+				Type:   operatorv1alpha1.ContourAdmittedConditionType,
+				Status: metav1.ConditionFalse,
+			},
+		},
+		{
+			description: "gatewayclass does not exist and is not admitted",
+			gcExists:    false,
 			gcAdmitted:  false,
 			expect: metav1.Condition{
 				Type:   operatorv1alpha1.ContourAdmittedConditionType,

@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -86,6 +87,10 @@ func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
 	if err := c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, r.enqueueRequestForOwningContour()); err != nil {
 		return nil, err
 	}
+	// Watch GatewayClass objects to properly surface Contour status conditions.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, r.enqueueRequestForGatewayClass()); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -97,7 +102,30 @@ func (r *reconciler) enqueueRequestForOwningContour() handler.EventHandler {
 		ns, nsFound := labels[operatorv1alpha1.OwningContourNsLabel]
 		name, nameFound := labels[operatorv1alpha1.OwningContourNameLabel]
 		if nsFound && nameFound {
-			r.log.Info("queueing contour", "namespace", ns, "name", name, "related", a.GetSelfLink())
+			r.log.Info("queueing contour", "namespace", ns, "name", name)
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: ns,
+						Name:      name,
+					},
+				},
+			}
+		}
+		return []reconcile.Request{}
+	})
+}
+
+// enqueueRequestForGatewayClass returns an event handler that maps events to
+// GatewayClass objects that refer to the operator as the controller.
+func (r *reconciler) enqueueRequestForGatewayClass() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gc := a.(*gatewayv1alpha1.GatewayClass)
+		owned := objgc.IsController(gc.Spec.Controller)
+		if owned {
+			ns := gc.Spec.ParametersRef.Namespace
+			name := gc.Spec.ParametersRef.Name
+			r.log.Info("queueing gatewayclass for contour", "namespace", ns, "name", name)
 			return []reconcile.Request{
 				{
 					NamespacedName: types.NamespacedName{
@@ -120,42 +148,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	contour := &operatorv1alpha1.Contour{}
 	if err := r.client.Get(ctx, req.NamespacedName, contour); err != nil {
 		if errors.IsNotFound(err) {
-			// Sync gatewayclass status if this contour is referenced by any gatewayclasses.
-			gc, exists, err := objgc.ParameterRefExists(ctx, r.client, req.Name, req.Namespace)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to verify the existence of gatewayclasses for contour %s/%s: %w",
-					req.Namespace, req.Name, err)
-			}
-			if exists {
-				var errs []error
-				owned := objgc.IsController(gc)
-				valid := false
-				if owned {
-					if err := validation.GatewayClass(ctx, r.client, gc); err == nil {
-						valid = true
-					}
-					if err := status.SyncGatewayClass(ctx, r.client, gc, valid); err != nil {
-						errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w",
-							gc.Name, err))
-					}
-					gateways, err := objgc.GatewaysRefClass(ctx, r.client, gc.Name)
-					if err != nil {
-						errs = append(errs, fmt.Errorf("failed to get gateways for gatewayclass %s: %w",
-							gc.Name, err))
-					}
-					if len(gateways) > 0 {
-						for i, gw := range gateways {
-							if err := status.SyncGateway(ctx, r.client, &gateways[i]); err != nil {
-								errs = append(errs, fmt.Errorf("failed to sync status for gateway %s/%s: %w",
-									gw.Namespace, gw.Name, err))
-							}
-						}
-					}
-					if len(errs) != 0 {
-						return ctrl.Result{}, retryable.NewMaybeRetryableAggregate(errs)
-					}
-				}
-			}
 			// This means the contour was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related
 			// resource that got deleted async).
@@ -168,20 +160,16 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The contour is safe to process, so ensure current state matches desired state.
 	desired := contour.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
-		if err := validation.Contour(ctx, r.client, contour); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
+		valid := false
+		if err := validation.Contour(ctx, r.client, contour); err == nil {
+			valid = true
 		}
 		switch {
 		case contour.GatewayClassSet():
-			if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
-				switch e := err.(type) {
-				case retryable.Error:
-					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-					return ctrl.Result{RequeueAfter: e.After()}, nil
-				default:
-					return ctrl.Result{}, err
-				}
+			if err := status.SyncContour(ctx, r.client, contour, valid); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 			}
+			r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
 		default:
 			if !contour.IsFinalized() {
 				// Before doing anything with the contour, ensure it has a finalizer
@@ -202,6 +190,11 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					}
 				}
 				r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
+				if err := status.SyncContour(ctx, r.client, contour, valid); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w",
+						contour.Namespace, contour.Name, err)
+				}
+				r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
 			}
 		}
 	} else {
@@ -280,56 +273,6 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 			}
 		}
 	}
-	if err := status.SyncContour(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
-	}
-	return retryable.NewMaybeRetryableAggregate(errs)
-}
-
-// ensureContourForGatewayClass ensures all necessary resources exist for the given contour
-// when the contour is being managed by a GatewayClass.
-func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	if !contour.GatewayClassSet() {
-		return fmt.Errorf("gatewayclass not set for contour %s/%s", contour.Namespace, contour.Name)
-	}
-	var errs []error
-	cli := r.client
-	gcRef := *contour.Spec.GatewayClassRef
-	gc, err := objgc.Get(ctx, cli, gcRef)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s exists: %w", gcRef, err))
-	} else {
-		owned := objgc.IsController(gc)
-		valid := false
-		if owned {
-			if err := validation.GatewayClass(ctx, cli, gc); err == nil {
-				valid = true
-			}
-			if err := status.SyncGatewayClass(ctx, r.client, gc, valid); err != nil {
-				errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w", gcRef, err))
-			}
-			if contour.Admitted() {
-				gateways, err := objgc.GatewaysRefClass(ctx, r.client, gc.Name)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("failed to get gateways for gatewayclass %s: %w", gc.Name, err))
-				}
-				if len(gateways) > 0 {
-					for i, gw := range gateways {
-						if err := status.SyncGateway(ctx, r.client, &gateways[i]); err != nil {
-							errs = append(errs, fmt.Errorf("failed to sync status for gateway %s/%s: %w",
-								gw.Namespace, gw.Name, err))
-						}
-					}
-				}
-			}
-		}
-	}
-	if err := status.SyncContour(ctx, r.client, contour); err != nil {
-		return fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err)
-	}
-	r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
 	return retryable.NewMaybeRetryableAggregate(errs)
 }
 

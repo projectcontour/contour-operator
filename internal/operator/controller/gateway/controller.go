@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -76,10 +77,74 @@ func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.Gateway{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	// Only enqueue Gateway objects that reference a GatewayClass owned by the operator.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.Gateway{}}, r.enqueueRequestForOwnedGateway()); err != nil {
+		return nil, err
+	}
+	// Watch GatewayClass objects to properly surface Gateway status conditions.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, r.enqueueRequestForGatewayClass()); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// enqueueRequestForOwnedGateway returns an event handler that maps events to
+// Gateway objects that specify reference a GatewayClass owned by the operator.
+func (r *reconciler) enqueueRequestForOwnedGateway() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gw := a.(*gatewayv1alpha1.Gateway)
+		ctx := context.Background()
+		gc, err := objgw.ClassForGateway(ctx, r.client, gw)
+		if err != nil {
+			return []reconcile.Request{}
+		}
+		if gc != nil {
+			// The gateway references a gatewayclass that exists and is managed
+			// by the operator, so enqueue it for reconciliation.
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: gw.Namespace,
+						Name:      gw.Name,
+					},
+				},
+			}
+		}
+		return []reconcile.Request{}
+	})
+}
+
+// enqueueRequestForGatewayClass returns an event handler that maps events to
+// GatewayClass objects that specify the operator as the controller and are
+// referenced by a Gateway.
+func (r *reconciler) enqueueRequestForGatewayClass() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gc := a.(*gatewayv1alpha1.GatewayClass)
+		if objgc.IsController(gc.Spec.Controller) {
+			ctx := context.Background()
+			gwList, err := objgw.GatewaysExist(ctx, r.client)
+			if err != nil {
+				return []reconcile.Request{}
+			}
+			if len(gwList.Items) > 0 {
+				for _, gw := range gwList.Items {
+					if gw.Spec.GatewayClassName == gc.Name {
+						r.log.Info("queueing gatewayclass for gateway", "namespace", gw.Namespace,
+							"name", gw.Name)
+						return []reconcile.Request{
+							{
+								NamespacedName: types.NamespacedName{
+									Namespace: gw.Namespace,
+									Name:      gw.Name,
+								},
+							},
+						}
+					}
+				}
+			}
+		}
+		return []reconcile.Request{}
+	})
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -108,31 +173,34 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The gateway is safe to process.
 	desired := gw.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
+		valid := false
+		if err := validation.Gateway(ctx, r.client, gw); err == nil {
+			valid = true
+		}
 		switch {
 		case objgw.IsFinalized(gw):
-			if err := validation.Gateway(ctx, r.client, gw); err != nil {
-				errs = append(errs, fmt.Errorf("failed to validate gateway %s/%s: %w", gw.Namespace, gw.Name, err))
-			}
-			if err := r.ensureGateway(ctx, gw); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to get ensure gateway %s/%s: %w", req.Namespace, req.Name, err)
-			}
-			// The gateway is valid, so finalize dependent resources of gateway.
-			gc, err := objgc.Get(ctx, r.client, gw.Spec.GatewayClassName)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get gatewayclass %s: %w", gw.Spec.GatewayClassName, err))
-			} else {
-				if err := objgc.EnsureFinalizer(ctx, r.client, gc); err != nil {
-					errs = append(errs, fmt.Errorf("failed to finalize gatewayclass %s: %w", gc.Name, err))
+			if valid {
+				if err := r.ensureGateway(ctx, gw); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to get ensure gateway %s/%s: %w", req.Namespace, req.Name, err)
 				}
-			}
-			cntr, err := objgw.ContourForGateway(ctx, r.client, gw)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get contour for gateway %s/%s: %w",
-					gw.Namespace, gw.Name, err))
-			} else {
-				if err := objcontour.EnsureFinalizer(ctx, r.client, cntr); err != nil {
-					errs = append(errs, fmt.Errorf("failed to finalize contour %s/%s: %w",
-						cntr.Namespace, cntr.Name, err))
+				// The gateway is valid, so finalize the referenced gatewayclass and contour.
+				gc, err := objgc.Get(ctx, r.client, gw.Spec.GatewayClassName)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to get gatewayclass %s: %w", gw.Spec.GatewayClassName, err))
+				} else {
+					if err := objgc.EnsureFinalizer(ctx, r.client, gc); err != nil {
+						errs = append(errs, fmt.Errorf("failed to finalize gatewayclass %s: %w", gc.Name, err))
+					}
+				}
+				cntr, err := objgw.ContourForGateway(ctx, r.client, gw)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to get contour for gateway %s/%s: %w",
+						gw.Namespace, gw.Name, err))
+				} else {
+					if err := objcontour.EnsureFinalizer(ctx, r.client, cntr); err != nil {
+						errs = append(errs, fmt.Errorf("failed to finalize contour %s/%s: %w",
+							cntr.Namespace, cntr.Name, err))
+					}
 				}
 			}
 			if err := status.SyncGateway(ctx, r.client, gw); err != nil {

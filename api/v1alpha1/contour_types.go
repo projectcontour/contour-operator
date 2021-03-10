@@ -301,6 +301,10 @@ const (
 	// Available indicates that the contour is running and available.
 	ContourAvailableConditionType = "Available"
 
+	// InvalidContour is a status condition reason that indicates the
+	// contour is invalid.
+	ContourInvalidConditionReason = "InvalidContour"
+
 	// Admitted is a condition type set when contour references a GatewayClass.
 	// This condition is set to true if the referenced GatewayClass exists and
 	// references the contour.

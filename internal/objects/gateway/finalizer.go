@@ -50,12 +50,8 @@ func EnsureFinalizer(ctx context.Context, cli client.Client, gw *gatewayv1alpha1
 
 // EnsureFinalizerRemoved ensures the finalizer is removed for the given gw.
 func EnsureFinalizerRemoved(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
-	latest, err := Get(ctx, cli, gw.Namespace, gw.Name)
-	if err != nil {
-		return fmt.Errorf("failed to get gateway %s/%s: %w", gw.Namespace, gw.Name, err)
-	}
-	if slice.ContainsString(latest.Finalizers, finalizer) {
-		updated := latest.DeepCopy()
+	if slice.ContainsString(gw.Finalizers, finalizer) {
+		updated := gw.DeepCopy()
 		updated.Finalizers = slice.RemoveString(updated.Finalizers, finalizer)
 		if err := cli.Update(ctx, updated); err != nil {
 			return fmt.Errorf("failed to remove finalizer %s: %w", finalizer, err)
