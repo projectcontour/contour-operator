@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
 
 	corev1 "k8s.io/api/core/v1"
@@ -106,12 +107,19 @@ func TestDesiredContourService(t *testing.T) {
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	svc := DesiredContourService(cntr)
-	xdsPort := objcfg.XDSPort
-	checkServiceHasPort(t, svc, xdsPort)
-	checkServiceHasTargetPort(t, svc, xdsPort)
-	checkServiceHasPortName(t, svc, "xds")
-	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
+	cntrCfg := NewCfgForContour(cntr)
+	cntrSvc := DesiredContour(cntrCfg)
+	gw := objgw.New("svc-test-ns", "svc-test", "gc-test", "foo", "bar")
+	gwCfg := NewCfgForGateway(gw)
+	gwSvc := DesiredContour(gwCfg)
+	svcs := []*corev1.Service{cntrSvc, gwSvc}
+	for _, svc := range svcs {
+		xdsPort := objcfg.XDSPort
+		checkServiceHasPort(t, svc, xdsPort)
+		checkServiceHasTargetPort(t, svc, xdsPort)
+		checkServiceHasPortName(t, svc, "xds")
+		checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
+	}
 }
 
 func TestDesiredEnvoyService(t *testing.T) {
@@ -124,30 +132,69 @@ func TestDesiredEnvoyService(t *testing.T) {
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	svc := DesiredEnvoyService(cntr)
-	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
-	checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
-	checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPPort)
-	checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPSPort)
-	for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {
-		checkServiceHasTargetPort(t, svc, port.PortNumber)
+	svcCfg := NewCfgForContour(cntr)
+	svcCfg.Envoy.NetworkPublishing.Type = cfg.NetworkType
+	cntrSvc := DesiredEnvoy(svcCfg)
+	gw := objgw.New("svc-test-ns", "svc-test", "gc-test", "foo", "bar")
+	gwCfg := NewCfgForGateway(gw)
+	gwCfg.Envoy.NetworkPublishing.Type = cfg.NetworkType
+	gwSvc := DesiredEnvoy(gwCfg)
+	svcs := []*corev1.Service{cntrSvc, gwSvc}
+	for _, svc := range svcs {
+		checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
+		checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
+		checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPPort)
+		checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPSPort)
+		for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {
+			checkServiceHasTargetPort(t, svc, port.PortNumber)
+		}
+		checkServiceHasPortName(t, svc, "http")
+		checkServiceHasPortName(t, svc, "https")
+		checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
 	}
-	checkServiceHasPortName(t, svc, "http")
-	checkServiceHasPortName(t, svc, "https")
-	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
 	// Check LB annotations for the different provider types.
-	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
-	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
-	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, awsInternalLBAnnotation)
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
-	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, azureInternalLBAnnotation)
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
-	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, gcpLBTypeAnnotation)
+	cfg = objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr = objcontour.New(cfg)
+	svcCfg = NewCfgForContour(cntr)
+	svcCfg.Envoy.NetworkPublishing.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+	cntrSvc = DesiredEnvoy(svcCfg)
+	gw = objgw.New("svc-test-ns", "svc-test", "gc-test", "foo", "bar")
+	gwCfg = NewCfgForGateway(gw)
+	gwSvc = DesiredEnvoy(gwCfg)
+	svcs = []*corev1.Service{cntrSvc, gwSvc}
+	for _, svc := range svcs {
+		checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
+	}
+	// Check the AWS annotation exists for AWS internal LB scope.
+	svcCfg.Envoy.NetworkPublishing.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
+	cntrSvc = DesiredEnvoy(svcCfg)
+	gw = objgw.New("svc-test-ns", "svc-test", "gc-test", "foo", "bar")
+	gwCfg = NewCfgForGateway(gw)
+	gwCfg.Envoy.NetworkPublishing.Type = cfg.NetworkType
+	gwCfg.Envoy.NetworkPublishing.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
+	gwSvc = DesiredEnvoy(gwCfg)
+	svcs = []*corev1.Service{cntrSvc, gwSvc}
+	for _, svc := range svcs {
+		checkServiceHasAnnotation(t, svc, awsInternalLBAnnotation)
+	}
+	// Check the Azure annotation exists for Azure LB type.
+	svcCfg.Envoy.NetworkPublishing.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
+	cntrSvc = DesiredEnvoy(svcCfg)
+	svcs = []*corev1.Service{cntrSvc}
+	for _, svc := range svcs {
+		checkServiceHasAnnotation(t, svc, azureInternalLBAnnotation)
+	}
+	// Check the GCP annotation exists for GCP LB type.
+	svcCfg.Envoy.NetworkPublishing.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
+	cntrSvc = DesiredEnvoy(svcCfg)
+	svcs = []*corev1.Service{cntrSvc}
+	for _, svc := range svcs {
+		checkServiceHasAnnotation(t, svc, gcpLBTypeAnnotation)
+	}
 }

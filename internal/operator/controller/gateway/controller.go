@@ -206,14 +206,16 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 		} else {
 			r.log.Info("ensured daemonset for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
-		if err := objsvc.EnsureContourService(ctx, cli, contour); err != nil {
+		svcCfg := objsvc.NewCfgForGateway(gw)
+		svcCfg.Envoy.NetworkPublishing = contour.Spec.NetworkPublishing.Envoy
+		if err := objsvc.EnsureContour(ctx, cli, svcCfg); err != nil {
 			errs = append(errs, fmt.Errorf("failed to ensure contour service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
 			r.log.Info("ensured contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
-		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-			if err := objsvc.EnsureEnvoyService(ctx, cli, contour); err != nil {
+		if svcCfg.Envoy.NetworkPublishing.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
+			svcCfg.Envoy.NetworkPublishing.Type == operatorv1alpha1.NodePortServicePublishingType {
+			if err := objsvc.EnsureEnvoy(ctx, cli, svcCfg); err != nil {
 				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
 					contour.Namespace, contour.Name, err))
 			} else {
@@ -232,15 +234,16 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 	if err != nil {
 		return fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
 	}
+	svcCfg := objsvc.NewCfgForGateway(gw)
 	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
 		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-		if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
+		if err := objsvc.EnsureEnvoyDeleted(ctx, cli, svcCfg); err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
 			r.log.Info("deleted envoy service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	}
-	if err := objsvc.EnsureContourServiceDeleted(ctx, cli, contour); err != nil {
+	if err := objsvc.EnsureContourDeleted(ctx, cli, svcCfg); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 	} else {
 		r.log.Info("deleted contour service for contour", "namespace", contour.Namespace, "name", contour.Name)

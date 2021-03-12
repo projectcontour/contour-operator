@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 var (
@@ -41,6 +42,40 @@ var (
 		},
 	}
 )
+
+// New makes a Gateway object using the provided ns/name for the object's
+// ns/name.
+func newGateway(ns, name string) *gatewayv1alpha1.Gateway {
+	routes := metav1.LabelSelector{
+		MatchLabels: map[string]string{"foo": "bar"},
+	}
+	http := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(80)),
+		Protocol: gatewayv1alpha1.HTTPProtocolType,
+		Routes: gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
+			Selector: routes,
+		},
+	}
+	https := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(443)),
+		Protocol: gatewayv1alpha1.HTTPSProtocolType,
+		Routes: gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
+			Selector: routes,
+		},
+	}
+	return &gatewayv1alpha1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: gatewayv1alpha1.GatewaySpec{
+			GatewayClassName: "test-gc",
+			Listeners:        []gatewayv1alpha1.Listener{http, https},
+		},
+	}
+}
 
 func TestDaemonSetConfigChanged(t *testing.T) {
 	testCases := []struct {
@@ -434,15 +469,21 @@ func TestClusterIpServiceChanged(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		expected := objsvc.DesiredContourService(cntr)
-
-		mutated := expected.DeepCopy()
-		tc.mutate(mutated)
-		if updated, changed := equality.ClusterIPServiceChanged(mutated, expected); changed != tc.expect {
-			t.Errorf("%s, expect ClusterIpServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
-		} else if changed {
-			if _, changedAgain := equality.ClusterIPServiceChanged(updated, expected); changedAgain {
-				t.Errorf("%s, ClusterIpServiceChanged does not behave as a fixed point function", tc.description)
+		cntrCfg := objsvc.NewCfgForContour(cntr)
+		cntrExpected := objsvc.DesiredContour(cntrCfg)
+		gw := newGateway("test-gw-ns", "test-gw")
+		gwCfg := objsvc.NewCfgForGateway(gw)
+		gwExpected := objsvc.DesiredContour(gwCfg)
+		svcs := []*corev1.Service{cntrExpected, gwExpected}
+		for _, expected := range svcs {
+			mutated := expected.DeepCopy()
+			tc.mutate(mutated)
+			if updated, changed := equality.ClusterIPServiceChanged(mutated, expected); changed != tc.expect {
+				t.Errorf("%s, expect ClusterIpServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+			} else if changed {
+				if _, changedAgain := equality.ClusterIPServiceChanged(updated, expected); changedAgain {
+					t.Errorf("%s, ClusterIpServiceChanged does not behave as a fixed point function", tc.description)
+				}
 			}
 		}
 	}
@@ -565,20 +606,22 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 				Name:       "https",
 				PortNumber: objsvc.EnvoyServiceHTTPPort,
 			},
-			{
-				Name:       "https",
-				PortNumber: objsvc.EnvoyServiceHTTPSPort,
-			},
 		}
-		expected := objsvc.DesiredEnvoyService(cntr)
-
-		mutated := expected.DeepCopy()
-		tc.mutate(mutated)
-		if updated, changed := equality.LoadBalancerServiceChanged(mutated, expected); changed != tc.expect {
-			t.Errorf("%s, expect LoadBalancerServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
-		} else if changed {
-			if _, changedAgain := equality.LoadBalancerServiceChanged(updated, expected); changedAgain {
-				t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
+		cntrCfg := objsvc.NewCfgForContour(cntr)
+		cntrExpected := objsvc.DesiredEnvoy(cntrCfg)
+		gw := newGateway("test-gw-ns", "test-gw")
+		gwCfg := objsvc.NewCfgForGateway(gw)
+		gwExpected := objsvc.DesiredEnvoy(gwCfg)
+		svcs := []*corev1.Service{cntrExpected, gwExpected}
+		for _, expected := range svcs {
+			mutated := expected.DeepCopy()
+			tc.mutate(mutated)
+			if updated, changed := equality.LoadBalancerServiceChanged(mutated, expected); changed != tc.expect {
+				t.Errorf("%s, expect LoadBalancerServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+			} else if changed {
+				if _, changedAgain := equality.LoadBalancerServiceChanged(updated, expected); changedAgain {
+					t.Errorf("%s, LoadBalancerServiceChanged does not behave as a fixed point function", tc.description)
+				}
 			}
 		}
 	}
@@ -615,20 +658,22 @@ func TestNodePortServiceChanged(t *testing.T) {
 				Name:       "https",
 				PortNumber: objsvc.EnvoyServiceHTTPSPort,
 			},
-			{
-				Name:       "https",
-				PortNumber: objsvc.EnvoyServiceHTTPSPort,
-			},
 		}
-		expected := objsvc.DesiredEnvoyService(cntr)
-
-		mutated := expected.DeepCopy()
-		tc.mutate(mutated)
-		if updated, changed := equality.NodePortServiceChanged(mutated, expected); changed != tc.expect {
-			t.Errorf("%s, expect NodePortServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
-		} else if changed {
-			if _, changedAgain := equality.NodePortServiceChanged(updated, expected); changedAgain {
-				t.Errorf("%s, NodePortServiceChanged does not behave as a fixed point function", tc.description)
+		cntrCfg := objsvc.NewCfgForContour(cntr)
+		cntrExpected := objsvc.DesiredEnvoy(cntrCfg)
+		gw := newGateway("test-gw-ns", "test-gw")
+		gwCfg := objsvc.NewCfgForGateway(gw)
+		gwExpected := objsvc.DesiredEnvoy(gwCfg)
+		svcs := []*corev1.Service{cntrExpected, gwExpected}
+		for _, expected := range svcs {
+			mutated := expected.DeepCopy()
+			tc.mutate(mutated)
+			if updated, changed := equality.NodePortServiceChanged(mutated, expected); changed != tc.expect {
+				t.Errorf("%s, expect NodePortServiceChanged to be %t, got %t", tc.description, tc.expect, changed)
+			} else if changed {
+				if _, changedAgain := equality.NodePortServiceChanged(updated, expected); changedAgain {
+					t.Errorf("%s, NodePortServiceChanged does not behave as a fixed point function", tc.description)
+				}
 			}
 		}
 	}

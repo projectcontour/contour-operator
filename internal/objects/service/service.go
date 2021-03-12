@@ -22,6 +22,7 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
 	labelutil "github.com/projectcontour/contour-operator/pkg/labels"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -107,50 +109,132 @@ var (
 	}
 )
 
-// EnsureContourService ensures that a Contour Service exists for the given contour.
-func EnsureContourService(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	desired := DesiredContourService(contour)
-	current, err := currentContourService(ctx, cli, contour)
+// Config contains everything needed to manage a service.
+type Config struct {
+	// Namespace is the namespace of the Service.
+	Namespace string
+	// Labels are labels to apply to the ConfigMap.
+	Labels map[string]string
+	// Contour contains Contour service configuration parameters.
+	Contour contourConfig
+	// Envoy contains Envoy service configuration parameters.
+	Envoy envoyConfig
+}
+
+// contourConfig contains contour service configuration parameters.
+type contourConfig struct {
+	// Name is the name of the contour service. Defaults to "contour".
+	Name string
+}
+
+// envoyConfig contains Envoy service configuration parameters.
+type envoyConfig struct {
+	// Name is the name of the envoy service. Defaults to "envoy".
+	Name string
+	// HTTPServicePort is the http port number of envoy's service.
+	HTTPServicePort int32
+	// HTTPSServicePort is the https port number of envoy's service.
+	HTTPSServicePort int32
+	// NetworkPublishing defines the schema to publish Envoy to a network.
+	NetworkPublishing operatorv1alpha1.EnvoyNetworkPublishing
+	// TargetPorts is the schema to specify a target port for a service.
+	TargetPorts []operatorv1alpha1.ContainerPort
+}
+
+// NewConfig returns a Config with default fields set.
+func NewConfig() *Config {
+	return &Config{
+		Contour: contourConfig{Name: contourSvcName},
+		Envoy:   envoyConfig{Name: envoySvcName},
+	}
+}
+
+// NewCfgForContour returns a Config with default fields set for contour.
+func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
+	cfg := NewConfig()
+	cfg.Namespace = contour.Spec.Namespace.Name
+	cfg.Labels = objcontour.OwnerLabels(contour)
+	cfg.Envoy.HTTPServicePort = EnvoyServiceHTTPPort
+	cfg.Envoy.HTTPSServicePort = EnvoyServiceHTTPSPort
+	cfg.Envoy.TargetPorts = contour.Spec.NetworkPublishing.Envoy.ContainerPorts
+	cfg.Envoy.NetworkPublishing = contour.Spec.NetworkPublishing.Envoy
+	return cfg
+}
+
+// NewCfgForGateway returns a Config with default fields set for gw.
+// It's expected that gw has been validated.
+func NewCfgForGateway(gw *gatewayv1alpha1.Gateway) *Config {
+	cfg := NewConfig()
+	cfg.Namespace = gw.Namespace
+	cfg.Labels = objgw.OwnerLabels(gw)
+	cfg.Envoy.NetworkPublishing.Type = operatorv1alpha1.LoadBalancerServicePublishingType
+	cfg.Envoy.NetworkPublishing.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
+	cfg.Envoy.NetworkPublishing.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+	listeners := gw.Spec.Listeners
+	for _, listener := range listeners {
+		if listener.Protocol == gatewayv1alpha1.HTTPProtocolType {
+			cfg.Envoy.HTTPServicePort = int32(listener.Port)
+		}
+		if listener.Protocol == gatewayv1alpha1.HTTPSProtocolType {
+			cfg.Envoy.HTTPSServicePort = int32(listener.Port)
+		}
+	}
+	cfg.Envoy.TargetPorts = []operatorv1alpha1.ContainerPort{
+		{
+			Name:       "http",
+			PortNumber: int32(8080),
+		},
+		{
+			Name:       "https",
+			PortNumber: int32(8443),
+		},
+	}
+	return cfg
+}
+
+// EnsureContour ensures that a Contour Service exists for the given cfg.
+func EnsureContour(ctx context.Context, cli client.Client, cfg *Config) error {
+	desired := DesiredContour(cfg)
+	current, err := currentContour(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return createService(ctx, cli, desired)
+			return create(ctx, cli, desired)
 		}
 		return fmt.Errorf("failed to get service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
-	if err := updateContourServiceIfNeeded(ctx, cli, contour, current, desired); err != nil {
+	if err := updateContourIfNeeded(ctx, cli, cfg, current, desired); err != nil {
 		return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	return nil
 }
 
-// EnsureEnvoyService ensures that an Envoy Service exists for the given contour.
-func EnsureEnvoyService(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	desired := DesiredEnvoyService(contour)
-	current, err := currentEnvoyService(ctx, cli, contour)
+// EnsureEnvoy ensures that an Envoy Service exists for the given cfg.
+func EnsureEnvoy(ctx context.Context, cli client.Client, cfg *Config) error {
+	desired := DesiredEnvoy(cfg)
+	current, err := currentEnvoy(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return createService(ctx, cli, desired)
+			return create(ctx, cli, desired)
 		}
 		return fmt.Errorf("failed to get service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
-	if err := updateEnvoyServiceIfNeeded(ctx, cli, contour, current, desired); err != nil {
+	if err := updateEnvoyIfNeeded(ctx, cli, cfg, current, desired); err != nil {
 		return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	return nil
 }
 
-// EnsureContourServiceDeleted ensures that a Contour Service for the
-// provided contour is deleted if Contour owner labels exist.
-func EnsureContourServiceDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	svc, err := currentContourService(ctx, cli, contour)
+// EnsureContourDeleted ensures that a Contour Service for the provided cfg
+// is deleted if owner labels exist.
+func EnsureContourDeleted(ctx context.Context, cli client.Client, cfg *Config) error {
+	svc, err := currentContour(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	labels := objcontour.OwnerLabels(contour)
-	if labelutil.Exist(svc, labels) {
+	if labelutil.Exist(svc, cfg.Labels) {
 		if err := cli.Delete(ctx, svc); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -161,18 +245,17 @@ func EnsureContourServiceDeleted(ctx context.Context, cli client.Client, contour
 	return nil
 }
 
-// EnsureEnvoyServiceDeleted ensures that an Envoy Service for the
-// provided contour is deleted.
-func EnsureEnvoyServiceDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	svc, err := currentEnvoyService(ctx, cli, contour)
+// EnsureEnvoyDeleted ensures that an Envoy Service for the provided cfg
+// is deleted if owner labels exist.
+func EnsureEnvoyDeleted(ctx context.Context, cli client.Client, cfg *Config) error {
+	svc, err := currentEnvoy(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	labels := objcontour.OwnerLabels(contour)
-	if labelutil.Exist(svc, labels) {
+	if labelutil.Exist(svc, cfg.Labels) {
 		if err := cli.Delete(ctx, svc); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -183,17 +266,14 @@ func EnsureEnvoyServiceDeleted(ctx context.Context, cli client.Client, contour *
 	return nil
 }
 
-// DesiredContourService generates the desired Contour Service for the given contour.
-func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
+// DesiredContour generates the desired Contour Service for the given cfg.
+func DesiredContour(cfg *Config) *corev1.Service {
 	xdsPort := objcfg.XDSPort
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
-			Name:      contourSvcName,
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Namespace: cfg.Namespace,
+			Name:      cfg.Contour.Name,
+			Labels:    cfg.Labels,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -212,10 +292,10 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	return svc
 }
 
-// DesiredEnvoyService generates the desired Envoy Service for the given contour.
-func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
+// DesiredEnvoy generates the desired Envoy Service for the given cfg.
+func DesiredEnvoy(cfg *Config) *corev1.Service {
 	var ports []corev1.ServicePort
-	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
+	for _, port := range cfg.Envoy.TargetPorts {
 		var p corev1.ServicePort
 		httpFound := false
 		httpsFound := false
@@ -225,14 +305,14 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		case port.Name == "http":
 			httpFound = true
 			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPPort
+			p.Port = cfg.Envoy.HTTPServicePort
 			p.Protocol = corev1.ProtocolTCP
 			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
 			ports = append(ports, p)
 		case port.Name == "https":
 			httpsFound = true
 			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPSPort
+			p.Port = cfg.Envoy.HTTPSServicePort
 			p.Protocol = corev1.ProtocolTCP
 			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
 			ports = append(ports, p)
@@ -240,13 +320,10 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	}
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   contour.Spec.Namespace.Name,
-			Name:        envoySvcName,
+			Namespace:   cfg.Namespace,
+			Name:        cfg.Envoy.Name,
 			Annotations: map[string]string{},
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Labels:      cfg.Labels,
 		},
 		Spec: corev1.ServiceSpec{
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
@@ -255,16 +332,16 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			SessionAffinity:       corev1.ServiceAffinityNone,
 		},
 	}
-	epType := contour.Spec.NetworkPublishing.Envoy.Type
-	switch epType {
+	pubType := cfg.Envoy.NetworkPublishing.Type
+	switch pubType {
 	case operatorv1alpha1.LoadBalancerServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
-		provider := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
+		provider := cfg.Envoy.NetworkPublishing.LoadBalancer.ProviderParameters.Type
 		lbAnnotations := LbAnnotations[provider]
 		for name, value := range lbAnnotations {
 			svc.Annotations[name] = value
 		}
-		isInternal := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope == operatorv1alpha1.InternalLoadBalancer
+		isInternal := cfg.Envoy.NetworkPublishing.LoadBalancer.Scope == operatorv1alpha1.InternalLoadBalancer
 		if isInternal {
 			internalAnnotations := InternalLBAnnotations[provider]
 			for name, value := range internalAnnotations {
@@ -279,12 +356,12 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	return svc
 }
 
-// currentContourService returns the current Contour Service for the provided contour.
-func currentContourService(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
+// currentContour returns the current Contour Service for the provided cfg.
+func currentContour(ctx context.Context, cli client.Client, cfg *Config) (*corev1.Service, error) {
 	current := &corev1.Service{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
-		Name:      contourSvcName,
+		Namespace: cfg.Namespace,
+		Name:      cfg.Contour.Name,
 	}
 	err := cli.Get(ctx, key, current)
 	if err != nil {
@@ -293,12 +370,12 @@ func currentContourService(ctx context.Context, cli client.Client, contour *oper
 	return current, nil
 }
 
-// currentEnvoyService returns the current Envoy Service for the provided contour.
-func currentEnvoyService(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*corev1.Service, error) {
+// currentEnvoy returns the current Envoy Service for the provided cfg.
+func currentEnvoy(ctx context.Context, cli client.Client, cfg *Config) (*corev1.Service, error) {
 	current := &corev1.Service{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
-		Name:      envoySvcName,
+		Namespace: cfg.Namespace,
+		Name:      cfg.Envoy.Name,
 	}
 	err := cli.Get(ctx, key, current)
 	if err != nil {
@@ -307,18 +384,18 @@ func currentEnvoyService(ctx context.Context, cli client.Client, contour *operat
 	return current, nil
 }
 
-// createService creates a Service resource for the provided svc.
-func createService(ctx context.Context, cli client.Client, svc *corev1.Service) error {
+// create creates a Service resource for the provided svc.
+func create(ctx context.Context, cli client.Client, svc *corev1.Service) error {
 	if err := cli.Create(ctx, svc); err != nil {
 		return fmt.Errorf("failed to create service %s/%s: %w", svc.Namespace, svc.Name, err)
 	}
 	return nil
 }
 
-// updateContourServiceIfNeeded updates a Contour Service if current does not match desired.
-func updateContourServiceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
-	labels := objcontour.OwnerLabels(contour)
-	if labelutil.Exist(current, labels) {
+// updateContourIfNeeded updates an Contour Service if current does not match desired,
+// using cfg to verify the existence of owner labels.
+func updateContourIfNeeded(ctx context.Context, cli client.Client, cfg *Config, current, desired *corev1.Service) error {
+	if labelutil.Exist(current, cfg.Labels) {
 		_, updated := equality.ClusterIPServiceChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, desired); err != nil {
@@ -330,13 +407,12 @@ func updateContourServiceIfNeeded(ctx context.Context, cli client.Client, contou
 	return nil
 }
 
-// updateEnvoyServiceIfNeeded updates an Envoy Service if current does not match desired,
-// using contour to verify the existence of owner labels.
-func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
-	labels := objcontour.OwnerLabels(contour)
-	if labelutil.Exist(current, labels) {
+// updateEnvoyIfNeeded updates an Envoy Service if current does not match desired,
+// using cfg to verify the existence of owner labels.
+func updateEnvoyIfNeeded(ctx context.Context, cli client.Client, cfg *Config, current, desired *corev1.Service) error {
+	if labelutil.Exist(current, cfg.Labels) {
 		updated := false
-		switch contour.Spec.NetworkPublishing.Envoy.Type {
+		switch cfg.Envoy.NetworkPublishing.Type {
 		case operatorv1alpha1.NodePortServicePublishingType:
 			_, updated = equality.NodePortServiceChanged(current, desired)
 		// Add additional network publishing types as they are introduced.

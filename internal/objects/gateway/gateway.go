@@ -26,6 +26,42 @@ import (
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
+// New makes a Gateway object using the provided ns/name for the object's
+// ns/name, gc for the gatewayClassName, and k/v for the key-value pair used for
+// route selection. The Gateway will contain an HTTP listener on port 80 and an
+// HTTPS listener on port 443.
+func New(ns, name, gc, k, v string) *gatewayv1alpha1.Gateway {
+	routes := metav1.LabelSelector{
+		MatchLabels: map[string]string{k: v},
+	}
+	http := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(80)),
+		Protocol: gatewayv1alpha1.HTTPProtocolType,
+		Routes: gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
+			Selector: routes,
+		},
+	}
+	https := gatewayv1alpha1.Listener{
+		Port:     gatewayv1alpha1.PortNumber(int32(443)),
+		Protocol: gatewayv1alpha1.HTTPSProtocolType,
+		Routes: gatewayv1alpha1.RouteBindingSelector{
+			Kind:     "HTTPRoute",
+			Selector: routes,
+		},
+	}
+	return &gatewayv1alpha1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: gatewayv1alpha1.GatewaySpec{
+			GatewayClassName: gc,
+			Listeners:        []gatewayv1alpha1.Listener{http, https},
+		},
+	}
+}
+
 // OtherGatewaysExist lists Gateway objects in all namespaces, returning the list
 // if any exist other than gw.
 func OtherGatewaysExist(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*gatewayv1alpha1.GatewayList, error) {
