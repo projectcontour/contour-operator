@@ -141,8 +141,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	gwSvc := DesiredEnvoy(gwCfg)
 	svcs := []*corev1.Service{cntrSvc, gwSvc}
 	for _, svc := range svcs {
-		checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
-		checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
+		checkServiceHasPort(t, svc, int32(80))
+		checkServiceHasPort(t, svc, int32(443))
 		checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPPort)
 		checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPSPort)
 		for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {

@@ -335,8 +335,8 @@ spec:
                           being exposed by Envoy. Any port which is listening on the
                           default \"0.0.0.0\" address inside the Envoy container will
                           be accessible from the network. Names and port numbers must
-                          be unique in the list container ports. Two ports must be
-                          specified, one named \"http\" for Envoy's insecure service
+                          be unique in the list of container ports. Two ports must
+                          be specified, one named \"http\" for Envoy's insecure service
                           and one named \"https\" for Envoy's secure service. \n TODO
                           [danehans]: Update minItems to 1, requiring only https when
                           the following issue is fixed: https://github.com/projectcontour/contour/issues/2577.
@@ -355,8 +355,8 @@ spec:
                               type: string
                             portNumber:
                               description: PortNumber is the network port number to
-                                expose on the envoy pod. The number must be greater
-                                than 0 and less than 65536.
+                                expose on the pod. The number must be greater than
+                                0 and less than 65536.
                               format: int32
                               maximum: 65535
                               minimum: 1
@@ -405,6 +405,48 @@ spec:
                             - External
                             type: string
                         type: object
+                      servicePorts:
+                        default:
+                        - name: http
+                          portNumber: 80
+                        - name: https
+                          portNumber: 443
+                        description: "ServicePorts is a list of service ports to expose
+                          from the Envoy service. ServicePorts is ignore if gatewayClassRef
+                          is specified. For more information on services, refer to:
+                          \n   https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxie
+                          \n Names and port numbers must be unique in the list of
+                          service ports. Two ports must be specified, one named \"http\"
+                          for Envoy's insecure service and one named \"https\" for
+                          Envoy's secure service. \n TODO [danehans]: Update minItems
+                          to 1, requiring only https when the following issue is fixed:
+                          https://github.com/projectcontour/contour/issues/2577. \n
+                          TODO [danehans]: Increase maxItems when https://github.com/projectcontour/contour/pull/3263
+                          is implemented."
+                        items:
+                          description: ServicePort is the schema to specify a port
+                            for a service.
+                          properties:
+                            name:
+                              description: Name is an IANA_SVC_NAME name.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            portNumber:
+                              description: PortNumber is the network port number to
+                                expose on the service. The number must be greater
+                                than 0 and less than 65536.
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                          required:
+                          - name
+                          - portNumber
+                          type: object
+                        maxItems: 2
+                        minItems: 2
+                        type: array
                       type:
                         default: LoadBalancerService
                         description: "Type is the type of publishing strategy to use.

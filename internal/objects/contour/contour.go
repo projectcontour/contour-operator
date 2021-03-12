@@ -35,8 +35,8 @@ type Config struct {
 }
 
 // New makes a Contour object using the provided ns/name for the object's
-// namespace/name, pubType for the network publishing type of Envoy, and
-// Envoy container ports 8080/8443.
+// namespace/name, pubType for the network publishing type of Envoy, Envoy
+// container ports 8080/8443 and Envoy service ports 80/443..
 func New(cfg Config) *operatorv1alpha1.Contour {
 	cntr := &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,13 +51,23 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: cfg.NetworkType,
+					ServicePorts: []operatorv1alpha1.ServicePort{
+						{
+							Name:       operatorv1alpha1.PortNameHTTP,
+							PortNumber: int32(80),
+						},
+						{
+							Name:       operatorv1alpha1.PortNameHTTPS,
+							PortNumber: int32(443),
+						},
+					},
 					ContainerPorts: []operatorv1alpha1.ContainerPort{
 						{
-							Name:       "http",
+							Name:       operatorv1alpha1.PortNameHTTP,
 							PortNumber: int32(8080),
 						},
 						{
-							Name:       "https",
+							Name:       operatorv1alpha1.PortNameHTTPS,
 							PortNumber: int32(8443),
 						},
 					},

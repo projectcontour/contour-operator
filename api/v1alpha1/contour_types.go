@@ -165,13 +165,34 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:default={scope: External, providerParameters: {type: AWS}}
 	LoadBalancer LoadBalancerStrategy `json:"loadBalancer,omitempty"`
 
+	// ServicePorts is a list of service ports to expose from the Envoy service.
+	// ServicePorts is ignore if gatewayClassRef is specified. For more information
+	// on services, refer to:
+	//
+	//   https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxie
+	//
+	// Names and port numbers must be unique in the list of service ports. Two ports must
+	// be specified, one named "http" for Envoy's insecure service and one named "https" for
+	// Envoy's secure service.
+	//
+	// TODO [danehans]: Update minItems to 1, requiring only https when the following issue
+	// is fixed: https://github.com/projectcontour/contour/issues/2577.
+	//
+	// TODO [danehans]: Increase maxItems when https://github.com/projectcontour/contour/pull/3263
+	// is implemented.
+	//
+	// +kubebuilder:validation:MinItems=2
+	// +kubebuilder:validation:MaxItems=2
+	// +kubebuilder:default={{name: http, portNumber: 80}, {name: https, portNumber: 443}}
+	ServicePorts []ServicePort `json:"servicePorts,omitempty"`
+
 	// ContainerPorts is a list of container ports to expose from the Envoy container(s).
 	// Exposing a port here gives the system additional information about the network
 	// connections the Envoy container uses, but is primarily informational. Not specifying
 	// a port here DOES NOT prevent that port from being exposed by Envoy. Any port which is
 	// listening on the default "0.0.0.0" address inside the Envoy container will be accessible
-	// from the network. Names and port numbers must be unique in the list container ports. Two
-	// ports must be specified, one named "http" for Envoy's insecure service and one named
+	// from the network. Names and port numbers must be unique in the list of container ports.
+	// Two ports must be specified, one named "http" for Envoy's insecure service and one named
 	// "https" for Envoy's secure service.
 	//
 	// TODO [danehans]: Update minItems to 1, requiring only https when the following issue
@@ -253,6 +274,30 @@ const (
 	GCPLoadBalancerProvider   LoadBalancerProviderType = "GCP"
 )
 
+const (
+	// PortNameHTTP is the name of an HTTP network port.
+	PortNameHTTP = "http"
+
+	// PortNameHTTPS is the name of an HTTPS network port.
+	PortNameHTTPS = "https"
+)
+
+// ServicePort is the schema to specify a port for a service.
+type ServicePort struct {
+	// Name is an IANA_SVC_NAME name.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// PortNumber is the network port number to expose on the service.
+	// The number must be greater than 0 and less than 65536.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	PortNumber int32 `json:"portNumber"`
+}
+
 // ContainerPort is the schema to specify a network port for a container.
 // A container port gives the system additional information about network
 // connections a container uses, but is primarily informational.
@@ -263,8 +308,9 @@ type ContainerPort struct {
 	// +kubebuilder:validation:MaxLength=253
 	Name string `json:"name"`
 
-	// PortNumber is the network port number to expose on the envoy pod.
+	// PortNumber is the network port number to expose on the pod.
 	// The number must be greater than 0 and less than 65536.
+	//
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	PortNumber int32 `json:"portNumber"`

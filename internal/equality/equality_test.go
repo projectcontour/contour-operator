@@ -31,6 +31,11 @@ import (
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
+const (
+	defaultEnvoyHTTPSvcPort  = int32(80)
+	defaultEnvoyHTTPSSvcPort = int32(443)
+)
+
 var (
 	testName  = "test"
 	testNs    = testName + "-ns"
@@ -599,12 +604,12 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
-				Name:       "http",
-				PortNumber: objsvc.EnvoyServiceHTTPPort,
+				Name:       operatorv1alpha1.PortNameHTTP,
+				PortNumber: defaultEnvoyHTTPSvcPort,
 			},
 			{
-				Name:       "https",
-				PortNumber: objsvc.EnvoyServiceHTTPPort,
+				Name:       operatorv1alpha1.PortNameHTTPS,
+				PortNumber: defaultEnvoyHTTPSSvcPort,
 			},
 		}
 		cntrCfg := objsvc.NewCfgForContour(cntr)
@@ -651,12 +656,12 @@ func TestNodePortServiceChanged(t *testing.T) {
 		cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.NodePortServicePublishingType
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
-				Name:       "http",
-				PortNumber: objsvc.EnvoyServiceHTTPPort,
+				Name:       operatorv1alpha1.PortNameHTTP,
+				PortNumber: defaultEnvoyHTTPSvcPort,
 			},
 			{
-				Name:       "https",
-				PortNumber: objsvc.EnvoyServiceHTTPSPort,
+				Name:       operatorv1alpha1.PortNameHTTPS,
+				PortNumber: defaultEnvoyHTTPSSvcPort,
 			},
 		}
 		cntrCfg := objsvc.NewCfgForContour(cntr)

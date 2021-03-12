@@ -31,7 +31,42 @@ const gatewayClassNamespacedParamRef = "Namespace"
 
 // Contour returns true if contour is valid.
 func Contour(contour *operatorv1alpha1.Contour) error {
-	return containerPorts(contour)
+	if err := servicePorts(contour); err != nil {
+		return err
+	}
+	if err := containerPorts(contour); err != nil {
+		return err
+	}
+	return nil
+}
+
+// servicePorts validates service ports of contour, returning an
+// error if the service ports do not meet the API specification.
+func servicePorts(contour *operatorv1alpha1.Contour) error {
+	var numsFound []int32
+	var namesFound []string
+	httpFound := false
+	httpsFound := false
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.ServicePorts {
+		if len(numsFound) > 0 && slice.ContainsInt32(numsFound, port.PortNumber) {
+			return fmt.Errorf("duplicate service port number %q", port.PortNumber)
+		}
+		numsFound = append(numsFound, port.PortNumber)
+		if len(namesFound) > 0 && slice.ContainsString(namesFound, port.Name) {
+			return fmt.Errorf("duplicate service port name %q", port.Name)
+		}
+		namesFound = append(namesFound, port.Name)
+		switch {
+		case port.Name == operatorv1alpha1.PortNameHTTP:
+			httpFound = true
+		case port.Name == operatorv1alpha1.PortNameHTTPS:
+			httpsFound = true
+		}
+	}
+	if httpFound && httpsFound {
+		return nil
+	}
+	return fmt.Errorf("http and https service ports are unspecified")
 }
 
 // containerPorts validates container ports of contour, returning an
@@ -51,9 +86,9 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 		}
 		namesFound = append(namesFound, port.Name)
 		switch {
-		case port.Name == "http":
+		case port.Name == operatorv1alpha1.PortNameHTTP:
 			httpFound = true
-		case port.Name == "https":
+		case port.Name == operatorv1alpha1.PortNameHTTPS:
 			httpsFound = true
 		}
 	}

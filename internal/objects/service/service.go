@@ -66,10 +66,6 @@ const (
 	// gcpLBTypeAnnotation is the annotation used on a service to specify a GCP load balancer
 	// type.
 	gcpLBTypeAnnotation = "cloud.google.com/load-balancer-type"
-	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
-	EnvoyServiceHTTPPort = int32(80)
-	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
-	EnvoyServiceHTTPSPort = int32(443)
 	// EnvoyNodePortHTTPPort is the NodePort port number for Envoy's HTTP service. For NodePort
 	// details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
 	EnvoyNodePortHTTPPort = int32(30080)
@@ -154,10 +150,16 @@ func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
 	cfg := NewConfig()
 	cfg.Namespace = contour.Spec.Namespace.Name
 	cfg.Labels = objcontour.OwnerLabels(contour)
-	cfg.Envoy.HTTPServicePort = EnvoyServiceHTTPPort
-	cfg.Envoy.HTTPSServicePort = EnvoyServiceHTTPSPort
 	cfg.Envoy.TargetPorts = contour.Spec.NetworkPublishing.Envoy.ContainerPorts
 	cfg.Envoy.NetworkPublishing = contour.Spec.NetworkPublishing.Envoy
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.ServicePorts {
+		if port.Name == operatorv1alpha1.PortNameHTTP {
+			cfg.Envoy.HTTPServicePort = port.PortNumber
+		}
+		if port.Name == operatorv1alpha1.PortNameHTTPS {
+			cfg.Envoy.HTTPSServicePort = port.PortNumber
+		}
+	}
 	return cfg
 }
 
@@ -302,14 +304,14 @@ func DesiredEnvoy(cfg *Config) *corev1.Service {
 		switch {
 		case httpsFound && httpFound:
 			break
-		case port.Name == "http":
+		case port.Name == operatorv1alpha1.PortNameHTTP:
 			httpFound = true
 			p.Name = port.Name
 			p.Port = cfg.Envoy.HTTPServicePort
 			p.Protocol = corev1.ProtocolTCP
 			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
 			ports = append(ports, p)
-		case port.Name == "https":
+		case port.Name == operatorv1alpha1.PortNameHTTPS:
 			httpsFound = true
 			p.Name = port.Name
 			p.Port = cfg.Envoy.HTTPSServicePort
