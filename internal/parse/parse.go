@@ -59,6 +59,21 @@ func DeploymentLogsForString(ns, name, container, expectedString string) (bool, 
 	return false, nil
 }
 
+// StringInPodExec parses the output of cmd for expectedString executed in the specified
+// pod ns/name, returning an error if expectedString was not found.
+func StringInPodExec(ns, name, expectedString string, cmd []string) error {
+	cmdPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return err
+	}
+	args := []string{"exec", name, fmt.Sprintf("--namespace=%v", ns), "--"}
+	args = append(args, cmd...)
+	if _, err := lookForString(cmdPath, args, expectedString); err != nil {
+		return err
+	}
+	return nil
+}
+
 // lookForString looks for the given string using cmd and args, returning
 // true if the string was found.
 func lookForString(cmd string, args []string, expectedString string) (bool, error) {

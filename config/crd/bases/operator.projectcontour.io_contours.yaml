@@ -142,10 +142,11 @@ spec:
                         type: object
                       type:
                         default: LoadBalancerService
-                        description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n In this configuration, network endpoints for Envoy use container networking. A Kubernetes LoadBalancer Service is created to publish Envoy network endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint and port 443 to publish Envoy's HTTPS network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes Envoy network endpoints using a Kubernetes NodePort Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes NodePort Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport"
+                        description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n In this configuration, network endpoints for Envoy use container networking. A Kubernetes LoadBalancer Service is created to publish Envoy network endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint and port 443 to publish Envoy's HTTPS network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes Envoy network endpoints using a Kubernetes NodePort Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes NodePort Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport \n * ClusterIPService \n Publishes Envoy network endpoints using a Kubernetes ClusterIP Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes ClusterIP Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types"
                         enum:
                         - LoadBalancerService
                         - NodePortService
+                        - ClusterIPService
                         type: string
                     type: object
                 type: object

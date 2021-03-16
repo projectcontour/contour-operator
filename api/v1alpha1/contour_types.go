@@ -153,6 +153,15 @@ type EnvoyNetworkPublishing struct {
 	//
 	// See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
 	//
+	// * ClusterIPService
+	//
+	// Publishes Envoy network endpoints using a Kubernetes ClusterIP Service.
+	//
+	// In this configuration, Envoy network endpoints use container networking. A Kubernetes
+	// ClusterIP Service is created to publish the network endpoints.
+	//
+	// See: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	//
 	// +unionDiscriminator
 	// +kubebuilder:default=LoadBalancerService
 	Type NetworkPublishingType `json:"type,omitempty"`
@@ -187,7 +196,7 @@ type EnvoyNetworkPublishing struct {
 }
 
 // EndpointPublishingType is a way to publish network endpoints.
-// +kubebuilder:validation:Enum=LoadBalancerService;NodePortService
+// +kubebuilder:validation:Enum=LoadBalancerService;NodePortService;ClusterIPService
 type NetworkPublishingType string
 
 const (
@@ -197,6 +206,10 @@ const (
 
 	// NodePortService publishes a network endpoint using a Kubernetes NodePort Service.
 	NodePortServicePublishingType NetworkPublishingType = "NodePortService"
+
+	// ClusterIPServicePublishingType publishes a network endpoint using a Kubernetes
+	// ClusterIP Service.
+	ClusterIPServicePublishingType NetworkPublishingType = "ClusterIPService"
 )
 
 // LoadBalancerStrategy holds parameters for a load balancer.

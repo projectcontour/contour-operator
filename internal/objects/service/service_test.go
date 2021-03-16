@@ -96,6 +96,22 @@ func checkServiceHasAnnotation(t *testing.T, svc *corev1.Service, key string) {
 	t.Errorf("service is missing annotation %q", key)
 }
 
+func checkServiceHasType(t *testing.T, svc *corev1.Service, svcType corev1.ServiceType) {
+	t.Helper()
+
+	if svc.Spec.Type != svcType {
+		t.Errorf("service is missing type %s", svcType)
+	}
+}
+
+func checkServiceHasExternalTrafficPolicy(t *testing.T, svc *corev1.Service, policy corev1.ServiceExternalTrafficPolicyType) {
+	t.Helper()
+
+	if svc.Spec.ExternalTrafficPolicy != policy {
+		t.Errorf("service is missing external traffic policy type %s", policy)
+	}
+}
+
 func TestDesiredContourService(t *testing.T) {
 	name := "svc-test"
 	cfg := objcontour.Config{
@@ -125,6 +141,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	}
 	cntr := objcontour.New(cfg)
 	svc := DesiredEnvoyService(cntr)
+	checkServiceHasType(t, svc, corev1.ServiceTypeNodePort)
+	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
 	checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
 	checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPPort)
@@ -140,6 +158,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
+	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
+	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
 	svc = DesiredEnvoyService(cntr)
@@ -150,4 +170,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, gcpLBTypeAnnotation)
+	// Set network publishing type to ClusterIPService and verify the service type is as expected.
+	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.ClusterIPServicePublishingType
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasType(t, svc, corev1.ServiceTypeClusterIP)
 }

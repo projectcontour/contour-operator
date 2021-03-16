@@ -324,6 +324,22 @@ func waitForDeploymentStatusConditions(ctx context.Context, cl client.Client, ti
 	})
 }
 
+func waitForPodStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string, conditions ...corev1.PodCondition) error {
+	nsName := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		pod := &corev1.Pod{}
+		if err := cl.Get(ctx, nsName, pod); err != nil {
+			return false, nil
+		}
+		expected := podConditionMap(conditions...)
+		current := podConditionMap(pod.Status.Conditions...)
+		return podConditionsMatchExpected(expected, current), nil
+	})
+}
+
 func conditionMap(conditions ...metav1.Condition) map[string]string {
 	conds := map[string]string{}
 	for _, cond := range conditions {
@@ -334,6 +350,14 @@ func conditionMap(conditions ...metav1.Condition) map[string]string {
 
 func deploymentConditionMap(conditions ...appsv1.DeploymentCondition) map[appsv1.DeploymentConditionType]corev1.ConditionStatus {
 	conds := map[appsv1.DeploymentConditionType]corev1.ConditionStatus{}
+	for _, cond := range conditions {
+		conds[cond.Type] = cond.Status
+	}
+	return conds
+}
+
+func podConditionMap(conditions ...corev1.PodCondition) map[corev1.PodConditionType]corev1.ConditionStatus {
+	conds := map[corev1.PodConditionType]corev1.ConditionStatus{}
 	for _, cond := range conditions {
 		conds[cond.Type] = cond.Status
 	}
@@ -352,6 +376,16 @@ func conditionsMatchExpected(expected, actual map[string]string) bool {
 
 func deploymentConditionsMatchExpected(expected, actual map[appsv1.DeploymentConditionType]corev1.ConditionStatus) bool {
 	filtered := map[appsv1.DeploymentConditionType]corev1.ConditionStatus{}
+	for k := range actual {
+		if _, comparable := expected[k]; comparable {
+			filtered[k] = actual[k]
+		}
+	}
+	return reflect.DeepEqual(expected, filtered)
+}
+
+func podConditionsMatchExpected(expected, actual map[corev1.PodConditionType]corev1.ConditionStatus) bool {
+	filtered := map[corev1.PodConditionType]corev1.ConditionStatus{}
 	for k := range actual {
 		if _, comparable := expected[k]; comparable {
 			filtered[k] = actual[k]
@@ -393,6 +427,30 @@ func newNs(ctx context.Context, cl client.Client, name string) error {
 		}
 	}
 	return nil
+}
+
+// newPod creates a Pod resource using name as the Pod's name, ns as
+// the Pod's namespace, image as the Pod container's image and cmd as the
+// Pod container's command.
+func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd []string) (*corev1.Pod, error) {
+	c := corev1.Container{
+		Name:    name,
+		Image:   image,
+		Command: cmd,
+	}
+	p := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{c},
+		},
+	}
+	if err := cl.Create(ctx, p); err != nil {
+		return nil, fmt.Errorf("failed to create pod %s/%s: %v", p.Namespace, p.Name, err)
+	}
+	return p, nil
 }
 
 func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
@@ -551,4 +609,20 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 		return fmt.Errorf("failed to create gateway %s/%s: %v", ns, name, err)
 	}
 	return nil
+}
+
+// envoyClusterIP returns the clusterIP for a service that matches the provided ns/name.
+func envoyClusterIP(ctx context.Context, cl client.Client, ns, name string) (string, error) {
+	svc := &corev1.Service{}
+	key := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	if err := cl.Get(ctx, key, svc); err != nil {
+		return "", fmt.Errorf("failed to get service %s/%s: %v", ns, name, err)
+	}
+	if len(svc.Spec.ClusterIP) > 0 {
+		return svc.Spec.ClusterIP, nil
+	}
+	return "", fmt.Errorf("service %s/%s does not have a clusterIP", ns, name)
 }
