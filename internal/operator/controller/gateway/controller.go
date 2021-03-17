@@ -270,12 +270,6 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 	} else {
 		r.log.Info("deleted rbac for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
-	if err := objns.EnsureNamespaceDeleted(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to delete namespace %s for contour %s/%s: %w",
-			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("deleted namespace for contour", "namespace", contour.Namespace, "name", contour.Name)
-	}
 
 	if len(errs) == 0 {
 		// Remove finalizer from dependent resources of gateway.
