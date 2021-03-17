@@ -42,26 +42,23 @@ run::sed() {
     esac
 }
 
-# Update the Docker image tags for Contour and the operator in the operator's
-# deployment manifests.
+# Update the Docker image tags for the operator in the deployment manifests.
 for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   # The version might be main or OLDVERS depending on whether we are
   # tagging from the release branch or from main.
   run::sed \
-    "-es|docker.io/projectcontour/contour:main|$CONTOUR_IMG|" \
-    "-es|docker.io/projectcontour/contour:$OLDVERS|$CONTOUR_IMG|" \
     "-es|docker.io/projectcontour/contour-operator:main|$OPERATOR_IMG|" \
     "-es|docker.io/projectcontour/contour-operator:$OLDVERS|$OPERATOR_IMG|" \
     "$file"
 done
 
-# Update the Docker image tags for the operator in the operator's kustomization
-# file. The version might be main or OLDVERS depending on whether we are tagging
-# from the release branch or from main.
+# Update the Docker image tags for Contour in the operator's config.
+# The version might be main or OLDVERS depending on whether we are
+# tagging from the release branch or from main.
 run::sed \
-  "-es|newTag: main|newTag: $NEWVERS|" \
-  "-es|newTag: $OLDVERS|newTag: $NEWVERS|" \
-  "config/manager/kustomization.yaml"
+  "-es|docker.io/projectcontour/contour:main|$CONTOUR_IMG|" \
+  "-es|docker.io/projectcontour/contour:$OLDVERS|$CONTOUR_IMG|" \
+  "internal/operator/config/config.go"
 
 # Update the operator's image pull policy. Set the pull policy with kustomize when
 # https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
@@ -93,7 +90,7 @@ if $cfg_changed  || $example_changed ; then
   git commit -s -m "Update Contour Docker image to $NEWVERS." \
     config/manager/manager.yaml \
     examples/operator/operator.yaml \
-    config/manager/kustomization.yaml \
+    internal/operator/config/config.go \
     README.md
 fi
 

@@ -6091,10 +6091,6 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        - --contour-image
-        - docker.io/projectcontour/contour:main
-        - --envoy-image
-        - docker.io/envoyproxy/envoy:v1.17.1
         image: docker.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator

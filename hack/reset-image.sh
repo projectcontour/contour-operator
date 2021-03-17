@@ -3,7 +3,6 @@
 readonly HERE=$(cd "$(dirname "$0")" && pwd)
 readonly REPO=$(cd "${HERE}/.." && pwd)
 readonly IMAGE="docker.io/projectcontour/contour-operator"
-readonly CONFIG_FILE="config/manager/kustomization.yaml"
 readonly EXAMPLE_FILE="examples/operator/operator.yaml"
 readonly MANAGER_FILE="config/manager/manager.yaml"
 readonly PULL_POLICY="Always"
@@ -29,14 +28,6 @@ run::sed() {
         *) sed -i '' "$@" ;;
     esac
 }
-
-if grep -q "${IMAGE}" "${CONFIG_FILE}" && grep -q "${NEW_VERSION}" "${CONFIG_FILE}"; then
-  echo "${CONFIG_FILE} contains ${IMAGE}:${NEW_VERSION}"
-else
-  echo "regenerating ${CONFIG_FILE} using kustomize..."
-  cd config/manager && kustomize edit set image contour-operator="${IMAGE}:${NEW_VERSION}"
-  cd "${REPO}"
-fi
 
 if grep -q "${IMAGE}:${NEW_VERSION}" "${EXAMPLE_FILE}"; then
   echo "${EXAMPLE_FILE} contains ${IMAGE}:${NEW_VERSION}"
