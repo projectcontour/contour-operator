@@ -89,6 +89,20 @@ type ContourSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	GatewayClassRef *string `json:"gatewayClassRef,omitempty"`
+
+	// IngressClassName is the name of the IngressClass used by Contour. If unset,
+	// Contour will process all ingress objects without an ingress class annotation
+	// or ingress objects with an annotation matching ingress-class=contour. When
+	// specified, Contour will only process ingress objects that match the provided
+	// class.
+	//
+	// For additional IngressClass details, refer to:
+	//   https://projectcontour.io/docs/main/config/annotations/#ingress-class
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	IngressClassName *string `json:"ingressClassName,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.

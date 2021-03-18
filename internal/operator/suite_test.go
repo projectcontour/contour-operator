@@ -63,6 +63,8 @@ var (
 		},
 	}
 
+	testIngressClass = "test-ic"
+
 	gc = &gatewayv1alpha1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -184,6 +186,7 @@ var _ = Describe("Run controller", func() {
 			updatedReplicas := int32(1)
 			updatedNs := defaultNamespace + "-updated"
 			updatedRemoveNs := true
+			updated.Spec.IngressClassName = &testIngressClass
 			updated.Spec.Replicas = updatedReplicas
 			updated.Spec.Namespace.Name = updatedNs
 			updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
@@ -214,6 +217,13 @@ var _ = Describe("Run controller", func() {
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Namespace.RemoveOnDeletion
 			}, timeout, interval).Should(Equal(updatedRemoveNs))
+
+			By("Expecting ingressClassName to be set")
+			Eventually(func() string {
+				f := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
+				return *f.Spec.IngressClassName
+			}, timeout, interval).Should(Equal(testIngressClass))
 
 			By("Expecting gatewayClassRef to be updated")
 			Eventually(func() string {
