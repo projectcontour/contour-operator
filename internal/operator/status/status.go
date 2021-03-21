@@ -70,19 +70,18 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s is admitted: %w", gcRef, err))
 		}
+	}
+	deploy, err = objdeploy.CurrentDeployment(ctx, cli, latest)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get deployment for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
 	} else {
-		deploy, err = objdeploy.CurrentDeployment(ctx, cli, latest)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get deployment for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
-		} else {
-			updated.Status.AvailableContours = deploy.Status.AvailableReplicas
-		}
-		ds, err = objds.CurrentDaemonSet(ctx, cli, latest)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get daemonset for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
-		} else {
-			updated.Status.AvailableEnvoys = ds.Status.NumberAvailable
-		}
+		updated.Status.AvailableContours = deploy.Status.AvailableReplicas
+	}
+	ds, err = objds.CurrentDaemonSet(ctx, cli, latest)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get daemonset for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
+	} else {
+		updated.Status.AvailableEnvoys = ds.Status.NumberAvailable
 	}
 
 	updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
