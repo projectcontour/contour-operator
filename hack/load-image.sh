@@ -6,10 +6,11 @@ readonly HERE=$(cd "$(dirname "$0")" && pwd)
 readonly REPO=$(cd "${HERE}/.." && pwd)
 readonly PROGNAME=$(basename "$0")
 readonly IMAGE="$1"
-readonly VERSION="$2"
+readonly OLD_VERSION="$2"
+readonly VERSION="$3"
 
-if [ -z "$IMAGE" ] || [ -z "$VERSION" ]; then
-    printf "Usage: %s IMAGE VERSION\n" "$PROGNAME"
+if [ -z "$IMAGE" ] || [ -z "$OLD_VERSION" ] || [ -z "$VERSION" ]; then
+    printf "Usage: %s IMAGE OLD_VERSION VERSION\n" "$PROGNAME"
     exit 1
 fi
 
@@ -48,6 +49,14 @@ for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   echo "setting \"imagePullPolicy: IfNotPresent\" for $file"
   run::sed \
     "-es|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|" \
+    "$file"
+done
+
+# Update the operator's image.
+for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+  echo "setting \"image: ${IMAGE}:${VERSION}\" for $file"
+  run::sed \
+    "-es|image: ${IMAGE}:${OLD_VERSION}|image: ${IMAGE}:${VERSION}|" \
     "$file"
 done
 

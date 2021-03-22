@@ -18,13 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if grep -q "${IMAGE}:${NEW_VERSION}" "${EXAMPLE_FILE}"; then
-  echo "${EXAMPLE_FILE} contains ${IMAGE}:${NEW_VERSION}"
-else
-  echo "error: ${EXAMPLE_FILE} is missing ${IMAGE}:${NEW_VERSION}"
-  echo "use \"make reset-image\" to reset image references"
-  exit 1
-fi
+for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
+  if grep -q "${IMAGE}:${NEW_VERSION}" $file; then
+    echo "$file contains ${IMAGE}:${NEW_VERSION}"
+  else
+    echo "error: $file is missing ${IMAGE}:${NEW_VERSION}"
+    echo "use \"make reset-image\" to reset the image"
+    exit 1
+  fi
+done
 
 for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
   if grep -q "imagePullPolicy: ${PULL_POLICY}" $file; then
