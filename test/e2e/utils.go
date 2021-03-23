@@ -555,7 +555,7 @@ func newGatewayClass(ctx context.Context, cl client.Client, name, contourNs, con
 			Name: name,
 		},
 		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller:    operatorv1alpha1.GatewayClassControllerRef,
+			Controller: operatorv1alpha1.GatewayClassControllerRef,
 			ParametersRef: &gatewayv1alpha1.ParametersReference{
 				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
 				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
@@ -582,7 +582,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 	http := gatewayv1alpha1.Listener{
 		Port:     gatewayv1alpha1.PortNumber(int32(80)),
 		Protocol: gatewayv1alpha1.HTTPProtocolType,
-		Routes:   gatewayv1alpha1.RouteBindingSelector{
+		Routes: gatewayv1alpha1.RouteBindingSelector{
 			Kind:     "HTTPRoute",
 			Selector: routes,
 		},
@@ -590,7 +590,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 	https := gatewayv1alpha1.Listener{
 		Port:     gatewayv1alpha1.PortNumber(int32(443)),
 		Protocol: gatewayv1alpha1.HTTPSProtocolType,
-		Routes:   gatewayv1alpha1.RouteBindingSelector{
+		Routes: gatewayv1alpha1.RouteBindingSelector{
 			Kind:     "HTTPRoute",
 			Selector: routes,
 		},
@@ -602,7 +602,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 		},
 		Spec: gatewayv1alpha1.GatewaySpec{
 			GatewayClassName: gc,
-			Listeners: []gatewayv1alpha1.Listener{http, https},
+			Listeners:        []gatewayv1alpha1.Listener{http, https},
 		},
 	}
 	if err := cl.Create(ctx, gw); err != nil {

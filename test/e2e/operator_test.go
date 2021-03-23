@@ -121,8 +121,8 @@ func TestDefaultContour(t *testing.T) {
 	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	// Create a sample workload for e2e testing.
-	appName := fmt.Sprintf("%s-%s",testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", specNs, appName)
@@ -194,7 +194,7 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", specNs, appName)
@@ -266,7 +266,7 @@ func TestContourClusterIPService(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", specNs, appName)
@@ -358,8 +358,8 @@ func TestContourSpecNs(t *testing.T) {
 	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	// Create a sample workload for e2e testing.
-	appName := fmt.Sprintf("%s-%s",testAppName, testName)
-	if err:= newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", specNs, appName)
@@ -451,7 +451,7 @@ func TestGateway(t *testing.T) {
 	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
 	// https://github.com/projectcontour/contour-operator/issues/241
 	gwName := "contour"
-	appName := fmt.Sprintf("%s-%s",testAppName, testName)
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
 	if err := newGateway(ctx, kclient, cfg.SpecNs, gwName, gcName, "app", appName); err != nil {
 		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
@@ -461,7 +461,7 @@ func TestGateway(t *testing.T) {
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
 
 	// Create a sample workload for e2e testing.
-	if err:= newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
