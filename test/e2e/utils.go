@@ -57,7 +57,7 @@ func newClient() (client.Client, error) {
 	}
 	kubeClient, err := client.New(config.GetConfigOrDie(), opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create kube client: %v\n", err)
+		return nil, fmt.Errorf("failed to create kube client: %v", err)
 	}
 	return kubeClient, nil
 }
@@ -403,6 +403,7 @@ func waitForHTTPResponse(url string, timeout time.Duration) error {
 		if err != nil {
 			return false, nil
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			return false, nil
 		}
@@ -528,10 +529,10 @@ func waitForService(ctx context.Context, cl client.Client, timeout time.Duration
 	return svc, nil
 }
 
-// updateLbSvcIpAndNodePorts updates the loadbalancer IP to "127.0.0.1" and nodeports
+// updateLbSvcIPAndNodePorts updates the loadbalancer IP to "127.0.0.1" and nodeports
 // to EnvoyNodePortHTTPPort and EnvoyNodePortHTTPSPort of the service referenced by ns/name.
-func updateLbSvcIpAndNodePorts(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) error {
-	svc, err := waitForService(ctx, kclient, 1*time.Minute, ns, name)
+func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) error {
+	svc, err := waitForService(ctx, kclient, timeout, ns, name)
 	if err != nil {
 		return fmt.Errorf("failed to observe service %s/%s: %v", ns, name, err)
 	}

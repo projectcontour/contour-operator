@@ -44,8 +44,8 @@ var (
 	operatorNs = "contour-operator"
 	// specNs is the spec.namespace.name of a Contour.
 	specNs = "projectcontour"
-	// testUrl is the url used to test e2e functionality.
-	testUrl = "http://local.projectcontour.io/"
+	// testURL is the url used to test e2e functionality.
+	testURL = "http://local.projectcontour.io/"
 	// expectedDeploymentConditions are the expected status conditions of a
 	// deployment.
 	expectedDeploymentConditions = []appsv1.DeploymentCondition{
@@ -110,7 +110,7 @@ func TestDefaultContour(t *testing.T) {
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	svcName := "envoy"
-	if err := updateLbSvcIpAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
+	if err := updateLbSvcIPAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
 		t.Fatalf("failed to update service %s/%s: %v", specNs, svcName, err)
 	}
 	t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
@@ -142,10 +142,10 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
-	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-	t.Logf("received http response for %q", testUrl)
+	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -214,10 +214,10 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
-	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-	t.Logf("received http response for %q", testUrl)
+	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -379,10 +379,10 @@ func TestContourSpecNs(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
-	if err := waitForHTTPResponse(testUrl, 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-	t.Logf("received http response for %q", testUrl)
+	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -481,10 +481,10 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForHTTPResponse(testUrl, 3*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testUrl, err)
+	if err := waitForHTTPResponse(testURL, 3*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-	t.Logf("received http response for %q", testUrl)
+	t.Logf("received http response for %q", testURL)
 
 	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
