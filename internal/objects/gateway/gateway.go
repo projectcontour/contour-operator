@@ -26,31 +26,6 @@ import (
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
-// OwnerLabelsExist returns true if obj contains Gateway owner labels.
-func OwnerLabelsExist(obj metav1.Object, gw *gatewayv1alpha1.Gateway) bool {
-	labels := obj.GetLabels()
-	nameFound := false
-	nsFound := false
-	if labels == nil {
-		return false
-	}
-	for l, v := range labels {
-		switch {
-		case nameFound && nsFound:
-			return true
-		case l == operatorv1alpha1.OwningGatewayNameLabel && v == gw.Name:
-			nameFound = true
-		case l == operatorv1alpha1.OwningGatewayNsLabel && v == gw.Namespace:
-			nsFound = true
-		}
-	}
-	if nameFound && nsFound {
-		return true
-	}
-	// no gateway owning name and ns labels found.
-	return false
-}
-
 // OtherGatewaysExist lists Gateway objects in all namespaces, returning the list
 // if any exist other than gw.
 func OtherGatewaysExist(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*gatewayv1alpha1.GatewayList, error) {
@@ -124,4 +99,12 @@ func OtherGatewaysRefGatewayClass(ctx context.Context, cli client.Client, gw *ga
 		}
 	}
 	return false, nil
+}
+
+// OwnerLabels returns owner labels for the provided gw.
+func OwnerLabels(gw *gatewayv1alpha1.Gateway) map[string]string {
+	return map[string]string{
+		operatorv1alpha1.OwningGatewayNameLabel: gw.Name,
+		operatorv1alpha1.OwningGatewayNsLabel:   gw.Namespace,
+	}
 }

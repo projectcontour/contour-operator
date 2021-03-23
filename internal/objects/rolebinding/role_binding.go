@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	equality "github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -110,7 +111,7 @@ func createRoleBinding(ctx context.Context, cli client.Client, rb *rbacv1.RoleBi
 // updateRoleBindingIfNeeded updates a RoleBinding resource if current does
 // not match desired.
 func updateRoleBindingIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *rbacv1.RoleBinding) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
 		rb, updated := equality.RoleBindingConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, rb); err != nil {

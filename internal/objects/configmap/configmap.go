@@ -21,6 +21,8 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
+	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -28,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -43,10 +46,13 @@ var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
 #
-# Specify the service-apis Gateway Contour should watch.
+# Specify the service-apis Gateway Contour should watch.{{if and .GatewayName .GatewayNamespace}}
+gateway:
+  name: {{.GatewayName}}
+  namespace: {{.GatewayNamespace}}{{else}}
 # gateway:
 #   name: contour
-#   namespace: projectcontour
+#   namespace: projectcontour{{end}}
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -140,36 +146,80 @@ accesslog-format: envoy
 #   num-trusted-hops: 0
 `))
 
-// EnsureConfigMap ensures that a ConfigMap exists for the given contour.
-func EnsureConfigMap(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	desired, err := desiredConfigMap(contour)
+// Config contains everything needed to manage a ConfigMap.
+type Config struct {
+	// Namespace is the namespace of the ConfigMap.
+	Namespace string
+	// Name is the name of the ConfigMap. Defaults to "contour".
+	Name string
+	// Labels are labels to apply to the ConfigMap.
+	Labels map[string]string
+	// Contour contains Contour configuration parameters.
+	Contour contourConfig
+}
+
+// contourConfig contains Contour configuration parameters.
+type contourConfig struct {
+	// GatewayNamespace is the Gateway namespace Contour should watch.
+	GatewayNamespace string
+	// GatewayName is the Gateway name Contour should watch.
+	GatewayName string
+}
+
+// NewConfig returns a Config with default fields set.
+func NewConfig() *Config {
+	return &Config{Name: ContourCfgMapName}
+}
+
+// NewCfgForContour returns a ConfigMap Config with default fields set for contour.
+func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
+	cfg := NewConfig()
+	cfg.Namespace = contour.Spec.Namespace.Name
+	labels := objcontour.OwnerLabels(contour)
+	cfg.Labels = labels
+	return cfg
+}
+
+// NewCfgForGateway returns a ConfigMap Config with default fields set for gw.
+func NewCfgForGateway(gw *gatewayv1alpha1.Gateway) *Config {
+	cfg := NewConfig()
+	cfg.Namespace = gw.Namespace
+	labels := objgw.OwnerLabels(gw)
+	cfg.Labels = labels
+	cfg.Contour.GatewayNamespace = gw.Namespace
+	cfg.Contour.GatewayName = gw.Name
+	return cfg
+}
+
+// Ensure ensures that a ConfigMap exists for the given cfg.
+func Ensure(ctx context.Context, cli client.Client, cfg *Config) error {
+	desired, err := desired(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build configmap: %w", err)
 	}
-	current, err := currentConfigMap(ctx, cli, contour)
+	current, err := current(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return createConfigMap(ctx, cli, desired)
+			return create(ctx, cli, desired)
 		}
 		return fmt.Errorf("failed to get configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
-	if err := updateConfigMapIfNeeded(ctx, cli, contour, current, desired); err != nil {
+	if err := updateIfNeeded(ctx, cli, cfg, current, desired); err != nil {
 		return fmt.Errorf("failed to update configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	return nil
 }
 
-// EnsureConfigMapDeleted ensures the configmap for the provided contour
-// is deleted if Contour owner labels exist.
-func EnsureConfigMapDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	cfgMap, err := currentConfigMap(ctx, cli, contour)
+// Delete deletes a ConfigMap for the provided cfg, if the configured owner labels exist.
+func Delete(ctx context.Context, cli client.Client, cfg *Config) error {
+	cfgMap, err := current(ctx, cli, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	if objcontour.OwnerLabelsExist(cfgMap, contour) {
+	if labels.Exist(cfgMap, cfg.Labels) {
 		if err := cli.Delete(ctx, cfgMap); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -180,12 +230,12 @@ func EnsureConfigMapDeleted(ctx context.Context, cli client.Client, contour *ope
 	return nil
 }
 
-// currentConfigMap gets the ConfigMap for contour from the api server.
-func currentConfigMap(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
+// current gets the ConfigMap for the provided cfg from the api server.
+func current(ctx context.Context, cli client.Client, cfg *Config) (*corev1.ConfigMap, error) {
 	current := &corev1.ConfigMap{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
-		Name:      ContourCfgMapName,
+		Namespace: cfg.Namespace,
+		Name:      cfg.Name,
 	}
 	err := cli.Get(ctx, key, current)
 	if err != nil {
@@ -194,29 +244,18 @@ func currentConfigMap(ctx context.Context, cli client.Client, contour *operatorv
 	return current, nil
 }
 
-// desiredConfigMap generates the desired ConfigMap for the given contour.
-func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
+// desired generates the desired ConfigMap for the given cfg.
+func desired(cfg *Config) (*corev1.ConfigMap, error) {
 	cfgFile := new(bytes.Buffer)
-
-	accessLogFormat := "envoy"
-	cfgFileParameters := struct {
-		AccessLogFormat string
-	}{
-		AccessLogFormat: accessLogFormat,
-	}
-
-	if err := contourCfgTemplate.Execute(cfgFile, cfgFileParameters); err != nil {
+	if err := contourCfgTemplate.Execute(cfgFile, cfg.Contour); err != nil {
 		return nil, err
 	}
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ContourCfgMapName,
-			Namespace: contour.Spec.Namespace.Name,
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Name:      cfg.Name,
+			Namespace: cfg.Namespace,
+			Labels:    cfg.Labels,
 		},
 		Data: map[string]string{
 			"contour.yaml": cfgFile.String(),
@@ -226,19 +265,19 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 	return cm, nil
 }
 
-// createConfigMap creates a ConfigMap resource for the provided cm.
-func createConfigMap(ctx context.Context, cli client.Client, cm *corev1.ConfigMap) error {
+// create creates a ConfigMap resource for the provided cm.
+func create(ctx context.Context, cli client.Client, cm *corev1.ConfigMap) error {
 	if err := cli.Create(ctx, cm); err != nil {
 		return fmt.Errorf("failed to create configmap %s/%s: %w", cm.Namespace, cm.Name, err)
 	}
 	return nil
 }
 
-// updateConfigMapIfNeeded updates a ConfigMap if current does not match desired,
-// using contour to verify the existence of owner labels.
-func updateConfigMapIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.ConfigMap) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
-		changed, updated := cfgFileChanged(current, desired)
+// updateIfNeeded updates a ConfigMap if current does not match desired,
+// using cfg to verify the existence of owner labels.
+func updateIfNeeded(ctx context.Context, cli client.Client, cfg *Config, current, desired *corev1.ConfigMap) error {
+	if labels.Exist(current, cfg.Labels) {
+		changed, updated := cfgMapChanged(current, desired)
 		if !changed {
 			return nil
 		}
@@ -250,9 +289,9 @@ func updateConfigMapIfNeeded(ctx context.Context, cli client.Client, contour *op
 	return nil
 }
 
-// cfgFileChanged compares current and expected returning true and an
+// cfgMapChanged compares current and expected returning true and an
 // updated ConfigMap if they don't match.
-func cfgFileChanged(current, expected *corev1.ConfigMap) (bool, *corev1.ConfigMap) {
+func cfgMapChanged(current, expected *corev1.ConfigMap) (bool, *corev1.ConfigMap) {
 	changed := false
 	updated := current.DeepCopy()
 

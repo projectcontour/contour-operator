@@ -24,6 +24,7 @@ import (
 	objrole "github.com/projectcontour/contour-operator/internal/objects/role"
 	objrb "github.com/projectcontour/contour-operator/internal/objects/rolebinding"
 	objsa "github.com/projectcontour/contour-operator/internal/objects/serviceaccount"
+	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -154,7 +155,7 @@ func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operator
 		kind := object.GetObjectKind().GroupVersionKind().Kind
 		namespace := object.(metav1.Object).GetNamespace()
 		name := object.(metav1.Object).GetName()
-		if objcontour.OwnerLabelsExist(object.(metav1.Object), contour) {
+		if labels.Exist(object, objcontour.OwnerLabels(contour)) {
 			if err := cli.Delete(ctx, object); err != nil {
 				if errors.IsNotFound(err) {
 					continue

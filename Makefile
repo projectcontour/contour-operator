@@ -111,7 +111,7 @@ deploy: manifests
 
 load-image: ## Load the operator image to a kind cluster
 load-image: container
-	./hack/load-image.sh $(IMAGE) $(VERSION)
+	./hack/load-image.sh $(IMAGE) $(OLD_VERSION) $(VERSION)
 
 # Remove the operator deployment. This assumes a kubeconfig in ~/.kube/config
 undeploy:
@@ -136,7 +136,7 @@ verify-image:
 reset-image: ## Resets operator image references and pull policy.
 .PHONY: reset-image
 reset-image:
-	./hack/reset-image.sh $(NEW_VERSION)
+	./hack/reset-image.sh $(IMAGE) $(VERSION) $(OLD_VERSION)
 
 # Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
 # Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.

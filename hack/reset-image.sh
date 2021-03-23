@@ -2,15 +2,16 @@
 
 readonly HERE=$(cd "$(dirname "$0")" && pwd)
 readonly REPO=$(cd "${HERE}/.." && pwd)
-readonly IMAGE="docker.io/projectcontour/contour-operator"
 readonly EXAMPLE_FILE="examples/operator/operator.yaml"
 readonly MANAGER_FILE="config/manager/manager.yaml"
 readonly PULL_POLICY="Always"
 readonly PROGNAME=$(basename "$0")
-readonly NEW_VERSION="$1"
+readonly IMAGE="$1"
+readonly VERSION="$2"
+readonly OLD_VERSION="$3"
 
-if [ -z "$NEW_VERSION" ]; then
-    printf "Usage: %s NEW_VERSION\n" "$PROGNAME"
+if [ -z "$IMAGE" ] || [ -z "$VERSION" ] || [ -z "$OLD_VERSION" ]; then
+    printf "Usage: %s IMAGE VERSION OLD_VERSION\n" "$PROGNAME"
     exit 1
 fi
 
@@ -29,13 +30,16 @@ run::sed() {
     esac
 }
 
-if grep -q "${IMAGE}:${NEW_VERSION}" "${EXAMPLE_FILE}"; then
-  echo "${EXAMPLE_FILE} contains ${IMAGE}:${NEW_VERSION}"
-else
-  echo "regenerating ${EXAMPLE_FILE} using kustomize..."
-  cd "${REPO}"
-  kustomize build config/default > "${EXAMPLE_FILE}"
-fi
+for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
+  if grep -q "image: ${IMAGE}:${OLD_VERSION}" $file; then
+    echo "$file contains image: ${IMAGE}:${OLD_VERSION}"
+  else
+    echo "resetting image to \"${IMAGE}:${OLD_VERSION}\" for $file"
+    run::sed \
+    "-es|image: ${IMAGE}:${VERSION}|image: ${IMAGE}:${OLD_VERSION}|" \
+      "$file"
+  fi
+done
 
 for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
   if grep -q "imagePullPolicy: ${PULL_POLICY}" $file; then

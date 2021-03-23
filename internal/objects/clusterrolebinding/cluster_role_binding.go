@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -106,7 +107,7 @@ func createClusterRoleBinding(ctx context.Context, cli client.Client, crb *rbacv
 // updateClusterRoleBindingIfNeeded updates a ClusterRoleBinding resource if current
 // does not match desired, using contour to verify the existence of owner labels.
 func updateClusterRoleBindingIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *rbacv1.ClusterRoleBinding) error {
-	if objcontour.OwnerLabelsExist(current, contour) {
+	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
 		crb, updated := equality.ClusterRoleBindingConfigChanged(current, desired)
 		if updated {
 			if err := cli.Update(ctx, crb); err != nil {
