@@ -41,7 +41,7 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 	var namesFound []string
 	httpFound := false
 	httpsFound := false
-	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
+	for _, port := range                contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		if len(numsFound) > 0 && slice.ContainsInt32(numsFound, port.PortNumber) {
 			return fmt.Errorf("duplicate container port number %q", port.PortNumber)
 		}

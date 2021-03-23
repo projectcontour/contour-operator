@@ -52,7 +52,7 @@ var (
 		{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
 	}
 	// expectedPodConditions are the expected status conditions of a pod.
-	expectedPodConditions = []corev1.PodCondition{
+	expectedPodConditions =        []corev1.PodCondition{
 		{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
 	}
 	// expectedContourConditions are the expected status conditions of a
