@@ -151,6 +151,7 @@ manifests: generate-contour-crds
 # Run go fmt against code
 fmt:
 	go fmt ./...
+	go fmt ./test/e2e/
 
 # Run go vet against code
 vet:
