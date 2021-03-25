@@ -26,7 +26,6 @@ import (
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,8 +55,6 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 
 	updated := latest.DeepCopy()
 
-	deploy := &appsv1.Deployment{}
-	ds := &appsv1.DaemonSet{}
 	set := latest.GatewayClassSet()
 	if set {
 		gcRef := *latest.Spec.GatewayClassRef
@@ -71,13 +68,13 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 			errs = append(errs, fmt.Errorf("failed to verify if gatewayclass %s is admitted: %w", gcRef, err))
 		}
 	}
-	deploy, err = objdeploy.CurrentDeployment(ctx, cli, latest)
+	deploy, err := objdeploy.CurrentDeployment(ctx, cli, latest)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to get deployment for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
 	} else {
 		updated.Status.AvailableContours = deploy.Status.AvailableReplicas
 	}
-	ds, err = objds.CurrentDaemonSet(ctx, cli, latest)
+	ds, err := objds.CurrentDaemonSet(ctx, cli, latest)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to get daemonset for contour %s/%s status: %w", latest.Namespace, latest.Name, err))
 	} else {
