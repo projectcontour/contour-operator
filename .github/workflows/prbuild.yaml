@@ -78,3 +78,4 @@ jobs:
         with:
           version: v1.38
           only-new-issues: true
+          args: --build-tags=e2e
