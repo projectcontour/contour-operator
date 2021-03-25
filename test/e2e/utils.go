@@ -532,7 +532,7 @@ func waitForService(ctx context.Context, cl client.Client, timeout time.Duration
 // updateLbSvcIPAndNodePorts updates the loadbalancer IP to "127.0.0.1" and nodeports
 // to EnvoyNodePortHTTPPort and EnvoyNodePortHTTPSPort of the service referenced by ns/name.
 func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) error {
-	svc, err := waitForService(ctx, kclient, timeout, ns, name)
+	svc, err := waitForService(ctx, cl, timeout, ns, name)
 	if err != nil {
 		return fmt.Errorf("failed to observe service %s/%s: %v", ns, name, err)
 	}
