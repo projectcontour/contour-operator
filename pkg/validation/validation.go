@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
@@ -30,7 +31,16 @@ import (
 const gatewayClassNamespacedParamRef = "Namespace"
 
 // Contour returns true if contour is valid.
-func Contour(contour *operatorv1alpha1.Contour) error {
+func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+	// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/18 is fixed.
+	exist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
+	if err != nil {
+		return fmt.Errorf("failed to verify if other contours exist in namespace %s: %w",
+			contour.Spec.Namespace.Name, err)
+	}
+	if exist {
+		return fmt.Errorf("other contours exist in namespace %s", contour.Spec.Namespace.Name)
+	}
 	return containerPorts(contour)
 }
 

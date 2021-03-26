@@ -27,7 +27,7 @@ const (
 	envoySecureContainerPort   = int32(8443)
 )
 
-func TestValidContour(t *testing.T) {
+func TestContainerPorts(t *testing.T) {
 	testCases := []struct {
 		description string
 		ports       []operatorv1alpha1.ContainerPort
@@ -137,7 +137,7 @@ func TestValidContour(t *testing.T) {
 		if tc.ports != nil {
 			cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = tc.ports
 		}
-		err := Contour(cntr)
+		err := containerPorts(cntr)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}
