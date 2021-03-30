@@ -58,11 +58,14 @@ func EnsureRBAC(ctx context.Context, cli client.Client, contour *operatorv1alpha
 			certSvcAct = svcAct
 		}
 	}
-	cr, err := objcr.EnsureClusterRole(ctx, cli, ContourRbacName, contour)
+	// ClusterRole and ClusterRoleBinding resources are namespace-named to allow ownership
+	// from individual instances of Contour.
+	nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Spec.Namespace.Name)
+	cr, err := objcr.EnsureClusterRole(ctx, cli, nsName, contour)
 	if err != nil {
 		return fmt.Errorf("failed to ensure cluster role %s: %w", ContourRbacName, err)
 	}
-	if err := objcrb.EnsureClusterRoleBinding(ctx, cli, ContourRbacName, cr.Name, ContourRbacName, contour); err != nil {
+	if err := objcrb.EnsureClusterRoleBinding(ctx, cli, nsName, cr.Name, ContourRbacName, contour); err != nil {
 		return fmt.Errorf("failed to ensure cluster role binding %s: %w", ContourRbacName, err)
 	}
 	certRole, err := objrole.EnsureRole(ctx, cli, CertGenRbacName, contour)
@@ -132,7 +135,10 @@ func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operator
 		return fmt.Errorf("failed to verify if contours exist in any namespace: %w", err)
 	}
 	if !contoursExist {
-		crb, err := objcrb.CurrentClusterRoleBinding(ctx, cli, ContourRbacName)
+		// ClusterRole and ClusterRoleBinding resources are namespace-named to allow ownership
+		// from individual instances of Contour.
+		nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Spec.Namespace.Name)
+		crb, err := objcrb.CurrentClusterRoleBinding(ctx, cli, nsName)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return err
@@ -141,7 +147,7 @@ func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operator
 		if crb != nil {
 			objectsToDelete = append(objectsToDelete, crb)
 		}
-		cr, err := objcr.CurrentClusterRole(ctx, cli, ContourRbacName)
+		cr, err := objcr.CurrentClusterRole(ctx, cli, nsName)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return err

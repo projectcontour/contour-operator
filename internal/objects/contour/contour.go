@@ -106,6 +106,10 @@ func OtherContoursExistInSpecNs(ctx context.Context, cli client.Client, contour 
 	}
 	if exist {
 		for _, c := range contours.Items {
+			if c.Name == contour.Name && c.Namespace == contour.Namespace {
+				// Skip the contour from the list that matches the provided contour.
+				continue
+			}
 			if c.Spec.Namespace.Name == contour.Spec.Namespace.Name {
 				return true, nil
 			}

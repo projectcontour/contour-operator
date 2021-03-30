@@ -408,6 +408,55 @@ func TestContourSpecNs(t *testing.T) {
 	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
+func TestMultipleContours(t *testing.T) {
+	testNames := []string{"test-user-contour", "test-user-contour-2"}
+	for _, testName := range testNames {
+		cfg := objcontour.Config{
+			Name:        testName,
+			Namespace:   operatorNs,
+			SpecNs:      fmt.Sprintf("%s-ns", testName),
+			RemoveNs:    true,
+			NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		}
+		cntr, err := newContour(ctx, kclient, cfg)
+		if err != nil {
+			t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
+		}
+		t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+		if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+		}
+		t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	}
+
+	// Scrape the operator logs for error messages.
+	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// Ensure the default contour can be deleted and clean-up.
+	for _, testName := range testNames {
+		if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
+			t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
+		}
+		t.Logf("deleted contour %s/%s", operatorNs, testName)
+
+		// Verify the user-defined namespace was removed by the operator.
+		specNs = fmt.Sprintf("%s-ns", testName)
+		if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, specNs); err != nil {
+			t.Fatalf("failed to observe the deletion of namespace %s: %v", specNs, err)
+		}
+		t.Logf("observed the deletion of namespace %s", specNs)
+	}
+}
+
 func TestGateway(t *testing.T) {
 	testName := "test-gateway"
 	contourName := fmt.Sprintf("%s-contour", testName)
