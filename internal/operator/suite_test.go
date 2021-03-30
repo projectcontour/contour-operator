@@ -116,7 +116,7 @@ var _ = BeforeSuite(func(done Done) {
 	operator, err = New(cliCfg, opCfg)
 	Expect(err).ToNot(HaveOccurred())
 	go func() {
-		err = operator.Start(ctrl.SetupSignalHandler())
+		err = operator.Start(ctrl.SetupSignalHandler(), opCfg)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
