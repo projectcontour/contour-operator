@@ -35,7 +35,7 @@ import (
 
 // syncContourStatus computes the current status of contour and updates status upon
 // any changes since last sync.
-func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, validErr error) error {
 	var err error
 	var errs []error
 	var gcExists, admitted bool
@@ -82,7 +82,7 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 	}
 
 	updated.Status.Conditions = mergeConditions(updated.Status.Conditions,
-		computeContourAvailableCondition(deploy, ds, set, gcExists, admitted))
+		computeContourAvailableCondition(deploy, ds, set, gcExists, admitted, validErr))
 
 	if equality.ContourStatusChanged(latest.Status, updated.Status) {
 		if err := cli.Status().Update(ctx, updated); err != nil {
@@ -92,7 +92,7 @@ func SyncContour(ctx context.Context, cli client.Client, contour *operatorv1alph
 				return retryable.NewMaybeRetryableAggregate(errs)
 			case strings.Contains(err.Error(), "the object has been modified"):
 				// Retry if the object was modified during status sync.
-				if err := SyncContour(ctx, cli, updated); err != nil {
+				if err := SyncContour(ctx, cli, updated, validErr); err != nil {
 					errs = append(errs, fmt.Errorf("failed to update contour %s/%s status: %w", latest.Namespace,
 						latest.Name, err))
 				}

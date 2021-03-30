@@ -45,6 +45,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 		gcSet            bool
 		gcExists         bool
 		gcAdmitted       bool
+		validErr         error
 		expect           metav1.Condition
 	}{
 		{
@@ -150,7 +151,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 			},
 		}
 
-		actual := computeContourAvailableCondition(deploy, ds, tc.gcSet, tc.gcExists, tc.gcAdmitted)
+		actual := computeContourAvailableCondition(deploy, ds, tc.gcSet, tc.gcExists, tc.gcAdmitted, tc.validErr)
 		if !apiequality.Semantic.DeepEqual(actual.Type, tc.expect.Type) ||
 			!apiequality.Semantic.DeepEqual(actual.Status, tc.expect.Status) {
 			t.Fatalf("%q: expected %#v, got %#v", tc.description, tc.expect, actual)

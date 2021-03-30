@@ -80,7 +80,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 			if len(cntrs) > 0 {
 				for i, cntr := range cntrs {
-					if err := status.SyncContour(ctx, r.client, &cntrs[i]); err != nil {
+					if err := status.SyncContour(ctx, r.client, &cntrs[i], nil); err != nil {
 						return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", cntr.Namespace, cntr.Name, err)
 					}
 					r.log.Info("synced contour for gatewayclass", "name", gc.Name)
@@ -120,7 +120,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		if len(cntrs) > 0 {
 			for i, cntr := range cntrs {
-				if err := status.SyncContour(ctx, r.client, &cntrs[i]); err != nil {
+				if err := status.SyncContour(ctx, r.client, &cntrs[i], nil); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", cntr.Namespace, cntr.Name, err)
 				}
 				r.log.Info("synced status for contour", "namespace", cntr.Namespace, "name", cntr.Name)

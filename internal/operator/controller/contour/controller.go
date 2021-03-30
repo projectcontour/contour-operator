@@ -157,31 +157,11 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The contour is safe to process, so ensure current state matches desired state.
 	desired := contour.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
-		if err := validation.Contour(ctx, r.client, contour); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
-		}
-		switch {
-		case contour.GatewayClassSet():
-			if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
-				switch e := err.(type) {
-				case retryable.Error:
-					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-					return ctrl.Result{RequeueAfter: e.After()}, nil
-				default:
-					return ctrl.Result{}, err
-				}
-			}
-		default:
-			if !contour.IsFinalized() {
-				// Before doing anything with the contour, ensure it has a finalizer
-				// so it can cleaned-up later.
-				if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
-					return ctrl.Result{}, err
-				}
-				r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
-			} else {
-				r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
-				if err := r.ensureContour(ctx, contour); err != nil {
+		validErr := validation.Contour(ctx, r.client, contour)
+		if validErr == nil {
+			switch {
+			case contour.GatewayClassSet():
+				if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
 					switch e := err.(type) {
 					case retryable.Error:
 						r.log.Error(e, "got retryable error; requeueing", "after", e.After())
@@ -190,8 +170,35 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						return ctrl.Result{}, err
 					}
 				}
-				r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
+			default:
+				if !contour.IsFinalized() {
+					// Before doing anything with the contour, ensure it has a finalizer
+					// so it can cleaned-up later.
+					if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
+						return ctrl.Result{}, err
+					}
+					r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
+				} else {
+					r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
+					if err := r.ensureContour(ctx, contour); err != nil {
+						switch e := err.(type) {
+						case retryable.Error:
+							r.log.Error(e, "got retryable error; requeueing", "after", e.After())
+							return ctrl.Result{RequeueAfter: e.After()}, nil
+						default:
+							return ctrl.Result{}, err
+						}
+					}
+					r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
+				}
 			}
+		}
+		if err := status.SyncContour(ctx, r.client, contour, validErr); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace,
+				contour.Name, err)
+		} else {
+			r.log.Info("synced status for contour", "namespace", contour.Namespace, "name",
+				contour.Name)
 		}
 	} else {
 		switch {
@@ -269,11 +276,6 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 			}
 		}
 	}
-	if err := status.SyncContour(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
-	}
 	return retryable.NewMaybeRetryableAggregate(errs)
 }
 
@@ -304,11 +306,6 @@ func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *
 		} else {
 			r.log.Info("synced gatewayclass status for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
-	}
-	if err := status.SyncContour(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	return retryable.NewMaybeRetryableAggregate(errs)
 }

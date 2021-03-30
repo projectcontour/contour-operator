@@ -31,8 +31,15 @@ var clock utilclock.Clock = utilclock.RealClock{}
 
 // computeContourAvailableCondition computes the contour Available status condition
 // type based on deployment, ds, set, exists and admitted.
-func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet, set, exists, admitted bool) metav1.Condition {
+func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet, set, exists, admitted bool, validErr error) metav1.Condition {
 	switch {
+	case validErr != nil:
+		return metav1.Condition{
+			Type:    operatorv1alpha1.ContourAvailableConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "InvalidContour",
+			Message: fmt.Sprintf("%v", validErr),
+		}
 	case set:
 		switch {
 		case !exists:
