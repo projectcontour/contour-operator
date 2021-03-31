@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -76,10 +77,39 @@ func New(mgr manager.Manager, cfg Config) (controller.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.Gateway{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	// Only enqueue Gateway objects that reference a GatewayClass owned by the operator.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.Gateway{}}, r.enqueueRequestForOwnedGateway()); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// enqueueRequestForOwnedGateway returns an event handler that maps events to
+// Gateway objects that specify reference a GatewayClass owned by the operator.
+func (r *reconciler) enqueueRequestForOwnedGateway() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gw, ok := a.(*gatewayv1alpha1.Gateway)
+		if ok {
+			ctx := context.Background()
+			gc, err := objgw.ClassForGateway(ctx, r.client, gw)
+			if err != nil {
+				return []reconcile.Request{}
+			}
+			if gc != nil {
+				// The gateway references a gatewayclass that exists and is managed
+				// by the operator, so enqueue it for reconciliation.
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Namespace: gw.Namespace,
+							Name:      gw.Name,
+						},
+					},
+				}
+			}
+		}
+		return []reconcile.Request{}
+	})
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

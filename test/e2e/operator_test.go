@@ -65,6 +65,20 @@ var (
 	expectedGatewayClassConditions = []metav1.Condition{
 		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionTrue},
 	}
+	// expectedNonOwnedGatewayClassConditions are the expected status conditions of a GatewayClass
+	// not owned by the operator.
+	expectedNonOwnedGatewayClassConditions = []metav1.Condition{
+		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionFalse},
+	}
+	// expectedGatewayConditions are the expected status conditions of a Gateway.
+	expectedGatewayConditions = []metav1.Condition{
+		{Type: string(gatewayv1alpha1.GatewayConditionReady), Status: metav1.ConditionTrue},
+	}
+	// expectedNonOwnedGatewayConditions are the expected status conditions of a Gateway
+	// not owned by the operator.
+	expectedNonOwnedGatewayConditions = []metav1.Condition{
+		{Type: string(gatewayv1alpha1.GatewayConditionScheduled), Status: metav1.ConditionFalse},
+	}
 	// testAppName is the name of the application used for e2e testing.
 	testAppName = "kuard"
 	// testAppImage is the image used by the e2e test application.
@@ -475,7 +489,7 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := newGatewayClass(ctx, kclient, gcName, operatorNs, contourName); err != nil {
+	if err := newOperatorGatewayClass(ctx, kclient, gcName, operatorNs, contourName); err != nil {
 		t.Fatalf("failed to create gatewayclass %s: %v", gcName, err)
 	}
 	t.Logf("created gatewayclass %s", gcName)
@@ -506,8 +520,10 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
-	// TODO [danehans]: Check gateway status conditions before proceeding.
-	// xref: https://github.com/projectcontour/contour-operator/issues/211
+	// The gateway should report admitted.
+	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -546,6 +562,114 @@ func TestGateway(t *testing.T) {
 	// Ensure the gatewayclass can be deleted and clean-up.
 	if err := deleteGatewayClass(ctx, kclient, 3*time.Minute, gcName); err != nil {
 		t.Fatalf("failed to delete gatewayclass %s: %v", gcName, err)
+	}
+
+	// Ensure the contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
+	}
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
+}
+
+// TestGatewayOwnership ensures the operator only manages Gateway resources that it owns,
+// i.e. a gatewayclass that specifies the controller as the operator.
+func TestGatewayOwnership(t *testing.T) {
+	testName := "test-gateway-owned"
+	contourName := fmt.Sprintf("%s-contour", testName)
+	gcName := "test-gatewayclass-owned"
+	cfg := objcontour.Config{
+		Name:         contourName,
+		Namespace:    operatorNs,
+		SpecNs:       specNs,
+		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
+		GatewayClass: &gcName,
+	}
+
+	nonOwnedClass := "test-gatewayclass-not-owned"
+	// Create Gateway API resources that should not be managed by the operator.
+	if err := newGatewayClass(ctx, kclient, nonOwnedClass); err != nil {
+		t.Fatalf("failed to create gatewayclass %s: %v", nonOwnedClass, err)
+	}
+	t.Logf("created gatewayclass %s", nonOwnedClass)
+
+	// The gatewayclass should not report admitted.
+	if err := waitForGatewayClassStatusConditions(ctx, kclient, 5*time.Second, nonOwnedClass, expectedNonOwnedGatewayClassConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", nonOwnedClass, err)
+	}
+
+	// Create the namespace used by the non-owned gateway
+	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
+	}
+
+	nonOwnedGateway := "other-vendor"
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newGateway(ctx, kclient, cfg.SpecNs, nonOwnedGateway, nonOwnedClass, "app", appName); err != nil {
+		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, nonOwnedGateway, err)
+	}
+	t.Logf("created gateway %s/%s", cfg.SpecNs, nonOwnedGateway)
+
+	// The gateway should not report scheduled.
+	if err := waitForGatewayStatusConditions(ctx, kclient, 5*time.Second, nonOwnedGateway, cfg.SpecNs, expectedNonOwnedGatewayConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, nonOwnedGateway, err)
+	}
+
+	// Create the Contour and Gateway API resources that should be managed by the operator.
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, contourName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	if err := newOperatorGatewayClass(ctx, kclient, gcName, operatorNs, contourName); err != nil {
+		t.Fatalf("failed to create gatewayclass %s: %v", gcName, err)
+	}
+	t.Logf("created gatewayclass %s", gcName)
+
+	// The gatewayclass should now report admitted.
+	if err := waitForGatewayClassStatusConditions(ctx, kclient, 1*time.Minute, gcName, expectedGatewayClassConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
+	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+
+	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
+	// https://github.com/projectcontour/contour-operator/issues/241
+	gwName := "contour"
+	if err := newGateway(ctx, kclient, cfg.SpecNs, gwName, gcName, "app", appName); err != nil {
+		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
+
+	// The gateway should report admitted.
+	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+
+	gateways := []string{nonOwnedGateway, gwName}
+	for _, gw := range gateways {
+		// Ensure the gateway can be deleted and clean-up.
+		if err := deleteGateway(ctx, kclient, 3*time.Minute, gw, cfg.SpecNs); err != nil {
+			t.Fatalf("failed to delete gateway %s/%s: %v", cfg.SpecNs, gw, err)
+		}
+	}
+
+	classes := []string{nonOwnedClass, gcName}
+	for _, class := range classes {
+		// Ensure the gatewayclass can be deleted and clean-up.
+		if err := deleteGatewayClass(ctx, kclient, 3*time.Minute, class); err != nil {
+			t.Fatalf("failed to delete gatewayclass %s: %v", class, err)
+		}
 	}
 
 	// Ensure the contour can be deleted and clean-up.
