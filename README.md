@@ -14,7 +14,7 @@ operator pattern.
 
 Install the Contour Operator & Contour CRDs:
 ```
-$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/operator/operator.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/v1.14.0/examples/operator/operator.yaml
 ```
 
 Verify the deployment is available:
@@ -26,7 +26,7 @@ contour-operator   1/1     1            1           1m
 
 Install an instance of the `Contour` custom resource:
 ```
-$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/v1.14.0/examples/contour/contour.yaml
 ```
 
 Verify the `Contour` custom resource is available:
@@ -38,7 +38,7 @@ contour-sample   True    ContourAvailable
 
 __Note:__ It may take several minutes for the `Contour` custom resource to become available.
 
-[Test with Ingress](https://projectcontour.io/docs/main/deploy-options/#test-with-ingress):
+[Test with Ingress](https://projectcontour.io/docs/v1.14.0/deploy-options/#test-with-ingress):
 ```
 $ kubectl apply -f https://projectcontour.io/examples/kuard.yaml
 ```
@@ -67,7 +67,7 @@ hostname of `kubectl get deploy/kuard`.
 Thanks for taking the time to join our community and start contributing!
 
 - Please familiarize yourself with the
-[Code of Conduct](https://github.com/projectcontour/contour/blob/main/CODE_OF_CONDUCT.md) before contributing.
+[Code of Conduct](https://github.com/projectcontour/contour/blob/v1.14.0/CODE_OF_CONDUCT.md) before contributing.
 - See the [contributing guide](docs/CONTRIBUTING.md) for information about setting up your environment, the expected
 workflow and instructions on the developer certificate of origin that is required.
 - Check out the [open issues](https://github.com/projectcontour/contour-operator/issues).
