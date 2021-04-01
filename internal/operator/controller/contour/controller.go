@@ -291,18 +291,10 @@ func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *
 		errs = append(errs, fmt.Errorf("failed to verify the existence of gatewayclass %s: %w", gcRef, err))
 	} else {
 		owned := objgc.IsController(gc)
-		valid := false
 		if owned {
 			if err := validation.GatewayClass(gc); err != nil {
 				errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-			} else {
-				valid = true
 			}
-		}
-		if err := status.SyncGatewayClass(ctx, r.client, gc, owned, valid); err != nil {
-			errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w", gcRef, err))
-		} else {
-			r.log.Info("synced gatewayclass status for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	}
 	if err := status.SyncContour(ctx, cli, contour); err != nil {

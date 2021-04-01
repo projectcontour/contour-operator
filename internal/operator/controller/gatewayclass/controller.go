@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -56,10 +57,29 @@ func New(mgr manager.Manager) (controller.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	// Only enqueue GatewayClass objects that specify the operator as the controller.
+	if err := c.Watch(&source.Kind{Type: &gatewayv1alpha1.GatewayClass{}}, r.enqueueRequestForGatewayClass()); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// enqueueRequestForGatewayClass returns an event handler that maps events to
+// GatewayClass objects owned by the operator.
+func (r *reconciler) enqueueRequestForGatewayClass() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		gc, ok := a.(*gatewayv1alpha1.GatewayClass)
+		if ok && objgc.IsController(gc) {
+			name := gc.Name
+			r.log.Info("queueing gatewayclass", "name", name)
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{Name: name},
+				},
+			}
+		}
+		return []reconcile.Request{}
+	})
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

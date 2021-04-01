@@ -67,18 +67,36 @@ func OwningSelector(gw *gatewayv1alpha1.Gateway) *metav1.LabelSelector {
 	}
 }
 
-// ContourForGateway returns the Contour associated to gw, if one exists.
+// ContourForGateway returns the Contour associated to gw, if one exists and is
+// managed by the operator.
 func ContourForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*operatorv1alpha1.Contour, error) {
-	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
+	gc, err := ClassForGateway(ctx, cli, gw)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify if gatewayclass %s exists for gateway %s/%s",
-			gw.Spec.GatewayClassName, gw.Namespace, gw.Name)
+		return nil, err
 	}
+	if gc == nil {
+		return nil, nil
+	}
+
 	cntr, err := objcontour.CurrentContour(ctx, cli, gc.Spec.ParametersRef.Namespace, gc.Spec.ParametersRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
 	}
 	return cntr, nil
+}
+
+// ClassForGateway returns the GatewayClass referenced by gw, if one exists and is
+// managed by the operator.
+func ClassForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*gatewayv1alpha1.GatewayClass, error) {
+	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify if gatewayclass %s exists for gateway %s/%s",
+			gw.Spec.GatewayClassName, gw.Namespace, gw.Name)
+	}
+	if objgc.IsController(gc) {
+		return gc, nil
+	}
+	return nil, nil
 }
 
 // OtherGatewaysRefGatewayClass returns true if other gateways have the same
