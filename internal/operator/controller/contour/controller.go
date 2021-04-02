@@ -311,7 +311,8 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	cli := r.client
 	if !contour.GatewayClassSet() {
 		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType ||
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.ClusterIPServicePublishingType {
 			if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
 				errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 			} else {
