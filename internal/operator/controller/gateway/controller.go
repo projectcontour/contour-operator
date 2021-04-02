@@ -242,7 +242,8 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 			r.log.Info("ensured contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType ||
+			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.ClusterIPServicePublishingType {
 			if err := objsvc.EnsureEnvoyService(ctx, cli, contour); err != nil {
 				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
 					contour.Namespace, contour.Name, err))
@@ -263,7 +264,8 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 		return fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
 	}
 	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType ||
+		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.ClusterIPServicePublishingType {
 		if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
