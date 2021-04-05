@@ -178,6 +178,12 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
+
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
 	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
@@ -249,6 +255,12 @@ func TestContourNodePortService(t *testing.T) {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("deleted contour %s/%s", operatorNs, testName)
+
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
@@ -568,6 +580,11 @@ func TestGateway(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
 	}
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
@@ -676,6 +693,12 @@ func TestGatewayOwnership(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
 	}
+
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
