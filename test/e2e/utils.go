@@ -62,7 +62,6 @@ func newClient() (client.Client, error) {
 	return kubeClient, nil
 }
 
-// func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
 func newContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*operatorv1alpha1.Contour, error) {
 	cntr := objcontour.New(cfg)
 	if err := cl.Create(ctx, cntr); err != nil {
@@ -90,13 +89,8 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, cntr); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		return false, nil
+		err := cl.Get(ctx, key, cntr)
+		return errors.IsNotFound(err), nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for contour %s/%s to be deleted: %v", cntr.Namespace, cntr.Name, err)
@@ -123,13 +117,8 @@ func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration,
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, gw); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		return false, nil
+		err := cl.Get(ctx, key, gw)
+		return errors.IsNotFound(err), nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for gateway %s/%s to be deleted: %v", gw.Namespace, gw.Name, err)
@@ -150,13 +139,8 @@ func deleteGatewayClass(ctx context.Context, cl client.Client, timeout time.Dura
 	key := types.NamespacedName{Name: gc.Name}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, gc); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		return false, nil
+		err := cl.Get(ctx, key, gc)
+		return errors.IsNotFound(err), nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for gatewayclass %s to be deleted: %v", gc.Name, err)
@@ -487,13 +471,8 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, ns); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		return false, nil
+		err := cl.Get(ctx, key, ns)
+		return errors.IsNotFound(err), nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
@@ -513,13 +492,8 @@ func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.D
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, ns); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		return false, nil
+		err := cl.Get(ctx, key, ns)
+		return errors.IsNotFound(err), nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
