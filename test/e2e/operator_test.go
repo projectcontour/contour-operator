@@ -602,6 +602,148 @@ func TestGateway(t *testing.T) {
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }
 
+func TestGatewayClusterIP(t *testing.T) {
+	testName := "test-clusterip-gateway"
+	contourName := fmt.Sprintf("%s-contour", testName)
+	gcName := "test-gatewayclass"
+	cfg := objcontour.Config{
+		Name:         contourName,
+		Namespace:    operatorNs,
+		SpecNs:       specNs,
+		NetworkType:  operatorv1alpha1.ClusterIPServicePublishingType,
+		GatewayClass: &gcName,
+	}
+
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, contourName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	if err := newOperatorGatewayClass(ctx, kclient, gcName, operatorNs, contourName); err != nil {
+		t.Fatalf("failed to create gatewayclass %s: %v", gcName, err)
+	}
+	t.Logf("created gatewayclass %s", gcName)
+
+	// The gatewayclass should now report admitted.
+	if err := waitForGatewayClassStatusConditions(ctx, kclient, 1*time.Minute, gcName, expectedGatewayClassConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
+	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+
+	// Create the gateway namespace if it doesn't exist.
+	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("created namespace %s", cfg.SpecNs)
+
+	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
+	// https://github.com/projectcontour/contour-operator/issues/241
+	gwName := "contour"
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newGateway(ctx, kclient, cfg.SpecNs, gwName, gcName, "app", appName); err != nil {
+		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
+
+	// The gateway should report admitted.
+	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+
+	// Create a sample workload for e2e testing.
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
+
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
+
+	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
+
+	// Create the client Pod.
+	cliName := "test-client"
+	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
+	if err != nil {
+		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
+	}
+	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
+		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
+	}
+	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
+
+	// Get the Envoy ClusterIP to curl.
+	svcName := "envoy"
+	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
+	if err != nil {
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
+	}
+
+	// Curl the ingress from the client pod.
+	url := fmt.Sprintf("http://%s/", ip)
+	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
+	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
+	resp := "200"
+	if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+		t.Fatalf("failed to parse pod %s/%s: %v", specNs, cliName, err)
+	}
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+
+	// Scrape the operator logs for error messages.
+	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
+	// xref: https://github.com/projectcontour/contour-operator/issues/211
+
+	// Ensure the gateway can be deleted and clean-up.
+	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete gateway %s/%s: %v", cfg.SpecNs, gwName, err)
+	}
+
+	// Ensure the gatewayclass can be deleted and clean-up.
+	if err := deleteGatewayClass(ctx, kclient, 3*time.Minute, gcName); err != nil {
+		t.Fatalf("failed to delete gatewayclass %s: %v", gcName, err)
+	}
+
+	// Ensure the contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
+	}
+
+	// TODO: ensure envoy service is deleted.
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
+}
+
 // TestGatewayOwnership ensures the operator only manages Gateway resources that it owns,
 // i.e. a gatewayclass that specifies the controller as the operator.
 func TestGatewayOwnership(t *testing.T) {
