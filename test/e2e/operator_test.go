@@ -695,6 +695,11 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
 	}
 
+	// Sleep a little bit since network seems not ready.
+	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
+	// TODO: remove it.
+	time.Sleep(time.Second * 60)
+
 	// Curl the ingress from the client pod.
 	url := fmt.Sprintf("http://%s/", ip)
 	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
@@ -704,17 +709,6 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to parse pod %s/%s: %v", specNs, cliName, err)
 	}
 	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
-
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
 
 	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
