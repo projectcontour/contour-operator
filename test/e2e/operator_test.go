@@ -53,7 +53,7 @@ var (
 	}
 	// expectedPodConditions are the expected status conditions of a pod.
 	expectedPodConditions = []corev1.PodCondition{
-		{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
 	}
 	// expectedContourConditions are the expected status conditions of a
 	// contour.
