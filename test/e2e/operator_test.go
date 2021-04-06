@@ -374,6 +374,7 @@ func TestContourClusterIPService(t *testing.T) {
 
 // TestContourSpec tests some spec changes such as:
 // - Enable RemoveNs.
+// - Initial replicas to 4.
 // - Increase replicas to 3.
 func TestContourSpec(t *testing.T) {
 	testName := "test-user-contour"
@@ -382,6 +383,7 @@ func TestContourSpec(t *testing.T) {
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
 		RemoveNs:    true,
+		Replicas:    4,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
