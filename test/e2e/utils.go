@@ -519,6 +519,22 @@ func waitForService(ctx context.Context, cl client.Client, timeout time.Duration
 	return svc, nil
 }
 
+func waitForServiceDeletion(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) error {
+	nsName := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	svc := &corev1.Service{}
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		err := cl.Get(ctx, nsName, svc)
+		return errors.IsNotFound(err), nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for service %s/%s: %v", ns, name, err)
+	}
+	return nil
+}
+
 // updateLbSvcIPAndNodePorts updates the loadbalancer IP to "127.0.0.1" and nodeports
 // to EnvoyNodePortHTTPPort and EnvoyNodePortHTTPSPort of the service referenced by ns/name.
 func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) error {
