@@ -276,7 +276,7 @@ func TestContourClusterIPService(t *testing.T) {
 		Name:        testName,
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
-		RemoveNs:    true,
+		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
@@ -355,12 +355,20 @@ func TestContourClusterIPService(t *testing.T) {
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
 	}
+	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
-	// Verify the user-defined namespace was removed by the operator.
-	if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, cfg.SpecNs); err != nil {
-		t.Fatalf("failed to observe the deletion of namespace %s: %v", cfg.SpecNs, err)
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
 	}
-	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
 func TestContourSpecNs(t *testing.T) {
