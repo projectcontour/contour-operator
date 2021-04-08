@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -695,19 +696,25 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
 	}
 
-	// Sleep a little bit since network seems not ready.
-	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
-	// TODO: remove it.
-	time.Sleep(time.Second * 60)
-
 	// Curl the ingress from the client pod.
 	url := fmt.Sprintf("http://%s/", ip)
 	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
 	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
 	resp := "200"
-	if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
-		t.Fatalf("failed to parse pod %s/%s: %v", specNs, cliName, err)
+	// Polling until success since network seems not ready.
+	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
+	// TODO: remove wait.PollImmediate.
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+			t.Logf("observed unexpected error: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
 	}
+
 	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
 
 	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
@@ -728,7 +735,11 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
 	}
 
-	// TODO: ensure envoy service is deleted.
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
