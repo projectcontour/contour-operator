@@ -233,6 +233,7 @@ var _ = Describe("Run controller", func() {
 			}, timeout, interval).Should(Equal(gc.Name))
 
 			// Remove the GatewayClass reference
+			Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
 			updated.Spec.GatewayClassRef = nil
 			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
 
