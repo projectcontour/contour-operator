@@ -338,14 +338,12 @@ func createDeployment(ctx context.Context, cli client.Client, deploy *appsv1.Dep
 // using contour to verify the existence of owner labels.
 func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *appsv1.Deployment) error {
 	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
-		return nil
-	}
-	deploy, updated := equality.DeploymentConfigChanged(current, desired)
-	if updated {
-		if err := cli.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+		deploy, updated := equality.DeploymentConfigChanged(current, desired)
+		if updated {
+			if err := cli.Update(ctx, deploy); err != nil {
+				return fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+			}
 		}
-		return nil
 	}
 	return nil
 }
