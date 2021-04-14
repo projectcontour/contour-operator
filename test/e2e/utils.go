@@ -70,6 +70,25 @@ func newContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*
 	return cntr, nil
 }
 
+func updateContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*operatorv1alpha1.Contour, error) {
+	desired := objcontour.New(cfg)
+	cntr := &operatorv1alpha1.Contour{}
+	key := types.NamespacedName{
+		Namespace: cfg.Namespace,
+		Name:      cfg.Name,
+	}
+	if err := cl.Get(ctx, key, cntr); err != nil {
+		return nil, err
+	}
+
+	cntr.Spec = desired.Spec
+
+	if err := cl.Update(ctx, cntr); err != nil {
+		return cntr, err
+	}
+	return cntr, nil
+}
+
 func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
 	cntr := &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{
@@ -273,6 +292,11 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeo
 		if err := cl.Get(ctx, nsName, cntr); err != nil {
 			return false, nil
 		}
+
+		if cntr.Status.AvailableContours != cntr.Spec.Replicas {
+			return false, nil
+		}
+
 		expected := conditionMap(conditions...)
 		current := conditionMap(cntr.Status.Conditions...)
 		return conditionsMatchExpected(expected, current), nil

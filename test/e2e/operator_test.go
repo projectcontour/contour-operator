@@ -372,7 +372,10 @@ func TestContourClusterIPService(t *testing.T) {
 	t.Logf("observed the deletion of namespace %s", specNs)
 }
 
-func TestContourSpecNs(t *testing.T) {
+// TestContourSpec tests some spec changes such as:
+// - Enable RemoveNs.
+// - Increase replicas to 3.
+func TestContourSpec(t *testing.T) {
 	testName := "test-user-contour"
 	cfg := objcontour.Config{
 		Name:        testName,
@@ -403,6 +406,15 @@ func TestContourSpecNs(t *testing.T) {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
+
+	cfg.Replicas = 3
+	if _, err := updateContour(ctx, kclient, cfg); err != nil {
+		t.Fatalf("failed to update contour %s/%s: %v", operatorNs, testName, err)
+	}
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
@@ -520,12 +532,6 @@ func TestGateway(t *testing.T) {
 		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
 	}
 
-	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
-	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
-
 	// Create the gateway namespace if it doesn't exist.
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
@@ -545,6 +551,12 @@ func TestGateway(t *testing.T) {
 	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -631,12 +643,6 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
 	}
 
-	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
-	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
-
 	// Create the gateway namespace if it doesn't exist.
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
@@ -656,6 +662,12 @@ func TestGatewayClusterIP(t *testing.T) {
 	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -809,12 +821,6 @@ func TestGatewayOwnership(t *testing.T) {
 		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
 	}
 
-	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
-	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
-
 	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
 	// https://github.com/projectcontour/contour-operator/issues/241
 	gwName := "contour"
@@ -827,6 +833,12 @@ func TestGatewayOwnership(t *testing.T) {
 	if err := waitForGatewayStatusConditions(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
 
 	gateways := []string{nonOwnedGateway, gwName}
 	for _, gw := range gateways {
