@@ -5936,6 +5936,22 @@ rules:
   - get
   - update
 - apiGroups:
+  - networking.x-k8s.io
+  resources:
+  - tcproutes
+  - udproutes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.x-k8s.io
+  resources:
+  - tcproutes/status
+  - udproutes/status
+  verbs:
+  - update
+- apiGroups:
   - operator.projectcontour.io
   resources:
   - contours
