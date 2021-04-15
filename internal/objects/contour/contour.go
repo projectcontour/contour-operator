@@ -30,6 +30,7 @@ type Config struct {
 	Namespace    string
 	SpecNs       string
 	RemoveNs     bool
+	Replicas     int32
 	NetworkType  operatorv1alpha1.NetworkPublishingType
 	GatewayClass *string
 }
@@ -44,6 +45,7 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 			Name:      cfg.Name,
 		},
 		Spec: operatorv1alpha1.ContourSpec{
+			Replicas: cfg.Replicas,
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name:             cfg.SpecNs,
 				RemoveOnDeletion: cfg.RemoveNs,
