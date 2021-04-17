@@ -25,11 +25,12 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -38,12 +39,18 @@ const (
 	operatorName = "contour_operator"
 )
 
+// Clients holds the API clients required by Operator.
+type Client struct {
+	client.Client
+	meta.RESTMapper
+}
+
 // Operator is the scaffolding for the contour operator. It sets up dependencies
 // and defines the topology of the operator and its managed components, wiring
 // them together. Operator knows what specific resource types should produce
 // operator events.
 type Operator struct {
-	client  client.Client
+	client  Client
 	manager manager.Manager
 	log     logr.Logger
 }
@@ -92,9 +99,14 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 		return nil, fmt.Errorf("failed to create contour controller: %w", err)
 	}
 
+	restMapper, err := apiutil.NewDiscoveryRESTMapper(cliCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Operator{
 		manager: mgr,
-		client:  mgr.GetClient(),
+		client:  Client{mgr.GetClient(), restMapper},
 		log:     ctrl.Log.WithName(operatorName),
 	}, nil
 }
@@ -102,7 +114,7 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 // Start creates Gateway API controllers (if configured) and starts the operator
 // synchronously until a message is received from ctx.
 func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) error {
-	if err := o.createGatewayControllers(ctx, opCfg); err != nil {
+	if err := o.createGatewayControllers(opCfg); err != nil {
 		return fmt.Errorf("failed to create gateway controllers: %w", err)
 	}
 
@@ -121,8 +133,8 @@ func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) erro
 }
 
 // createGatewayControllers creates Gateway and GatewayClass controllers.
-func (o *Operator) createGatewayControllers(ctx context.Context, opCfg *operatorconfig.Config) error {
-	if !o.gatewayCRDsExist(ctx) {
+func (o *Operator) createGatewayControllers(opCfg *operatorconfig.Config) error {
+	if !o.gatewayCRDsExist() {
 		o.log.Info("Gateway CRDs not found; starting operator without gateway controllers")
 	} else {
 		// Create and register the gatewayclass controller with the operator manager.
@@ -142,44 +154,38 @@ func (o *Operator) createGatewayControllers(ctx context.Context, opCfg *operator
 }
 
 // gatewayCRDsExist returns nil if Gateway CRDs exist.
-func (o *Operator) gatewayCRDsExist(ctx context.Context) bool {
-	gc := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gatewayclasses.networking.x-k8s.io",
-		},
-	}
-	gw := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gateways.networking.x-k8s.io",
-		},
-	}
-	httproute := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "httproutes.networking.x-k8s.io",
-		},
-	}
-	tlsroute := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tlsroutes.networking.x-k8s.io",
-		},
-	}
-	bp := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "backendpolicies.networking.x-k8s.io",
-		},
-	}
-	// The list omits TCP and UDP routes since they're unsupported by Contour.
-	crds := []*apiextensionsv1.CustomResourceDefinition{gc, gw, httproute, tlsroute, bp}
-	for i, crd := range crds {
-		key := types.NamespacedName{Name: crd.Name}
-		if err := o.client.Get(ctx, key, crds[i]); err != nil {
+func (o *Operator) gatewayCRDsExist() bool {
+	for _, gvr := range GatewayAPIResources() {
+		_, err := o.client.KindFor(gvr)
+		if meta.IsNoMatchError(err) {
 			return false
 		}
 	}
 	return true
+}
+
+// GatewayAPIResources for Operator.
+// The list omits TCP and UDP routes since they're unsupported by operator.
+func GatewayAPIResources() []schema.GroupVersionResource {
+	return []schema.GroupVersionResource{{
+		Group:    gatewayv1alpha1.GroupVersion.Group,
+		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Resource: "gatewayclasses",
+	}, {
+		Group:    gatewayv1alpha1.GroupVersion.Group,
+		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Resource: "gateways",
+	}, {
+		Group:    gatewayv1alpha1.GroupVersion.Group,
+		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Resource: "httproutes",
+	}, {
+		Group:    gatewayv1alpha1.GroupVersion.Group,
+		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Resource: "backendpolicies",
+	}, {
+		Group:    gatewayv1alpha1.GroupVersion.Group,
+		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Resource: "tlsroutes",
+	}}
 }
