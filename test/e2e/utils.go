@@ -297,6 +297,11 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeo
 			return false, nil
 		}
 
+		envoyReplicas, err := envoyReplicas(ctx, cl, cntr.Spec.Namespace.Name)
+		if err != nil || cntr.Status.AvailableEnvoys != envoyReplicas {
+			return false, nil
+		}
+
 		expected := conditionMap(conditions...)
 		current := conditionMap(cntr.Status.Conditions...)
 		return conditionsMatchExpected(expected, current), nil
@@ -673,4 +678,18 @@ func envoyClusterIP(ctx context.Context, cl client.Client, ns, name string) (str
 		return svc.Spec.ClusterIP, nil
 	}
 	return "", fmt.Errorf("service %s/%s does not have a clusterIP", ns, name)
+}
+
+// envoyReplicas returns the number of envoy pods running by numberReady in daemonset status.
+func envoyReplicas(ctx context.Context, cl client.Client, ns string) (int32, error) {
+	ds := &appsv1.DaemonSet{}
+	key := types.NamespacedName{
+		Namespace: ns,
+		Name:      "envoy",
+	}
+	if err := cl.Get(ctx, key, ds); err != nil {
+		return 0, fmt.Errorf("failed to get daemonset %s/envoy: %v", ns, err)
+
+	}
+	return ds.Status.NumberReady, nil
 }
