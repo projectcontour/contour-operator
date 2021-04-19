@@ -133,7 +133,7 @@ func TestDefaultContour(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
@@ -181,7 +181,7 @@ func TestDefaultContour(t *testing.T) {
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
@@ -259,7 +259,7 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
@@ -360,7 +360,7 @@ func TestContourClusterIPService(t *testing.T) {
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
@@ -393,7 +393,7 @@ func TestContourSpec(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
@@ -414,7 +414,7 @@ func TestContourSpec(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
@@ -474,7 +474,7 @@ func TestMultipleContours(t *testing.T) {
 		if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 		}
-		t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 	}
 
 	// Scrape the operator logs for error messages.
@@ -496,11 +496,11 @@ func TestMultipleContours(t *testing.T) {
 		t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 		// Verify the user-defined namespace was removed by the operator.
-		specNs = fmt.Sprintf("%s-ns", testName)
-		if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, specNs); err != nil {
-			t.Fatalf("failed to observe the deletion of namespace %s: %v", specNs, err)
+		ns := fmt.Sprintf("%s-ns", testName)
+		if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, ns); err != nil {
+			t.Fatalf("failed to observe the deletion of namespace %s: %v", ns, err)
 		}
-		t.Logf("observed the deletion of namespace %s", specNs)
+		t.Logf("observed the deletion of namespace %s", ns)
 	}
 }
 
@@ -556,7 +556,7 @@ func TestGateway(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -603,7 +603,7 @@ func TestGateway(t *testing.T) {
 	}
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
@@ -667,7 +667,7 @@ func TestGatewayClusterIP(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -749,7 +749,7 @@ func TestGatewayClusterIP(t *testing.T) {
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
@@ -838,7 +838,7 @@ func TestGatewayOwnership(t *testing.T) {
 	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", testName, operatorNs)
+	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	gateways := []string{nonOwnedGateway, gwName}
 	for _, gw := range gateways {
@@ -863,7 +863,7 @@ func TestGatewayOwnership(t *testing.T) {
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete contour %s/envoy: %v", specNs, err)
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
 	}
 	t.Logf("cleaned up envoy service %s/envoy", specNs)
 
