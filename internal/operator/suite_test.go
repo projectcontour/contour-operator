@@ -181,17 +181,20 @@ var _ = Describe("Run controller", func() {
 
 			// Update the contour
 			By("By updating a contour spec")
-			updated := &operatorv1alpha1.Contour{}
-			Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
 			updatedReplicas := int32(1)
 			updatedNs := defaultNamespace + "-updated"
 			updatedRemoveNs := true
-			updated.Spec.IngressClassName = &testIngressClass
-			updated.Spec.Replicas = updatedReplicas
-			updated.Spec.Namespace.Name = updatedNs
-			updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
-			updated.Spec.GatewayClassRef = &gc.Name
-			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
+			Eventually(func() error {
+				updated := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
+				updated.Spec.IngressClassName = &testIngressClass
+				updated.Spec.Replicas = updatedReplicas
+				updated.Spec.Namespace.Name = updatedNs
+				updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
+				updated.Spec.GatewayClassRef = &gc.Name
+
+				return operator.client.Update(ctx, updated)
+			}).Should(Succeed())
 
 			// Create the GatewayClass referenced by the test Contour.
 			By("By creating a gatewayclass")
@@ -233,9 +236,12 @@ var _ = Describe("Run controller", func() {
 			}, timeout, interval).Should(Equal(gc.Name))
 
 			// Remove the GatewayClass reference
-			Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
-			updated.Spec.GatewayClassRef = nil
-			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
+			Eventually(func() error {
+				updated := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
+				updated.Spec.GatewayClassRef = nil
+				return operator.client.Update(ctx, updated)
+			}).Should(Succeed())
 
 			// Delete the GatewayClass referenced by the test Contour.
 			By("By deleting a gatewayclass")
@@ -285,10 +291,12 @@ var _ = Describe("Run controller", func() {
 			}, timeout, interval).Should(ContainElement(finalizer))
 
 			By("Resetting the contour finalizer")
-			updated := &operatorv1alpha1.Contour{}
-			Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
-			updated.Finalizers = slice.RemoveString(updated.Finalizers, finalizer)
-			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
+			Eventually(func() error {
+				updated := &operatorv1alpha1.Contour{}
+				Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
+				updated.Finalizers = slice.RemoveString(updated.Finalizers, finalizer)
+				return operator.client.Update(ctx, updated)
+			}).Should(Succeed())
 
 			By("Expecting the contour to be re-finalized")
 			Eventually(func() []string {
