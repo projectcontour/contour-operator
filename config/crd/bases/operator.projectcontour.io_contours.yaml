@@ -196,6 +196,53 @@ spec:
                             - External
                             type: string
                         type: object
+                      nodePorts:
+                        description: "NodePorts is a list of network ports to expose
+                          on each node's IP at a static port number using a NodePort
+                          Service. Present only if type is NodePortService. A ClusterIP
+                          Service, which the NodePort Service routes to, is automatically
+                          created. You'll be able to contact the NodePort Service,
+                          from outside the cluster, by requesting <NodeIP>:<NodePort>.
+                          \n If type is NodePortService and nodePorts is unspecified,
+                          two nodeports will be created, one named \"http\" and the
+                          other named \"https\", with port numbers auto assigned by
+                          Kubernetes API server. For additional information on the
+                          NodePort Service, see: \n  https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+                          \n Names and port numbers must be unique in the list. Two
+                          ports must be specified, one named \"http\" for Envoy's
+                          insecure service and one named \"https\" for Envoy's secure
+                          service."
+                        items:
+                          description: NodePort is the schema to specify a network
+                            port for a NodePort Service.
+                          properties:
+                            name:
+                              description: Name is an IANA_SVC_NAME within the NodePort
+                                Service.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            portNumber:
+                              description: "PortNumber is the network port number
+                                to expose for the NodePort Service. If unspecified,
+                                a port number will be assigned from the the cluster's
+                                nodeport service range, i.e. --service-node-port-range
+                                flag (default: 30000-32767). \n If specified, the
+                                number must: \n 1. Not be used by another NodePort
+                                Service. 2. Be within the cluster's nodeport service
+                                range, i.e. --service-node-port-range    flag (default:
+                                30000-32767). 3. Be a valid network port number, i.e.
+                                greater than 0 and less than 65536."
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                          required:
+                          - name
+                          type: object
+                        maxItems: 2
+                        minItems: 2
+                        type: array
                       type:
                         default: LoadBalancerService
                         description: "Type is the type of publishing strategy to use.

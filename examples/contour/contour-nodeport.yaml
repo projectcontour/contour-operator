@@ -6,3 +6,9 @@ spec:
   networkPublishing:
     envoy:
       type: NodePortService
+      # nodePorts are auto-assigned by k8s if unspecified.
+      nodePorts:
+        - name: http
+          portNumber: 30080
+        - name: https
+          portNumber: 30443

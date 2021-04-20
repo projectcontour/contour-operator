@@ -274,8 +274,17 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		}
 	case operatorv1alpha1.NodePortServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeNodePort
-		svc.Spec.Ports[0].NodePort = EnvoyNodePortHTTPPort
-		svc.Spec.Ports[1].NodePort = EnvoyNodePortHTTPSPort
+		if len(contour.Spec.NetworkPublishing.Envoy.NodePorts) > 0 {
+			for _, p := range contour.Spec.NetworkPublishing.Envoy.NodePorts {
+				if p.PortNumber != nil {
+					for i, q := range svc.Spec.Ports {
+						if q.Name == p.Name {
+							svc.Spec.Ports[i].NodePort = *p.PortNumber
+						}
+					}
+				}
+			}
+		}
 	case operatorv1alpha1.ClusterIPServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeClusterIP
 	}
@@ -336,19 +345,22 @@ func updateContourServiceIfNeeded(ctx context.Context, cli client.Client, contou
 // using contour to verify the existence of owner labels.
 func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, current, desired *corev1.Service) error {
 	if labels.Exist(current, objcontour.OwnerLabels(contour)) {
-		updated := false
+		// Using the Service returned by the equality pkg instead of the desired
+		// parameter since clusterIP is immutable.
+		var updated *corev1.Service
+		needed := false
 		switch contour.Spec.NetworkPublishing.Envoy.Type {
 		case operatorv1alpha1.NodePortServicePublishingType:
-			_, updated = equality.NodePortServiceChanged(current, desired)
+			updated, needed = equality.NodePortServiceChanged(current, desired)
 		case operatorv1alpha1.ClusterIPServicePublishingType:
-			_, updated = equality.ClusterIPServiceChanged(current, desired)
+			updated, needed = equality.ClusterIPServiceChanged(current, desired)
 		// Add additional network publishing types as they are introduced.
 		default:
 			// LoadBalancerService is the default network publishing type.
-			_, updated = equality.LoadBalancerServiceChanged(current, desired)
+			updated, needed = equality.LoadBalancerServiceChanged(current, desired)
 		}
-		if updated {
-			if err := cli.Update(ctx, desired); err != nil {
+		if needed {
+			if err := cli.Update(ctx, updated); err != nil {
 				return fmt.Errorf("failed to update service %s/%s: %w", desired.Namespace, desired.Name, err)
 			}
 			return nil
