@@ -22,7 +22,6 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/pkg/labels"
 
-	projectcontourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,6 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+)
+
+const (
+	contourV1GroupName = "projectcontour.io"
 )
 
 // EnsureClusterRole ensures a ClusterRole resource exists with the provided name
@@ -63,7 +66,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	groupNet := []string{networkingv1.GroupName}
 	groupGateway := []string{gatewayv1alpha1.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
-	groupContour := []string{projectcontourv1.GroupName}
+	groupContour := []string{contourV1GroupName}
 	verbCGU := []string{"create", "get", "update"}
 	verbGLW := []string{"get", "list", "watch"}
 	verbGLWU := []string{"get", "list", "watch", "update"}

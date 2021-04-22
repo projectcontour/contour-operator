@@ -18,6 +18,7 @@ This section describes how to build Contour Operator from source.
 2. [Kustomize](https://kustomize.io/)
 3. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 4. [Make](https://www.gnu.org/software/make/)
+5. [kubebuilder](https://book.kubebuilder.io/quick-start.html#installation)
 
 ### Fetch the source
 
