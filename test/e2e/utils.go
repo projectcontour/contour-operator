@@ -693,3 +693,70 @@ func envoyReplicas(ctx context.Context, cl client.Client, ns string) (int32, err
 	}
 	return ds.Status.NumberReady, nil
 }
+
+func getDeployment(ctx context.Context, cl client.Client, name, ns string) (*appsv1.Deployment, error) {
+	deploy := &appsv1.Deployment{}
+	key := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	if err := cl.Get(ctx, key, deploy); err != nil {
+		return nil, fmt.Errorf("failed to get deployment %s/%s: %v", ns, name, err)
+	}
+	return deploy, nil
+}
+
+func getDeploymentImage(ctx context.Context, cl client.Client, name, ns, container string) (string, error) {
+	deploy, err := getDeployment(ctx, cl, name, ns)
+	if err != nil {
+		return "", fmt.Errorf("failed to get deployment %s/%s: %v", ns, name, err)
+	}
+	for _, c := range deploy.Spec.Template.Spec.Containers {
+		if c.Name == container {
+			return c.Image, nil
+		}
+	}
+	return "", fmt.Errorf("failed to find container %s in deployment %s/%s", container, ns, name)
+}
+
+func setDeploymentImage(ctx context.Context, cl client.Client, name, ns, container, image string) error {
+	deploy, err := getDeployment(ctx, cl, name, ns)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment %s/%s: %v", ns, name, err)
+	}
+	updated := deploy.DeepCopy()
+	for i, c := range updated.Spec.Template.Spec.Containers {
+		if c.Name == container {
+			updated.Spec.Template.Spec.Containers[i].Image = image
+			if err := cl.Update(ctx, updated); err != nil {
+				return fmt.Errorf("failed to update deployment %s/%s: %v", updated.Namespace, updated.Name, err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("failed to find container %s in deployment %s/%s", container, ns, name)
+}
+
+// waitForImage waits for all pods identified by key/val labels in namespace ns to contain
+// the expected image for the provided container until timeout is reached.
+func waitForImage(ctx context.Context, cl client.Client, timeout time.Duration, ns, key, val, container, expected string) error {
+	pods := &corev1.PodList{}
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.List(ctx, pods, client.MatchingLabels{key: val}, client.InNamespace(ns)); err != nil {
+			return false, nil
+		}
+		for _, p := range pods.Items {
+			for _, c := range p.Spec.Containers {
+				if c.Name == container && c.Image != expected {
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
