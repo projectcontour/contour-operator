@@ -876,3 +876,173 @@ func TestGatewayOwnership(t *testing.T) {
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }
+
+// TestOperatorUpgrade tests an instance of the Contour custom resource while
+// upgrading the operator from release "latest" to main.
+func TestOperatorUpgrade(t *testing.T) {
+	// Get the current image to use for upgrade testing.
+	current, err := getDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName)
+	if err != nil {
+		t.Fatalf("failed to get image for deployment %s/%s", operatorNs, operatorName)
+	}
+	// Ensure the current image is not the "latest" release.
+	latest := "docker.io/projectcontour/contour-operator:latest"
+	if current == latest {
+		t.Fatalf("unexpected image %s for deployment %s/%s", current, operatorNs, operatorName)
+	}
+	t.Logf("found image %s for deployment %s/%s", current, operatorNs, operatorName)
+
+	// Set the operator image as "latest" to simulate the previous release.
+	if err := setDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName, latest); err != nil {
+		t.Fatalf("failed to set image %s for deployment %s/%s: %v", latest, operatorNs, operatorName, err)
+	}
+	t.Logf("set image %s for deployment %s/%s", latest, operatorNs, operatorName)
+
+	// Wait for the operator container to use image "latest".
+	if err := waitForImage(ctx, kclient, 3*time.Minute, operatorNs, "control-plane", operatorName, operatorName, latest); err != nil {
+		t.Fatalf("failed to observe image %s for deployment %s/%s: %v", latest, operatorNs, operatorName, err)
+	}
+	t.Logf("observed image %s for deployment %s/%s", latest, operatorNs, operatorName)
+
+	testName := "upgrade"
+	contourName := fmt.Sprintf("%s-contour", testName)
+	cfg := objcontour.Config{
+		Name:        contourName,
+		Namespace:   operatorNs,
+		RemoveNs:    true,
+		SpecNs:      specNs,
+		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
+	}
+
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, contourName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
+
+	// Create a sample workload for e2e testing.
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
+
+	// Wait for the sample workload to become available.
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
+
+	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+	}
+	t.Logf("created ingress %s/%s", specNs, appName)
+
+	// Create the client pod to test connectivity to the sample workload.
+	cliName := "test-client"
+	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
+	if err != nil {
+		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
+	}
+	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
+		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
+	}
+	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
+
+	// Get the Envoy ClusterIP to curl.
+	svcName := "envoy"
+	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
+	if err != nil {
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
+	}
+
+	// Curl the ingress from the client pod.
+	url := fmt.Sprintf("http://%s/", ip)
+	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
+	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
+	resp := "200"
+	// Polling until success since network seems not ready.
+	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
+	// TODO: remove wait.PollImmediate.
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+			t.Logf("observed unexpected error: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
+	}
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+
+	// Scrape the operator logs for error messages.
+	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// Simulate an upgrade from the previous release, i.e. image "latest", to the current release.
+	if err := setDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName, current); err != nil {
+		t.Fatalf("failed to set image %s for deployment %s/%s: %v", latest, operatorNs, operatorName, err)
+	}
+	t.Logf("set image %s for deployment %s/%s", current, operatorNs, operatorName)
+
+	// Wait for the operator container to use the updated image.
+	if err := waitForImage(ctx, kclient, 3*time.Minute, operatorNs, "control-plane", operatorName, operatorName, current); err != nil {
+		t.Fatalf("failed to observe image %s for deployment %s/%s: %v", current, operatorNs, operatorName, err)
+	}
+	t.Logf("observed image %s for deployment %s/%s", current, operatorNs, operatorName)
+
+	// Wait for the contour containers to use the "main" tag.
+	main := "docker.io/projectcontour/contour:main"
+	if err := waitForImage(ctx, kclient, 3*time.Minute, cfg.SpecNs, "app", "contour", "contour", main); err != nil {
+		t.Fatalf("failed to observe image %s for deployment %s/contour: %v", main, cfg.SpecNs, err)
+	}
+	t.Logf("observed image %s for deployment %s/contour", main, cfg.SpecNs)
+
+	// Polling until success since the envoy daemonset may still be performing the rolling update.
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+			t.Logf("observed unexpected error: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
+	}
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+
+	// Scrape the operator logs for error messages.
+	found, err = parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// Ensure the contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
+	}
+}
