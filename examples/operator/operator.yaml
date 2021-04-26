@@ -561,7 +561,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
   name: extensionservices.projectcontour.io
 spec:
@@ -1851,7 +1851,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
   name: httpproxies.projectcontour.io
 spec:
@@ -1949,6 +1949,12 @@ spec:
                                   value must not be equal to. The condition is true
                                   if the header has any other value.
                                 type: string
+                              notpresent:
+                                description: NotPresent specifies that condition is
+                                  true when the named header is not present. Note
+                                  that setting NotPresent to false does not make the
+                                  condition true if the named header is present.
+                                type: boolean
                               present:
                                 description: Present specifies that condition is true
                                   when the named header is present, regardless of
@@ -2036,6 +2042,12 @@ spec:
                                   value must not be equal to. The condition is true
                                   if the header has any other value.
                                 type: string
+                              notpresent:
+                                description: NotPresent specifies that condition is
+                                  true when the named header is not present. Note
+                                  that setting NotPresent to false does not make the
+                                  condition true if the named header is present.
+                                type: boolean
                               present:
                                 description: Present specifies that condition is true
                                   when the named header is present, regardless of
@@ -2239,6 +2251,94 @@ spec:
                                               description: HeaderName defines the
                                                 name of the header to look for on
                                                 the request.
+                                              minLength: 1
+                                              type: string
+                                          type: object
+                                        requestHeaderValueMatch:
+                                          description: RequestHeaderValueMatch defines
+                                            a descriptor entry that's populated if
+                                            the request's headers match a set of 1+
+                                            match criteria. The descriptor key is
+                                            "header_match", and the descriptor value
+                                            is static.
+                                          properties:
+                                            expectMatch:
+                                              default: true
+                                              description: ExpectMatch defines whether
+                                                the request must positively match
+                                                the match criteria in order to generate
+                                                a descriptor entry (i.e. true), or
+                                                not match the match criteria in order
+                                                to generate a descriptor entry (i.e.
+                                                false). The default is true.
+                                              type: boolean
+                                            headers:
+                                              description: Headers is a list of 1+
+                                                match criteria to apply against the
+                                                request to determine whether to populate
+                                                the descriptor entry or not.
+                                              items:
+                                                description: HeaderMatchCondition
+                                                  specifies how to conditionally match
+                                                  against HTTP headers. The Name field
+                                                  is required, but only one of the
+                                                  remaining fields should be be provided.
+                                                properties:
+                                                  contains:
+                                                    description: Contains specifies
+                                                      a substring that must be present
+                                                      in the header value.
+                                                    type: string
+                                                  exact:
+                                                    description: Exact specifies a
+                                                      string that the header value
+                                                      must be equal to.
+                                                    type: string
+                                                  name:
+                                                    description: Name is the name
+                                                      of the header to match against.
+                                                      Name is required. Header names
+                                                      are case insensitive.
+                                                    type: string
+                                                  notcontains:
+                                                    description: NotContains specifies
+                                                      a substring that must not be
+                                                      present in the header value.
+                                                    type: string
+                                                  notexact:
+                                                    description: NoExact specifies
+                                                      a string that the header value
+                                                      must not be equal to. The condition
+                                                      is true if the header has any
+                                                      other value.
+                                                    type: string
+                                                  notpresent:
+                                                    description: NotPresent specifies
+                                                      that condition is true when
+                                                      the named header is not present.
+                                                      Note that setting NotPresent
+                                                      to false does not make the condition
+                                                      true if the named header is
+                                                      present.
+                                                    type: boolean
+                                                  present:
+                                                    description: Present specifies
+                                                      that condition is true when
+                                                      the named header is present,
+                                                      regardless of its value. Note
+                                                      that setting Present to false
+                                                      does not make the condition
+                                                      true if the named header is
+                                                      absent.
+                                                    type: boolean
+                                                required:
+                                                - name
+                                                type: object
+                                              minItems: 1
+                                              type: array
+                                            value:
+                                              description: Value defines the value
+                                                of the descriptor entry.
                                               minLength: 1
                                               type: string
                                           type: object
@@ -2824,7 +2924,7 @@ spec:
                     description: This field configures an extension service to perform
                       authorization for this virtual host. Authorization can only
                       be configured on virtual hosts that have TLS enabled. If the
-                      TLS configuration requires client certificate /validation, the
+                      TLS configuration requires client certificate validation, the
                       client certificate is always included in the authentication
                       check request.
                     properties:
@@ -3009,6 +3109,91 @@ spec:
                                             minLength: 1
                                             type: string
                                         type: object
+                                      requestHeaderValueMatch:
+                                        description: RequestHeaderValueMatch defines
+                                          a descriptor entry that's populated if the
+                                          request's headers match a set of 1+ match
+                                          criteria. The descriptor key is "header_match",
+                                          and the descriptor value is static.
+                                        properties:
+                                          expectMatch:
+                                            default: true
+                                            description: ExpectMatch defines whether
+                                              the request must positively match the
+                                              match criteria in order to generate
+                                              a descriptor entry (i.e. true), or not
+                                              match the match criteria in order to
+                                              generate a descriptor entry (i.e. false).
+                                              The default is true.
+                                            type: boolean
+                                          headers:
+                                            description: Headers is a list of 1+ match
+                                              criteria to apply against the request
+                                              to determine whether to populate the
+                                              descriptor entry or not.
+                                            items:
+                                              description: HeaderMatchCondition specifies
+                                                how to conditionally match against
+                                                HTTP headers. The Name field is required,
+                                                but only one of the remaining fields
+                                                should be be provided.
+                                              properties:
+                                                contains:
+                                                  description: Contains specifies
+                                                    a substring that must be present
+                                                    in the header value.
+                                                  type: string
+                                                exact:
+                                                  description: Exact specifies a string
+                                                    that the header value must be
+                                                    equal to.
+                                                  type: string
+                                                name:
+                                                  description: Name is the name of
+                                                    the header to match against. Name
+                                                    is required. Header names are
+                                                    case insensitive.
+                                                  type: string
+                                                notcontains:
+                                                  description: NotContains specifies
+                                                    a substring that must not be present
+                                                    in the header value.
+                                                  type: string
+                                                notexact:
+                                                  description: NoExact specifies a
+                                                    string that the header value must
+                                                    not be equal to. The condition
+                                                    is true if the header has any
+                                                    other value.
+                                                  type: string
+                                                notpresent:
+                                                  description: NotPresent specifies
+                                                    that condition is true when the
+                                                    named header is not present. Note
+                                                    that setting NotPresent to false
+                                                    does not make the condition true
+                                                    if the named header is present.
+                                                  type: boolean
+                                                present:
+                                                  description: Present specifies that
+                                                    condition is true when the named
+                                                    header is present, regardless
+                                                    of its value. Note that setting
+                                                    Present to false does not make
+                                                    the condition true if the named
+                                                    header is absent.
+                                                  type: boolean
+                                              required:
+                                              - name
+                                              type: object
+                                            minItems: 1
+                                            type: array
+                                          value:
+                                            description: Value defines the value of
+                                              the descriptor entry.
+                                            minLength: 1
+                                            type: string
+                                        type: object
                                     type: object
                                   minItems: 1
                                   type: array
@@ -3087,9 +3272,12 @@ spec:
                         description: "ClientValidation defines how to verify the client
                           certificate when an external client establishes a TLS connection
                           to Envoy. \n This setting: \n 1. Enables TLS client certificate
-                          validation. 2. Requires clients to present a TLS certificate
-                          (i.e. not optional validation). 3. Specifies how the client
-                          certificate will be validated."
+                          validation. 2. Specifies how the client certificate will
+                          be validated (i.e.    validation required or skipped). \n
+                          Note: Setting client certificate validation to be skipped
+                          should be only used in conjunction with an external authorization
+                          server that performs client validation as Contour will ensure
+                          client certificates are passed along."
                         properties:
                           caSecret:
                             description: Name of a Kubernetes secret that contains
@@ -3097,8 +3285,17 @@ spec:
                               validate against the certificates in the bundle.
                             minLength: 1
                             type: string
-                        required:
-                        - caSecret
+                          skipClientCertValidation:
+                            description: SkipClientCertValidation disables downstream
+                              client certificate validation. Defaults to false. This
+                              field is intended to be used in conjunction with external
+                              authorization in order to enable the external authorization
+                              server to validate client certificates. When this field
+                              is set to true, client certificates are requested but
+                              not verified by Envoy. If external authorization is
+                              in use, they are presented to the external authorization
+                              server.
+                            type: boolean
                         type: object
                       enableFallbackCertificate:
                         description: EnableFallbackCertificate defines if the vhost
@@ -4708,7 +4905,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
   name: tlscertificatedelegations.projectcontour.io
 spec:
