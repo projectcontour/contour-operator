@@ -9,6 +9,7 @@
 readonly KIND=${KIND:-kind}
 readonly KUBECTL=${KUBECTL:-kubectl}
 
+readonly NODEIMAGE=${NODEIMAGE:-"docker.io/kindest/node:v1.20.2"}
 readonly CLUSTER=${CLUSTER:-contour}
 
 readonly HERE=$(cd $(dirname $0) && pwd)
@@ -56,6 +57,7 @@ EOF
 kind::cluster::create() {
     ${KIND} create cluster \
         --config <(kind::cluster::config) \
+        --image "${NODEIMAGE}" \
         --name ${CLUSTER} \
         --wait 5m
 }
