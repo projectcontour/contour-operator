@@ -32,6 +32,24 @@ jobs:
           CODECOV_NAME=coverage.out bash <(curl -s https://codecov.io/bash)
   test-example-linux:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # use stable kubernetes_version values since they're included
+        # in the name of the GitHub Actions job, and we don't want to
+        # have to update branch protection rules every time we change
+        # a Kubernetes version number.
+        kubernetes_version: ["kubernetes:latest", "kubernetes:n-1", "kubernetes:n-2"]
+        # include defines an additional variable (the specific node
+        # image to use) for each kubernetes_version value.
+        include:
+          - kubernetes_version: "kubernetes:latest"
+            # TODO: Use official upstream image once it is available
+            # See https://github.com/projectcontour/contour/issues/3610
+            node_image: "docker.io/stevesloka/kind-node:v1.21.0"
+          - kubernetes_version: "kubernetes:n-1"
+            node_image: "docker.io/kindest/node:v1.20.2"
+          - kubernetes_version: "kubernetes:n-2"
+            node_image: "docker.io/kindest/node:v1.19.7"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
@@ -44,13 +62,29 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-example
         env:
-          # TODO: Use official upstream image once it is available
-          # See https://github.com/projectcontour/contour/issues/3610
-          NODEIMAGE: "stevesloka/kind-node:v1.21.0"
+          NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image example test-example
   test-e2e-linux:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # use stable kubernetes_version values since they're included
+        # in the name of the GitHub Actions job, and we don't want to
+        # have to update branch protection rules every time we change
+        # a Kubernetes version number.
+        kubernetes_version: ["kubernetes:latest", "kubernetes:n-1", "kubernetes:n-2"]
+        # include defines an additional variable (the specific node
+        # image to use) for each kubernetes_version value.
+        include:
+          - kubernetes_version: "kubernetes:latest"
+            # TODO: Use official upstream image once it is available
+            # See https://github.com/projectcontour/contour/issues/3610
+            node_image: "docker.io/stevesloka/kind-node:v1.21.0"
+          - kubernetes_version: "kubernetes:n-1"
+            node_image: "docker.io/kindest/node:v1.20.2"
+          - kubernetes_version: "kubernetes:n-2"
+            node_image: "docker.io/kindest/node:v1.19.7"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
@@ -63,9 +97,7 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-e2e
         env:
-          # TODO: Use official upstream image once it is available
-          # See https://github.com/projectcontour/contour/issues/3610
-          NODEIMAGE: "stevesloka/kind-node:v1.21.0"
+          NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image test-e2e
   codespell:
