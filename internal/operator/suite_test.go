@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -76,8 +77,8 @@ var (
 			ParametersRef: &gatewayv1alpha1.ParametersReference{
 				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
 				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
-				Scope:     "Namespace",
-				Namespace: testOperatorNs,
+				Scope:     pointer.StringPtr("Namespace"),
+				Namespace: pointer.StringPtr(testOperatorNs),
 				Name:      testContourName,
 			},
 		},

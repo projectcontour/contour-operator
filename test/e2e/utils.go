@@ -254,9 +254,9 @@ func newIngress(ctx context.Context, cl client.Client, name, ns, backendName str
 }
 
 func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
-	rootPrefix := gatewayv1alpha1.HTTPPathMatch{
-		Type:  gatewayv1alpha1.PathMatchPrefix,
-		Value: "/",
+	rootPrefix := &gatewayv1alpha1.HTTPPathMatch{
+		Type:  pathMatchTypePtr(gatewayv1alpha1.PathMatchPrefix),
+		Value: pointer.StringPtr("/"),
 	}
 	fwdPort := gatewayv1alpha1.PortNumber(svcPort)
 	svcFwd := gatewayv1alpha1.HTTPRouteForwardTo{
@@ -673,8 +673,8 @@ func newOperatorGatewayClass(ctx context.Context, cl client.Client, name, contou
 				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
 				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
 				Name:      contourName,
-				Scope:     "Namespace",
-				Namespace: contourNs,
+				Scope:     pointer.StringPtr("Namespace"),
+				Namespace: pointer.StringPtr(contourNs),
 			},
 		},
 	}
@@ -706,7 +706,7 @@ func newGatewayClass(ctx context.Context, cl client.Client, name string) error {
 // route selection. The Gateway will contain an HTTP listener on port 80 and an
 // HTTPS listener on port 443.
 func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string) error {
-	routes := metav1.LabelSelector{
+	routes := &metav1.LabelSelector{
 		MatchLabels: map[string]string{k: v},
 	}
 	http := gatewayv1alpha1.Listener{
@@ -931,4 +931,8 @@ func labelWorkerNodes(ctx context.Context, cl client.Client) error {
 		}
 	}
 	return nil
+}
+
+func pathMatchTypePtr(t gatewayv1alpha1.PathMatchType) *gatewayv1alpha1.PathMatchType {
+	return &t
 }
