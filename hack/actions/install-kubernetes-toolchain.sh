@@ -66,6 +66,9 @@ download \
 tar -C "${DESTDIR}" -xf "${DESTDIR}/kustomize.tgz" kustomize
 rm "${DESTDIR}/kustomize.tgz"
 
-curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERS}/${OS}/amd64 | tar -xz -C /tmp/
+download \
+    "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${KUBEBUILDER_VERS}/kubebuilder_${KUBEBUILDER_VERS}_${OS}_amd64.tar.gz" \
+    "/tmp/kubebuilder.tgz"
+tar -C /tmp/ -xzf /tmp/kubebuilder.tgz
 mv /tmp/kubebuilder_${KUBEBUILDER_VERS}_${OS}_amd64 kubebuilder
 sudo mv kubebuilder /usr/local/
