@@ -128,6 +128,9 @@ spec:
                               type: AWS
                             description: providerParameters contains load balancer information specific to the underlying infrastructure provider.
                             properties:
+                              loadBalancerIP:
+                                description: loadBalancerIP contains IP for LoadBalancer service type, optional
+                                type: string
                               type:
                                 default: AWS
                                 description: type is the underlying infrastructure provider for the load balancer. Allowed values are "AWS", "Azure", and "GCP".

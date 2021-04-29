@@ -266,6 +266,10 @@ type ProviderLoadBalancerParameters struct {
 	// +unionDiscriminator
 	// +kubebuilder:default=AWS
 	Type LoadBalancerProviderType `json:"type,omitempty"`
+
+	// loadBalancerIP contains IP for LoadBalancer service type, optional
+  // +optional
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the

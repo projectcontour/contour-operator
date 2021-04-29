@@ -260,6 +260,9 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	switch epType {
 	case operatorv1alpha1.LoadBalancerServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+		if len(contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.LoadBalancerIP) > 0 {
+			svc.Spec.LoadBalancerIP = contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.LoadBalancerIP
+		}
 		provider := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
 		lbAnnotations := LbAnnotations[provider]
 		for name, value := range lbAnnotations {
