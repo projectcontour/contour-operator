@@ -45,16 +45,10 @@ var (
 	operatorNs = "contour-operator"
 	// specNs is the spec.namespace.name of a Contour.
 	specNs = "projectcontour"
-	// testURL is the url used to test e2e functionality.
-	testURL = "http://local.projectcontour.io/"
 	// expectedDeploymentConditions are the expected status conditions of a
 	// deployment.
 	expectedDeploymentConditions = []appsv1.DeploymentCondition{
 		{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
-	}
-	// expectedPodConditions are the expected status conditions of a pod.
-	expectedPodConditions = []corev1.PodCondition{
-		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
 	}
 	// expectedContourConditions are the expected status conditions of a
 	// contour.
@@ -89,6 +83,8 @@ var (
 	testAppReplicas = 3
 	// opLogMsg is the string used to search operator log messages.
 	opLogMsg = "error"
+	// isKind determines if tests should be tuned to run in a kind cluster.
+	isKind = true
 )
 
 func TestMain(m *testing.M) {
@@ -97,6 +93,17 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	kclient = cl
+
+	isKind, err = isKindCluster(ctx, kclient)
+	if err != nil {
+		os.Exit(1)
+	}
+
+	if isKind {
+		if err := labelWorkerNodes(ctx, kclient); err != nil {
+			os.Exit(1)
+		}
+	}
 
 	os.Exit(m.Run())
 }
@@ -124,11 +131,13 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	svcName := "envoy"
-	if err := updateLbSvcIPAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
-		t.Fatalf("failed to update service %s/%s: %v", specNs, svcName, err)
+	if isKind {
+		svcName := "envoy"
+		if err := updateLbSvcIPAndNodePorts(ctx, kclient, 1*time.Minute, cfg.SpecNs, svcName); err != nil {
+			t.Fatalf("failed to update service %s/%s: %v", cfg.SpecNs, svcName, err)
+		}
+		t.Logf("updated service %s/%s loadbalancer IP and nodeports", cfg.SpecNs, svcName)
 	}
-	t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
 
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
@@ -137,30 +146,49 @@ func TestDefaultContour(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", specNs, appName)
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created service %s/%s", specNs, appName)
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", specNs, appName)
+	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	// testURL is the url used to test e2e functionality.
+	testURL := "http://local.projectcontour.io/"
+
+	if isKind {
+		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	} else {
+		lb, err := waitForIngressLB(ctx, kclient, 1*time.Minute, cfg.SpecNs, appName)
+		if err != nil {
+			t.Fatalf("failed to get ingress %s/%s load-balancer: %v", cfg.SpecNs, appName, err)
+		}
+		t.Logf("ingress %s/%s has load-balancer %s", cfg.SpecNs, appName, lb)
+		testURL = fmt.Sprintf("http://%s/", lb)
+
+		// Curl the ingress from a client pod.
+		cliName := "test-client"
+		if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
 	}
-	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -180,17 +208,17 @@ func TestDefaultContour(t *testing.T) {
 	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
 	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
-		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
+	if err := deleteNamespace(ctx, kclient, 1*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
-	t.Logf("observed the deletion of namespace %s", specNs)
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }
 
 func TestContourNodePortService(t *testing.T) {
@@ -198,7 +226,7 @@ func TestContourNodePortService(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        testName,
 		Namespace:   operatorNs,
-		SpecNs:      specNs,
+		SpecNs:      fmt.Sprintf("%s-nodeport", specNs),
 		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
 	}
@@ -215,27 +243,135 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", specNs, appName)
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created service %s/%s", specNs, appName)
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", specNs, appName)
+	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+	// testURL is the url used to test e2e functionality.
+	testURL := "http://local.projectcontour.io/"
+
+	if isKind {
+		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	} else {
+		// Get the IP of a worker node to test the nodeport service.
+		ip, err := getWorkerNodeIP(ctx, kclient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("using worker node ip %s", ip)
+
+		// Curl the ingress from a client pod.
+		testURL = fmt.Sprintf("http://%s:30080/", ip)
+		cliName := "test-client"
+		if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	}
+
+	// Scrape the operator logs for error messages.
+	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
+	case found:
+		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	default:
+		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
+	}
+
+	// Ensure the default contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("deleted contour %s/%s", operatorNs, testName)
+
+	// Ensure the envoy service is cleaned up automatically.
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
+	}
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
+
+	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
+	// defaults to false.
+	if err := deleteNamespace(ctx, kclient, 1*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
+	}
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
+}
+
+func TestContourClusterIPService(t *testing.T) {
+	testName := "test-clusterip-contour"
+	cfg := objcontour.Config{
+		Name:        testName,
+		Namespace:   operatorNs,
+		SpecNs:      fmt.Sprintf("%s-clusterip", specNs),
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
+	}
+	cntr, err := newContour(ctx, kclient, cfg)
+	if err != nil {
+		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
+	}
+	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
+
+	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
+	}
+	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
+
+	// Create a sample workload for e2e testing.
+	appName := fmt.Sprintf("%s-%s", testAppName, testName)
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
+
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
+
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
+
+	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
+
+	// Get the Envoy ClusterIP to curl.
+	svcName := "envoy"
+	ip, err := envoyClusterIP(ctx, kclient, cfg.SpecNs, svcName)
+	if err != nil {
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", cfg.SpecNs, svcName, err)
+	}
+
+	// Curl the ingress from a client pod.
+	testURL := fmt.Sprintf("http://%s/", ip)
+	cliName := "test-client"
+	if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
 	t.Logf("received http response for %q", testURL)
@@ -258,118 +394,17 @@ func TestContourNodePortService(t *testing.T) {
 	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
 	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
-		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
+	if err := deleteNamespace(ctx, kclient, 1*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
-	t.Logf("observed the deletion of namespace %s", specNs)
-}
-
-func TestContourClusterIPService(t *testing.T) {
-	testName := "test-clusterip-contour"
-	cfg := objcontour.Config{
-		Name:        testName,
-		Namespace:   operatorNs,
-		SpecNs:      specNs,
-		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
-	}
-	cntr, err := newContour(ctx, kclient, cfg)
-	if err != nil {
-		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
-	}
-	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
-
-	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
-	}
-	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
-
-	// Create a sample workload for e2e testing.
-	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
-	}
-	t.Logf("created deployment %s/%s", specNs, appName)
-
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
-	}
-	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
-
-	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
-	}
-	t.Logf("created service %s/%s", specNs, appName)
-
-	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
-	}
-	t.Logf("created ingress %s/%s", specNs, appName)
-
-	// Create the client Pod.
-	cliName := "test-client"
-	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
-	if err != nil {
-		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
-	}
-	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
-		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
-	}
-	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
-
-	// Get the Envoy ClusterIP to curl.
-	svcName := "envoy"
-	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
-	if err != nil {
-		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
-	}
-
-	// Curl the ingress from the client pod.
-	url := fmt.Sprintf("http://%s/", ip)
-	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
-	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
-	resp := "200"
-	if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
-		t.Fatalf("failed to parse pod %s/%s: %v", specNs, cliName, err)
-	}
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
-
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
-
-	// Ensure the default contour can be deleted and clean-up.
-	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
-		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
-	}
-	t.Logf("deleted contour %s/%s", operatorNs, testName)
-
-	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
-	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
-
-	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
-	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, 5*time.Minute, specNs); err != nil {
-		t.Fatalf("failed to delete namespace %s: %v", specNs, err)
-	}
-	t.Logf("observed the deletion of namespace %s", specNs)
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }
 
 // TestContourSpec tests some spec changes such as:
@@ -381,7 +416,7 @@ func TestContourSpec(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        testName,
 		Namespace:   operatorNs,
-		SpecNs:      specNs,
+		SpecNs:      fmt.Sprintf("%s-contourspec", specNs),
 		RemoveNs:    true,
 		Replicas:    4,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
@@ -399,15 +434,15 @@ func TestContourSpec(t *testing.T) {
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, specNs, testAppImage, testAppReplicas); err != nil {
-		t.Fatalf("failed to create deployment %s/%s: %v", specNs, appName, err)
+	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created deployment %s/%s", specNs, appName)
+	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, specNs, expectedDeploymentConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", specNs, appName, err)
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("observed expected status conditions for deployment %s/%s", specNs, appName)
+	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
 	cfg.Replicas = 3
 	if _, err := updateContour(ctx, kclient, cfg); err != nil {
@@ -418,20 +453,40 @@ func TestContourSpec(t *testing.T) {
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
-	if err := newClusterIPService(ctx, kclient, appName, specNs, 80, 8080); err != nil {
-		t.Fatalf("failed to create service %s/%s: %v", specNs, appName, err)
+	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created service %s/%s", specNs, appName)
+	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, specNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", specNs, appName)
+	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	// testURL is the url used to test e2e functionality.
+	testURL := "http://local.projectcontour.io/"
+
+	if isKind {
+		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	} else {
+		// Get the IP of a worker node to test the nodeport service.
+		ip, err := getWorkerNodeIP(ctx, kclient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("using worker node ip %s", ip)
+
+		// Curl the ingress from the client pod.
+		testURL = fmt.Sprintf("http://%s:30080/", ip)
+		cliName := "test-client"
+		if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
 	}
-	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -451,10 +506,10 @@ func TestContourSpec(t *testing.T) {
 	t.Logf("deleted contour %s/%s", operatorNs, testName)
 
 	// Verify the user-defined namespace was removed by the operator.
-	if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, specNs); err != nil {
-		t.Fatalf("failed to observe the deletion of namespace %s: %v", specNs, err)
+	if err := waitForSpecNsDeletion(ctx, kclient, 1*time.Minute, cfg.SpecNs); err != nil {
+		t.Fatalf("failed to observe the deletion of namespace %s: %v", cfg.SpecNs, err)
 	}
-	t.Logf("observed the deletion of namespace %s", specNs)
+	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
 }
 
 func TestMultipleContours(t *testing.T) {
@@ -499,7 +554,7 @@ func TestMultipleContours(t *testing.T) {
 
 		// Verify the user-defined namespace was removed by the operator.
 		ns := fmt.Sprintf("%s-ns", testName)
-		if err := waitForSpecNsDeletion(ctx, kclient, 5*time.Minute, ns); err != nil {
+		if err := waitForSpecNsDeletion(ctx, kclient, 1*time.Minute, ns); err != nil {
 			t.Fatalf("failed to observe the deletion of namespace %s: %v", ns, err)
 		}
 		t.Logf("observed the deletion of namespace %s", ns)
@@ -513,7 +568,7 @@ func TestGateway(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:         contourName,
 		Namespace:    operatorNs,
-		SpecNs:       specNs,
+		SpecNs:       fmt.Sprintf("%s-gateway", specNs),
 		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
 		GatewayClass: &gcName,
 	}
@@ -556,9 +611,9 @@ func TestGateway(t *testing.T) {
 
 	// The contour should now report available.
 	if err := waitForContourStatusConditions(ctx, kclient, 1*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
-	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
+	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
 
 	// Create a sample workload for e2e testing.
 	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
@@ -581,10 +636,30 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForHTTPResponse(testURL, 3*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	// testURL is the url used to test e2e functionality.
+	testURL := "http://local.projectcontour.io/"
+
+	if isKind {
+		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	} else {
+		// Get the IP of a worker node to test the nodeport service.
+		ip, err := getWorkerNodeIP(ctx, kclient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("using worker node ip %s", ip)
+
+		// Curl the httproute from the client pod.
+		testURL = fmt.Sprintf("http://%s:30080/", ip)
+		cliName := "test-client"
+		if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
 	}
-	t.Logf("received http response for %q", testURL)
 
 	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
@@ -604,10 +679,10 @@ func TestGateway(t *testing.T) {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, contourName, err)
 	}
 	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
 	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
@@ -624,7 +699,7 @@ func TestGatewayClusterIP(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:         contourName,
 		Namespace:    operatorNs,
-		SpecNs:       specNs,
+		SpecNs:       fmt.Sprintf("%s-gateway-clusterip", specNs),
 		NetworkType:  operatorv1alpha1.ClusterIPServicePublishingType,
 		GatewayClass: &gcName,
 	}
@@ -692,44 +767,20 @@ func TestGatewayClusterIP(t *testing.T) {
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
 
-	// Create the client Pod.
-	cliName := "test-client"
-	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
-	if err != nil {
-		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
-	}
-	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
-		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
-	}
-	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
-
 	// Get the Envoy ClusterIP to curl.
 	svcName := "envoy"
-	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
+	ip, err := envoyClusterIP(ctx, kclient, cfg.SpecNs, svcName)
 	if err != nil {
-		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", cfg.SpecNs, svcName, err)
 	}
 
-	// Curl the ingress from the client pod.
-	url := fmt.Sprintf("http://%s/", ip)
-	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
-	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
-	resp := "200"
-	// Polling until success since network seems not ready.
-	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
-	// TODO: remove wait.PollImmediate.
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
-			t.Logf("observed unexpected error: %v", err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
+	// Curl the httproute from the client pod.
+	testURL := fmt.Sprintf("http://%s/", ip)
+	cliName := "test-client"
+	if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+	t.Logf("received http response for %q", testURL)
 
 	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
 	// xref: https://github.com/projectcontour/contour-operator/issues/211
@@ -750,10 +801,10 @@ func TestGatewayClusterIP(t *testing.T) {
 	}
 
 	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
 	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
@@ -772,7 +823,7 @@ func TestGatewayOwnership(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:         contourName,
 		Namespace:    operatorNs,
-		SpecNs:       specNs,
+		SpecNs:       fmt.Sprintf("%s-gateway-ownership", specNs),
 		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
 		GatewayClass: &gcName,
 	}
@@ -864,10 +915,10 @@ func TestGatewayOwnership(t *testing.T) {
 	}
 
 	// Ensure the envoy service is cleaned up automatically.
-	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, specNs, "envoy"); err != nil {
-		t.Fatalf("failed to delete envoy service %s/envoy: %v", specNs, err)
+	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
+		t.Fatalf("failed to delete envoy service %s/envoy: %v", cfg.SpecNs, err)
 	}
-	t.Logf("cleaned up envoy service %s/envoy", specNs)
+	t.Logf("cleaned up envoy service %s/envoy", cfg.SpecNs)
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
@@ -910,18 +961,18 @@ func TestOperatorUpgrade(t *testing.T) {
 		Name:        contourName,
 		Namespace:   operatorNs,
 		RemoveNs:    true,
-		SpecNs:      specNs,
+		SpecNs:      fmt.Sprintf("%s-%s", testName, specNs),
 		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
 	}
 
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
-		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, contourName, err)
+		t.Fatalf("failed to create contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
@@ -945,15 +996,15 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
 	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
-		t.Fatalf("failed to create ingress %s/%s: %v", specNs, appName, err)
+		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
-	t.Logf("created ingress %s/%s", specNs, appName)
+	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
 
 	// Create the client pod to test connectivity to the sample workload.
 	cliName := "test-client"
-	cliPod, err := newPod(ctx, kclient, specNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
+	cliPod, err := newPod(ctx, kclient, cfg.SpecNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
 	if err != nil {
-		t.Fatalf("failed to create pod %s/%s: %v", specNs, cliName, err)
+		t.Fatalf("failed to create pod %s/%s: %v", cfg.SpecNs, cliName, err)
 	}
 	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
 		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
@@ -962,9 +1013,9 @@ func TestOperatorUpgrade(t *testing.T) {
 
 	// Get the Envoy ClusterIP to curl.
 	svcName := "envoy"
-	ip, err := envoyClusterIP(ctx, kclient, specNs, svcName)
+	ip, err := envoyClusterIP(ctx, kclient, cfg.SpecNs, svcName)
 	if err != nil {
-		t.Fatalf("failed to get clusterIP for service %s/%s: %v", specNs, svcName, err)
+		t.Fatalf("failed to get clusterIP for service %s/%s: %v", cfg.SpecNs, svcName, err)
 	}
 
 	// Curl the ingress from the client pod.
@@ -976,16 +1027,16 @@ func TestOperatorUpgrade(t *testing.T) {
 	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
 	// TODO: remove wait.PollImmediate.
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+		if err := parse.StringInPodExec(cfg.SpecNs, cliName, resp, cmd); err != nil {
 			t.Logf("observed unexpected error: %v", err)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
+		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, cfg.SpecNs, cliName, err)
 	}
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, cfg.SpecNs, cliName)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -1019,16 +1070,16 @@ func TestOperatorUpgrade(t *testing.T) {
 
 	// Polling until success since the envoy daemonset may still be performing the rolling update.
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := parse.StringInPodExec(specNs, cliName, resp, cmd); err != nil {
+		if err := parse.StringInPodExec(cfg.SpecNs, cliName, resp, cmd); err != nil {
 			t.Logf("observed unexpected error: %v", err)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, specNs, cliName, err)
+		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, cfg.SpecNs, cliName, err)
 	}
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, specNs, cliName)
+	t.Logf("received http %s response for %s in pod %s/%s", resp, url, cfg.SpecNs, cliName)
 
 	// Scrape the operator logs for error messages.
 	found, err = parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)

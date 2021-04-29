@@ -25,6 +25,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
+	"github.com/projectcontour/contour-operator/internal/parse"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +44,10 @@ import (
 
 var (
 	scheme = runtime.NewScheme()
+	// expectedPodConditions are the expected status conditions of a pod.
+	expectedPodConditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
 )
 
 func init() {
@@ -444,6 +449,39 @@ func waitForHTTPResponse(url string, timeout time.Duration) error {
 	return nil
 }
 
+// podWaitForHTTPResponse will curl url from ns/name client pod using host
+// header "local.projectcontour.io" until timeout, expecting a 200 status code.
+func podWaitForHTTPResponse(ctx context.Context, cl client.Client, ns, name, url string, timeout time.Duration) error {
+	cliPod, err := newPod(ctx, cl, ns, name, "curlimages/curl:7.75.0", []string{"sleep", "600"})
+	if err != nil {
+		return fmt.Errorf("failed to create pod %s/%s: %v", ns, name, err)
+	}
+
+	if err := waitForPodStatusConditions(ctx, cl, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
+		return fmt.Errorf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
+	}
+
+	// Curl the ingress from the client pod.
+	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
+	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
+	resp := "200"
+	err = wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := parse.StringInPodExec(cliPod.Namespace, cliPod.Name, resp, cmd); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, cliPod.Namespace, cliPod.Name, err)
+	}
+
+	if err := deletePod(ctx, cl, cliPod.Namespace, cliPod.Name); err != nil {
+		return fmt.Errorf("failed to delete pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
+	}
+
+	return nil
+}
+
 // newNs creates a Namespace object using the provided name for the object's name.
 func newNs(ctx context.Context, cl client.Client, name string) error {
 	ns := &corev1.Namespace{
@@ -500,12 +538,38 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		err := cl.Get(ctx, key, ns)
-		return errors.IsNotFound(err), nil
+		if err := cl.Get(ctx, key, ns); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		// Consider the namespace deleted if status is terminating.
+		if ns.Status.Phase == corev1.NamespaceTerminating {
+			return true, nil
+		}
+		// The namespace is still "Active"
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
 	}
+	return nil
+}
+
+func deletePod(ctx context.Context, cl client.Client, ns, name string) error {
+	p := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+	}
+	if err := cl.Delete(ctx, p); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete pod %s/%s: %v", p.Namespace, p.Name, err)
+		}
+	}
+
 	return nil
 }
 
@@ -521,8 +585,18 @@ func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.D
 	}
 
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		err := cl.Get(ctx, key, ns)
-		return errors.IsNotFound(err), nil
+		if err := cl.Get(ctx, key, ns); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		// Consider the namespace deleted if status is terminating.
+		if ns.Status.Phase == corev1.NamespaceTerminating {
+			return true, nil
+		}
+		// The namespace is still "Active"
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
@@ -757,6 +831,101 @@ func waitForImage(ctx context.Context, cl client.Client, timeout time.Duration, 
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
+// waitForIngressLB polls Ingress ns/name until timeout, returning the status load-balancer
+// IP or hostname.
+func waitForIngressLB(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) (string, error) {
+	nsName := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	ing := &networkingv1.Ingress{}
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.Get(ctx, nsName, ing); err != nil {
+			return false, nil
+		}
+		if ing.Status.LoadBalancer.Ingress == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("timed out waiting for ingress %s/%s load-balancer: %v", ns, name, err)
+	}
+
+	switch {
+	case len(ing.Status.LoadBalancer.Ingress[0].Hostname) > 0:
+		return ing.Status.LoadBalancer.Ingress[0].Hostname, nil
+	case len(ing.Status.LoadBalancer.Ingress[0].IP) > 0:
+		return ing.Status.LoadBalancer.Ingress[0].IP, nil
+	}
+	return "", fmt.Errorf("failed to determine ingress %s/%s load-balancer: %v", ns, name, err)
+}
+
+// isKindCluster returns true if the cluster under test was provisioned using kind.
+func isKindCluster(ctx context.Context, cl client.Client) (bool, error) {
+	ds := &appsv1.DaemonSet{}
+	key := types.NamespacedName{
+		Namespace: "kube-system",
+		Name:      "kindnet",
+	}
+	if err := cl.Get(ctx, key, ds); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get daemonset %s/%s: %v", key.Namespace, key.Name, err)
+	}
+	return true, nil
+}
+
+// getWorkerNodeIP returns the ip address of a worker node.
+func getWorkerNodeIP(ctx context.Context, cl client.Client) (string, error) {
+	nodes := &corev1.NodeList{}
+	if err := cl.List(ctx, nodes, client.MatchingLabels{"node-role.kubernetes.io/worker": ""}); err != nil {
+		return "", fmt.Errorf("failed to list worker nodes: %v", err)
+	}
+	for _, node := range nodes.Items {
+		for _, c := range node.Status.Conditions {
+			if c.Type == corev1.NodeReady && c.Status == corev1.ConditionTrue {
+				for _, a := range node.Status.Addresses {
+					switch {
+					// Prefer external IP over internal IP
+					case a.Type == corev1.NodeExternalIP:
+						return a.Address, nil
+					case a.Type == corev1.NodeInternalIP:
+						return a.Address, nil
+						// Consider adding support for other address types.
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("failed to get worker node ip address")
+}
+
+// labelWorkerNodes applies the node role label to nodes that are not labeled as control-plane
+// and do not contain the worker node label.
+func labelWorkerNodes(ctx context.Context, cl client.Client) error {
+	nodes := &corev1.NodeList{}
+	if err := cl.List(ctx, nodes); err != nil {
+		return fmt.Errorf("failed to list nodes: %v", err)
+	}
+	var workers []corev1.Node
+	for _, node := range nodes.Items {
+		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+			continue
+		}
+		if _, ok := node.Labels["node-role.kubernetes.io/worker"]; !ok {
+			node.Labels["node-role.kubernetes.io/worker"] = ""
+			workers = append(workers, node)
+		}
+	}
+	for i, worker := range workers {
+		if err := cl.Update(ctx, &workers[i]); err != nil {
+			return fmt.Errorf("failed to update node %s: %v", err, worker.Name)
+		}
+	}
 	return nil
 }
