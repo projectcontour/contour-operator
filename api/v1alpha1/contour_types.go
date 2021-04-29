@@ -268,7 +268,7 @@ type ProviderLoadBalancerParameters struct {
 	Type LoadBalancerProviderType `json:"type,omitempty"`
 
 	// loadBalancerIP contains IP for LoadBalancer service type, optional
-  // +optional
+	// +optional
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
