@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
@@ -513,6 +514,8 @@ func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd [
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{c},
+			// Kill the pod immediately so it exits quickly on deletion.
+			TerminationGracePeriodSeconds: pointer.Int64Ptr(0),
 		},
 	}
 	if err := cl.Create(ctx, p); err != nil {

@@ -410,7 +410,7 @@ func TestContourClusterIPService(t *testing.T) {
 // TestContourSpec tests some spec changes such as:
 // - Enable RemoveNs.
 // - Initial replicas to 4.
-// - Increase replicas to 3.
+// - Decrease replicas to 3.
 func TestContourSpec(t *testing.T) {
 	testName := "test-user-contour"
 	cfg := objcontour.Config{

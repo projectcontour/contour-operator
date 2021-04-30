@@ -64,7 +64,7 @@ func ParameterRefExists(ctx context.Context, cli client.Client, name, ns string)
 		return nil, false, err
 	}
 	for _, gc := range gcList.Items {
-		if gc.Spec.ParametersRef.Name == name && gc.Spec.ParametersRef.Namespace == ns {
+		if gc.Spec.ParametersRef != nil && gc.Spec.ParametersRef.Name == name && gc.Spec.ParametersRef.Namespace == ns {
 			return &gc, true, nil
 		}
 	}
