@@ -9,7 +9,9 @@
 readonly KIND=${KIND:-kind}
 readonly KUBECTL=${KUBECTL:-kubectl}
 
-readonly NODEIMAGE=${NODEIMAGE:-"docker.io/kindest/node:v1.20.2"}
+# TODO: Use official upstream image once it is available
+# See https://github.com/projectcontour/contour/issues/3610
+readonly NODEIMAGE=${NODEIMAGE:-"stevesloka/kind-node:v1.21.0"}
 readonly CLUSTER=${CLUSTER:-contour}
 
 readonly HERE=$(cd $(dirname $0) && pwd)
