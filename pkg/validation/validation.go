@@ -109,18 +109,20 @@ func nodePorts(contour *operatorv1alpha1.Contour) error {
 	return nil
 }
 
-// GatewayClass returns true if gc is a valid GatewayClass.
+// GatewayClass returns nil if gc is a valid GatewayClass,
+// otherwise an error.
 func GatewayClass(gc *gatewayv1alpha1.GatewayClass) error {
 	return parameterRef(gc)
 }
 
-// parameterRef returns true if parametersRef of gc is valid.
+// parameterRef returns nil if parametersRef of gc is valid,
+// otherwise an error.
 func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	if gc.Spec.ParametersRef == nil {
-		return nil
+		return fmt.Errorf("invalid gateway class %s, missing parametersRef", gc.Name)
 	}
 	if gc.Spec.ParametersRef.Scope == nil || *gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
-		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped referecnes are supported", gc.Name)
+		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped references are supported", gc.Name)
 	}
 	group := gc.Spec.ParametersRef.Group
 	if group != operatorv1alpha1.GatewayClassParamsRefGroup {
@@ -129,6 +131,9 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	kind := gc.Spec.ParametersRef.Kind
 	if kind != operatorv1alpha1.GatewayClassParamsRefKind {
 		return fmt.Errorf("invalid kind %q", kind)
+	}
+	if gc.Spec.ParametersRef.Namespace == nil {
+		return fmt.Errorf("invalid parametersRef for gateway class %s, missing namespace", gc.Name)
 	}
 	return nil
 }

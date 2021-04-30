@@ -18,8 +18,10 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -281,5 +283,118 @@ func TestNodePorts(t *testing.T) {
 		if err == nil && !tc.expected {
 			t.Fatalf("%q: expected to fail but received no error", tc.description)
 		}
+	}
+}
+
+func TestGatewayClass(t *testing.T) {
+
+	testCases := map[string]struct {
+		gc       *gatewayv1alpha1.GatewayClass
+		expected bool
+	}{
+		"happy path": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     pointer.StringPtr("Namespace"),
+						Group:     "operator.projectcontour.io",
+						Kind:      "Contour",
+						Name:      "a-contour",
+						Namespace: pointer.StringPtr("a-namespace"),
+					},
+				},
+			},
+			expected: true,
+		},
+		"missing scope": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     nil,
+						Group:     "operator.projectcontour.io",
+						Kind:      "Contour",
+						Name:      "a-contour",
+						Namespace: pointer.StringPtr("a-namespace"),
+					},
+				},
+			},
+			expected: false,
+		},
+		"invalid scope": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     pointer.StringPtr("Cluster"),
+						Group:     "operator.projectcontour.io",
+						Kind:      "Contour",
+						Name:      "a-contour",
+						Namespace: pointer.StringPtr("a-namespace"),
+					},
+				},
+			},
+			expected: false,
+		},
+		"invalid group": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     pointer.StringPtr("Namespace"),
+						Group:     "operator.not-projectcontour.io",
+						Kind:      "Contour",
+						Name:      "a-contour",
+						Namespace: pointer.StringPtr("a-namespace"),
+					},
+				},
+			},
+			expected: false,
+		},
+		"invalid kind": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     pointer.StringPtr("Namespace"),
+						Group:     "operator.projectcontour.io",
+						Kind:      "NotContour",
+						Name:      "a-contour",
+						Namespace: pointer.StringPtr("a-namespace"),
+					},
+				},
+			},
+			expected: false,
+		},
+		"missing namespace": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Scope:     pointer.StringPtr("Namespace"),
+						Group:     "operator.projectcontour.io",
+						Kind:      "Contour",
+						Name:      "a-contour",
+						Namespace: nil,
+					},
+				},
+			},
+			expected: false,
+		},
+		"missing parameters ref": {
+			gc: &gatewayv1alpha1.GatewayClass{
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					ParametersRef: nil,
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := GatewayClass(tc.gc)
+			if tc.expected && err != nil {
+				t.Fatal("expected gateway class to be valid")
+			}
+			if !tc.expected && err == nil {
+				t.Fatal("expected gateway class to be invalid")
+			}
+		})
 	}
 }
