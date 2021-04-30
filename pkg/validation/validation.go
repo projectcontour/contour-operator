@@ -83,7 +83,7 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	if gc.Spec.ParametersRef == nil {
 		return nil
 	}
-	if gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
+	if gc.Spec.ParametersRef.Scope == nil || *gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
 		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped referecnes are supported", gc.Name)
 	}
 	group := gc.Spec.ParametersRef.Group
@@ -161,7 +161,7 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 func gatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
 	if len(gw.Spec.Addresses) > 0 {
 		for _, a := range gw.Spec.Addresses {
-			if a.Type != gatewayv1alpha1.IPAddressType {
+			if a.Type == nil || *a.Type != gatewayv1alpha1.IPAddressType {
 				return fmt.Errorf("invalid address type %v", a.Type)
 			}
 			if ip := validation.IsValidIP(a.Value); ip != nil {

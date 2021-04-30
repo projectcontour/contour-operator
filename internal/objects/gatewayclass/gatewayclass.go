@@ -64,7 +64,7 @@ func ParameterRefExists(ctx context.Context, cli client.Client, name, ns string)
 		return nil, false, err
 	}
 	for _, gc := range gcList.Items {
-		if gc.Spec.ParametersRef != nil && gc.Spec.ParametersRef.Name == name && gc.Spec.ParametersRef.Namespace == ns {
+		if gc.Spec.ParametersRef != nil && gc.Spec.ParametersRef.Name == name && gc.Spec.ParametersRef.Namespace != nil && *gc.Spec.ParametersRef.Namespace == ns {
 			return &gc, true, nil
 		}
 	}
@@ -83,9 +83,9 @@ func OtherGatewayClassesRefContour(ctx context.Context, cli client.Client, gc *g
 				switch {
 				case g.Name == gc.Name && g.Namespace == gc.Namespace:
 					continue
-				case g.Spec.ParametersRef.Namespace == contour.Namespace &&
+				case g.Spec.ParametersRef.Namespace != nil && *g.Spec.ParametersRef.Namespace == contour.Namespace &&
 					g.Spec.ParametersRef.Name == contour.Name &&
-					g.Spec.ParametersRef.Scope == "Namespace" &&
+					g.Spec.ParametersRef.Scope != nil && *g.Spec.ParametersRef.Scope == "Namespace" &&
 					g.Spec.ParametersRef.Kind == contour.Kind:
 					return true, nil
 				}
