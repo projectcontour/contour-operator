@@ -146,3 +146,140 @@ func TestContainerPorts(t *testing.T) {
 		}
 	}
 }
+
+func TestNodePorts(t *testing.T) {
+	httpPort := int32(30080)
+	httpsPort := int32(30443)
+
+	testCases := []struct {
+		description string
+		ports       []operatorv1alpha1.NodePort
+		expected    bool
+	}{
+		{
+			description: "default http and https nodeports",
+			expected:    true,
+		},
+		{
+			description: "user-specified http and https nodeports",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name:       "http",
+					PortNumber: &httpPort,
+				},
+				{
+					Name:       "https",
+					PortNumber: &httpsPort,
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "invalid port name",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name:       "http",
+					PortNumber: &httpPort,
+				},
+				{
+					Name:       "foo",
+					PortNumber: &httpsPort,
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "auto-assigned https port number",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name:       "http",
+					PortNumber: &httpPort,
+				},
+				{
+					Name: "https",
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "auto-assigned http and https port numbers",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name: "http",
+				},
+				{
+					Name: "https",
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "duplicate nodeport names",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name:       "http",
+					PortNumber: &httpPort,
+				},
+				{
+					Name:       "http",
+					PortNumber: &httpsPort,
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "duplicate nodeport numbers",
+			ports: []operatorv1alpha1.NodePort{
+				{
+					Name:       "http",
+					PortNumber: &httpPort,
+				},
+				{
+					Name:       "https",
+					PortNumber: &httpPort,
+				},
+			},
+			expected: false,
+		},
+	}
+
+	name := "test-validation"
+	cntr := &operatorv1alpha1.Contour{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: fmt.Sprintf("%s-ns", name),
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
+			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
+				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+					Type: operatorv1alpha1.NodePortServicePublishingType,
+					NodePorts: []operatorv1alpha1.NodePort{
+						{
+							Name:       "http",
+							PortNumber: &httpPort,
+						},
+						{
+							Name:       "https",
+							PortNumber: &httpsPort,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.ports != nil {
+			cntr.Spec.NetworkPublishing.Envoy.NodePorts = tc.ports
+		}
+		err := nodePorts(cntr)
+		if err != nil && tc.expected {
+			t.Fatalf("%q: failed with error: %#v", tc.description, err)
+		}
+		if err == nil && !tc.expected {
+			t.Fatalf("%q: expected to fail but received no error", tc.description)
+		}
+	}
+}

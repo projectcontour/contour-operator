@@ -41,7 +41,18 @@ func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.C
 	if exist {
 		return fmt.Errorf("other contours exist in namespace %s", contour.Spec.Namespace.Name)
 	}
-	return containerPorts(contour)
+
+	if err := containerPorts(contour); err != nil {
+		return err
+	}
+
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+		if err := nodePorts(contour); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // containerPorts validates container ports of contour, returning an
@@ -53,7 +64,7 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 	httpsFound := false
 	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		if len(numsFound) > 0 && slice.ContainsInt32(numsFound, port.PortNumber) {
-			return fmt.Errorf("duplicate container port number %q", port.PortNumber)
+			return fmt.Errorf("duplicate container port number %d", port.PortNumber)
 		}
 		numsFound = append(numsFound, port.PortNumber)
 		if len(namesFound) > 0 && slice.ContainsString(namesFound, port.Name) {
@@ -71,6 +82,31 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 		return nil
 	}
 	return fmt.Errorf("http and https container ports are unspecified")
+}
+
+// nodePorts validates nodeports of contour, returning an error if the nodeports
+// do not meet the API specification.
+func nodePorts(contour *operatorv1alpha1.Contour) error {
+	ports := contour.Spec.NetworkPublishing.Envoy.NodePorts
+	if ports == nil {
+		// When unspecified, API server will auto-assign port numbers.
+		return nil
+	}
+	for _, p := range ports {
+		if p.Name != "http" && p.Name != "https" {
+			return fmt.Errorf("invalid port name %q; only \"http\" and \"https\" are supported", p.Name)
+		}
+	}
+	if ports[0].Name == ports[1].Name {
+		return fmt.Errorf("duplicate nodeport names detected")
+	}
+	if ports[0].PortNumber != nil && ports[1].PortNumber != nil {
+		if ports[0].PortNumber == ports[1].PortNumber {
+			return fmt.Errorf("duplicate nodeport port numbers detected")
+		}
+	}
+
+	return nil
 }
 
 // GatewayClass returns true if gc is a valid GatewayClass.

@@ -138,6 +138,7 @@ func TestDesiredEnvoyService(t *testing.T) {
 		SpecNs:      "projectcontour",
 		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+		NodePorts:   objcontour.MakeNodePorts(map[string]int{"http": 30081, "https": 30444}),
 	}
 	cntr := objcontour.New(cfg)
 	svc := DesiredEnvoyService(cntr)
@@ -145,8 +146,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)
 	checkServiceHasPort(t, svc, EnvoyServiceHTTPSPort)
-	checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPPort)
-	checkServiceHasNodeport(t, svc, EnvoyNodePortHTTPSPort)
+	checkServiceHasNodeport(t, svc, 30081)
+	checkServiceHasNodeport(t, svc, 30444)
 	for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		checkServiceHasTargetPort(t, svc, port.PortNumber)
 	}

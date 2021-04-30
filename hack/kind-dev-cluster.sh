@@ -37,6 +37,8 @@ kind::cluster::list() {
 }
 
 # Emit a Kind config that maps the envoy listener ports to the host.
+# ContainerPort and hostPort definitions are used for testing Contour
+# nodeports.
 kind::cluster::config() {
     cat <<EOF
 kind: Cluster
@@ -50,6 +52,12 @@ nodes:
     listenAddress: "0.0.0.0"
   - containerPort: 30443
     hostPort: 443
+    listenAddress: "0.0.0.0"
+  - containerPort: 30081
+    hostPort: 81
+    listenAddress: "0.0.0.0"
+  - containerPort: 30444
+    hostPort: 444
     listenAddress: "0.0.0.0"
 EOF
 }

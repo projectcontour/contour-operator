@@ -28,7 +28,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -228,10 +230,11 @@ func TestContourNodePortService(t *testing.T) {
 		SpecNs:      fmt.Sprintf("%s-nodeport", specNs),
 		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+		NodePorts:   objcontour.MakeNodePorts(map[string]int{"http": 30080, "https": 30443}),
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
-		t.Fatalf("failed to create contour %s/%s: %v", operatorNs, testName, err)
+		t.Fatalf("failed to create contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
@@ -298,11 +301,62 @@ func TestContourNodePortService(t *testing.T) {
 		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
 	}
 
-	// Ensure the default contour can be deleted and clean-up.
-	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
-		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
+	// update the contour nodeports. Note that kind is configured to map port 81>30081 and 444>30444.
+	key := types.NamespacedName{
+		Namespace: cfg.Namespace,
+		Name:      cfg.Name,
 	}
-	t.Logf("deleted contour %s/%s", operatorNs, testName)
+	if err := kclient.Get(ctx, key, cntr); err != nil {
+		t.Fatalf("failed to get contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
+	}
+
+	cntr.Spec.NetworkPublishing.Envoy.NodePorts = objcontour.MakeNodePorts(map[string]int{"http": 30081, "https": 30444})
+	if err := kclient.Update(ctx, cntr); err != nil {
+		t.Fatalf("failed to update contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
+	}
+	t.Logf("updated contour %s/%s", cfg.Namespace, cfg.Name)
+
+	// Update the kuard service port.
+	svc := &corev1.Service{}
+	key = types.NamespacedName{
+		Namespace: cfg.SpecNs,
+		Name:      appName,
+	}
+	if err := kclient.Get(ctx, key, svc); err != nil {
+		t.Fatalf("failed to get service %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	svc.Spec.Ports[0].Port = int32(81)
+	if err := kclient.Update(ctx, svc); err != nil {
+		t.Fatalf("failed to update service %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("updated service %s/%s", cfg.SpecNs, appName)
+
+	// Update the kuard ingress port.
+	ing := &networkingv1.Ingress{}
+	key = types.NamespacedName{
+		Namespace: cfg.SpecNs,
+		Name:      appName,
+	}
+	if err := kclient.Get(ctx, key, ing); err != nil {
+		t.Fatalf("failed to get ingress %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	ing.Spec.DefaultBackend.Service.Port.Number = int32(81)
+	if err := kclient.Update(ctx, ing); err != nil {
+		t.Fatalf("failed to update ingress %s/%s: %v", cfg.SpecNs, appName, err)
+	}
+	t.Logf("updated ingress %s/%s", cfg.SpecNs, appName)
+
+	// Curl the kuard ingress
+	if err := waitForHTTPResponse("http://local.projectcontour.io:81/", 1*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	}
+	t.Logf("received http response for %q", testURL)
+
+	// Ensure the default contour can be deleted and clean-up.
+	if err := deleteContour(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace); err != nil {
+		t.Fatalf("failed to delete contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
+	}
+	t.Logf("deleted contour %s/%s", cfg.Namespace, cfg.Name)
 
 	// Ensure the envoy service is cleaned up automatically.
 	if err := waitForServiceDeletion(ctx, kclient, 3*time.Minute, cfg.SpecNs, "envoy"); err != nil {
@@ -419,6 +473,7 @@ func TestContourSpec(t *testing.T) {
 		RemoveNs:    true,
 		Replicas:    4,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+		NodePorts:   objcontour.MakeNodePorts(map[string]int{"http": 30080, "https": 30443}),
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
@@ -569,6 +624,7 @@ func TestGateway(t *testing.T) {
 		Namespace:    operatorNs,
 		SpecNs:       fmt.Sprintf("%s-gateway", specNs),
 		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
+		NodePorts:    objcontour.MakeNodePorts(map[string]int{"http": 30080, "https": 30443}),
 		GatewayClass: &gcName,
 	}
 
@@ -824,6 +880,7 @@ func TestGatewayOwnership(t *testing.T) {
 		Namespace:    operatorNs,
 		SpecNs:       fmt.Sprintf("%s-gateway-ownership", specNs),
 		NetworkType:  operatorv1alpha1.NodePortServicePublishingType,
+		NodePorts:    objcontour.MakeNodePorts(map[string]int{"http": 30080, "https": 30443}),
 		GatewayClass: &gcName,
 	}
 

@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -32,6 +33,7 @@ type Config struct {
 	RemoveNs     bool
 	Replicas     int32
 	NetworkType  operatorv1alpha1.NetworkPublishingType
+	NodePorts    []operatorv1alpha1.NodePort
 	GatewayClass *string
 }
 
@@ -66,6 +68,9 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 				},
 			},
 		},
+	}
+	if cfg.NetworkType == operatorv1alpha1.NodePortServicePublishingType && len(cfg.NodePorts) > 0 {
+		cntr.Spec.NetworkPublishing.Envoy.NodePorts = cfg.NodePorts
 	}
 	if cfg.GatewayClass != nil {
 		cntr.Spec.GatewayClassRef = cfg.GatewayClass
@@ -157,4 +162,18 @@ func OwnerLabels(contour *operatorv1alpha1.Contour) map[string]string {
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
+}
+
+// MakeNodePorts returns a nodeport slice using the ports key as the nodeport name
+// and the ports value as the nodeport number.
+func MakeNodePorts(ports map[string]int) []operatorv1alpha1.NodePort {
+	nodePorts := []operatorv1alpha1.NodePort{}
+	for k, v := range ports {
+		p := operatorv1alpha1.NodePort{
+			Name:       k,
+			PortNumber: pointer.Int32Ptr(int32(v)),
+		}
+		nodePorts = append(nodePorts, p)
+	}
+	return nodePorts
 }

@@ -188,6 +188,28 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:default={scope: External, providerParameters: {type: AWS}}
 	LoadBalancer LoadBalancerStrategy `json:"loadBalancer,omitempty"`
 
+	// NodePorts is a list of network ports to expose on each node's IP at a static
+	// port number using a NodePort Service. Present only if type is NodePortService.
+	// A ClusterIP Service, which the NodePort Service routes to, is automatically
+	// created. You'll be able to contact the NodePort Service, from outside the
+	// cluster, by requesting <NodeIP>:<NodePort>.
+	//
+	// If type is NodePortService and nodePorts is unspecified, two nodeports will be
+	// created, one named "http" and the other named "https", with port numbers auto
+	// assigned by Kubernetes API server. For additional information on the NodePort
+	// Service, see:
+	//
+	//  https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+	//
+	// Names and port numbers must be unique in the list. Two ports must be specified,
+	// one named "http" for Envoy's insecure service and one named "https" for Envoy's
+	// secure service.
+	//
+	// +kubebuilder:validation:MinItems=2
+	// +kubebuilder:validation:MaxItems=2
+	// +optional
+	NodePorts []NodePort `json:"nodePorts,omitempty"`
+
 	// ContainerPorts is a list of container ports to expose from the Envoy container(s).
 	// Exposing a port here gives the system additional information about the network
 	// connections the Envoy container uses, but is primarily informational. Not specifying
@@ -279,6 +301,32 @@ const (
 	AzureLoadBalancerProvider LoadBalancerProviderType = "Azure"
 	GCPLoadBalancerProvider   LoadBalancerProviderType = "GCP"
 )
+
+// NodePort is the schema to specify a network port for a NodePort Service.
+type NodePort struct {
+	// Name is an IANA_SVC_NAME within the NodePort Service.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// PortNumber is the network port number to expose for the NodePort Service.
+	// If unspecified, a port number will be assigned from the the cluster's
+	// nodeport service range, i.e. --service-node-port-range flag
+	// (default: 30000-32767).
+	//
+	// If specified, the number must:
+	//
+	// 1. Not be used by another NodePort Service.
+	// 2. Be within the cluster's nodeport service range, i.e. --service-node-port-range
+	//    flag (default: 30000-32767).
+	// 3. Be a valid network port number, i.e. greater than 0 and less than 65536.
+	//
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	PortNumber *int32 `json:"portNumber,omitempty"`
+}
 
 // ContainerPort is the schema to specify a network port for a container.
 // A container port gives the system additional information about network
