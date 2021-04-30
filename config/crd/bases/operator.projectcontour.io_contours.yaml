@@ -130,6 +130,7 @@ spec:
                             properties:
                               loadBalancerIP:
                                 description: loadBalancerIP contains IP for LoadBalancer service type, optional
+                                format: ipv4
                                 type: string
                               type:
                                 default: AWS
