@@ -6362,8 +6362,8 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        image: docker.io/projectcontour/contour-operator:main
-        imagePullPolicy: Always
+        image: docker.io/projectcontour/contour-operator:v1.15.0
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:
