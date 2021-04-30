@@ -157,7 +157,7 @@ func TestDesiredEnvoyService(t *testing.T) {
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
-	svc = DesiredContourService(cntr)
+	svc = DesiredEnvoyService(cntr)
 	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
