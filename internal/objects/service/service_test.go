@@ -112,6 +112,14 @@ func checkServiceHasExternalTrafficPolicy(t *testing.T, svc *corev1.Service, pol
 	}
 }
 
+func checkServiceHasLoadBalancerIp(t *testing.T, svc *corev1.Service, loadBalancerIp string) {
+	t.Helper()
+
+	if svc.Spec.LoadBalancerIP != loadBalancerIp {
+		t.Errorf("service is missing correct loadbalancer ip %s", loadBalancerIp)
+	}
+}
+
 func TestDesiredContourService(t *testing.T) {
 	name := "svc-test"
 	cfg := objcontour.Config{
@@ -156,10 +164,13 @@ func TestDesiredEnvoyService(t *testing.T) {
 	// Check LB annotations for the different provider types.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
-	svc = DesiredEnvoyService(cntr)
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.LoadBalancerIP = operatorv1alpha1.LoadBalancerIP
+	svc = DesiredContourService(cntr)
 	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
+	checkServiceHasLoadBalancerIp(t, svc, cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.LoadBalancerIP)
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
 	svc = DesiredEnvoyService(cntr)

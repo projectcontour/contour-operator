@@ -268,6 +268,7 @@ type ProviderLoadBalancerParameters struct {
 	Type LoadBalancerProviderType `json:"type,omitempty"`
 
 	// loadBalancerIP contains IP for LoadBalancer service type, optional
+	// +kubebuilder:validation:Format=ipv4
 	// +optional
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
