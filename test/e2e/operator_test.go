@@ -29,7 +29,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
@@ -955,6 +954,12 @@ func TestOperatorUpgrade(t *testing.T) {
 	}
 	t.Logf("observed image %s for deployment %s/%s", latest, operatorNs, operatorName)
 
+	// Ensure the operator's deployment becomes available before proceeding.
+	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, operatorName, operatorNs, expectedDeploymentConditions...); err != nil {
+		t.Fatalf("failed to observe expected conditions for deployment %s/%s: %v", operatorNs, operatorName, err)
+	}
+	t.Logf("observed expected status conditions for deployment %s/%s", operatorNs, operatorName)
+
 	testName := "upgrade"
 	contourName := fmt.Sprintf("%s-contour", testName)
 	cfg := objcontour.Config{
@@ -1000,17 +1005,6 @@ func TestOperatorUpgrade(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
 
-	// Create the client pod to test connectivity to the sample workload.
-	cliName := "test-client"
-	cliPod, err := newPod(ctx, kclient, cfg.SpecNs, cliName, "curlimages/curl:7.75.0", []string{"sleep", "600"})
-	if err != nil {
-		t.Fatalf("failed to create pod %s/%s: %v", cfg.SpecNs, cliName, err)
-	}
-	if err := waitForPodStatusConditions(ctx, kclient, 1*time.Minute, cliPod.Namespace, cliPod.Name, expectedPodConditions...); err != nil {
-		t.Fatalf("failed to observe expected conditions for pod %s/%s: %v", cliPod.Namespace, cliPod.Name, err)
-	}
-	t.Logf("observed expected status conditions for pod %s/%s", cliPod.Namespace, cliPod.Name)
-
 	// Get the Envoy ClusterIP to curl.
 	svcName := "envoy"
 	ip, err := envoyClusterIP(ctx, kclient, cfg.SpecNs, svcName)
@@ -1018,25 +1012,13 @@ func TestOperatorUpgrade(t *testing.T) {
 		t.Fatalf("failed to get clusterIP for service %s/%s: %v", cfg.SpecNs, svcName, err)
 	}
 
-	// Curl the ingress from the client pod.
-	url := fmt.Sprintf("http://%s/", ip)
-	host := fmt.Sprintf("Host: %s", "local.projectcontour.io")
-	cmd := []string{"curl", "-H", host, "-s", "-w", "%{http_code}", url}
-	resp := "200"
-	// Polling until success since network seems not ready.
-	// It might be related to https://github.com/projectcontour/contour-operator/issues/296
-	// TODO: remove wait.PollImmediate.
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := parse.StringInPodExec(cfg.SpecNs, cliName, resp, cmd); err != nil {
-			t.Logf("observed unexpected error: %v", err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, cfg.SpecNs, cliName, err)
+	// Create the client pod to test connectivity to the sample workload.
+	cliName := "test-client"
+	testURL := fmt.Sprintf("http://%s/", ip)
+	if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, cfg.SpecNs, cliName)
+	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
@@ -1068,18 +1050,16 @@ func TestOperatorUpgrade(t *testing.T) {
 	}
 	t.Logf("observed image %s for deployment %s/contour", main, cfg.SpecNs)
 
-	// Polling until success since the envoy daemonset may still be performing the rolling update.
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := parse.StringInPodExec(cfg.SpecNs, cliName, resp, cmd); err != nil {
-			t.Logf("observed unexpected error: %v", err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("failed to get http %s response for %s in pod %s/%s: %v", resp, url, cfg.SpecNs, cliName, err)
+	// The contour should now report available.
+	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
-	t.Logf("received http %s response for %s in pod %s/%s", resp, url, cfg.SpecNs, cliName)
+	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
+
+	if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	}
+	t.Logf("received http response for %q", testURL)
 
 	// Scrape the operator logs for error messages.
 	found, err = parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
