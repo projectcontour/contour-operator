@@ -79,7 +79,7 @@ test: generate fmt vet manifests verify-image
 	go test \
 	  -mod=readonly \
 	  -covermode=atomic \
-	  -coverprofile cover.out \
+	  -coverprofile coverage.out \
 	  ./...
 
 lint-golint:
