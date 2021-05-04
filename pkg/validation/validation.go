@@ -119,10 +119,10 @@ func GatewayClass(gc *gatewayv1alpha1.GatewayClass) error {
 // otherwise an error.
 func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	if gc.Spec.ParametersRef == nil {
-		return fmt.Errorf("invalid gateway class %s, missing parametersRef", gc.Name)
+		return fmt.Errorf("invalid gatewayclass %s, missing parametersRef", gc.Name)
 	}
 	if gc.Spec.ParametersRef.Scope == nil || *gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
-		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped references are supported", gc.Name)
+		return fmt.Errorf("invalid parametersRef for gatewayclass %s, only namespaced-scoped references are supported", gc.Name)
 	}
 	group := gc.Spec.ParametersRef.Group
 	if group != operatorv1alpha1.GatewayClassParamsRefGroup {
@@ -133,7 +133,7 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 		return fmt.Errorf("invalid kind %q", kind)
 	}
 	if gc.Spec.ParametersRef.Namespace == nil {
-		return fmt.Errorf("invalid parametersRef for gateway class %s, missing namespace", gc.Name)
+		return fmt.Errorf("invalid parametersRef for gatewayclass %s, missing namespace", gc.Name)
 	}
 	return nil
 }
