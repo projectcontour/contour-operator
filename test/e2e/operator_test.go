@@ -24,8 +24,6 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-	"github.com/projectcontour/contour-operator/internal/parse"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -82,8 +80,6 @@ var (
 	// testAppReplicas is the number of replicas used for the e2e test application's
 	// deployment.
 	testAppReplicas = 3
-	// opLogMsg is the string used to search operator log messages.
-	opLogMsg = "error"
 	// isKind determines if tests should be tuned to run in a kind cluster.
 	isKind = true
 )
@@ -191,17 +187,6 @@ func TestDefaultContour(t *testing.T) {
 		t.Logf("received http response for %q", testURL)
 	}
 
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
-
 	// Ensure the default contour can be deleted and clean-up.
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
@@ -288,17 +273,6 @@ func TestContourNodePortService(t *testing.T) {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
-	}
-
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
 	}
 
 	// update the contour nodeports. Note that kind is configured to map port 81>30081 and 444>30444.
@@ -429,17 +403,6 @@ func TestContourClusterIPService(t *testing.T) {
 	}
 	t.Logf("received http response for %q", testURL)
 
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
-
 	// Ensure the default contour can be deleted and clean-up.
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
@@ -542,17 +505,6 @@ func TestContourSpec(t *testing.T) {
 		t.Logf("received http response for %q", testURL)
 	}
 
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
-
 	// Ensure the default contour can be deleted and clean-up.
 	if err := deleteContour(ctx, kclient, 3*time.Minute, testName, operatorNs); err != nil {
 		t.Fatalf("failed to delete contour %s/%s: %v", operatorNs, testName, err)
@@ -586,17 +538,6 @@ func TestMultipleContours(t *testing.T) {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
-	}
-
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
 	}
 
 	// Ensure the default contour can be deleted and clean-up.
@@ -716,9 +657,6 @@ func TestGateway(t *testing.T) {
 		t.Logf("received http response for %q", testURL)
 	}
 
-	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
-	// xref: https://github.com/projectcontour/contour-operator/issues/211
-
 	// Ensure the gateway can be deleted and clean-up.
 	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete gateway %s/%s: %v", cfg.SpecNs, gwName, err)
@@ -836,9 +774,6 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
 	t.Logf("received http response for %q", testURL)
-
-	// TODO [danehans]: Scrape operator logs for error messages before proceeding.
-	// xref: https://github.com/projectcontour/contour-operator/issues/211
 
 	// Ensure the gateway can be deleted and clean-up.
 	if err := deleteGateway(ctx, kclient, 3*time.Minute, gwName, cfg.SpecNs); err != nil {
@@ -1077,17 +1012,6 @@ func TestOperatorUpgrade(t *testing.T) {
 	}
 	t.Logf("received http response for %q", testURL)
 
-	// Scrape the operator logs for error messages.
-	found, err := parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
-
 	// Simulate an upgrade from the previous release, i.e. image "latest", to the current release.
 	if err := setDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName, current); err != nil {
 		t.Fatalf("failed to set image %s for deployment %s/%s: %v", latest, operatorNs, operatorName, err)
@@ -1117,17 +1041,6 @@ func TestOperatorUpgrade(t *testing.T) {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
 	t.Logf("received http response for %q", testURL)
-
-	// Scrape the operator logs for error messages.
-	found, err = parse.DeploymentLogsForString(operatorNs, operatorName, operatorName, opLogMsg)
-	switch {
-	case err != nil:
-		t.Fatalf("failed to look for string in operator %s/%s logs: %v", operatorNs, operatorName, err)
-	case found:
-		t.Fatalf("found %s message in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	default:
-		t.Logf("no %s message observed in operator %s/%s logs", opLogMsg, operatorNs, operatorName)
-	}
 
 	// Ensure the contour can be deleted and clean-up.
 	if err := deleteContour(ctx, kclient, 3*time.Minute, contourName, operatorNs); err != nil {

@@ -37,28 +37,6 @@ func Image(s string) error {
 	return nil
 }
 
-// DeploymentLogsForString parses the container logs of the specified ns/name
-// deployment, returning true if the string was found.
-// TODO [danehans]: Refactor to use client-go GetLogs() method:
-// https://github.com/projectcontour/contour-operator/issues/200
-func DeploymentLogsForString(ns, name, container, expectedString string) (bool, error) {
-	cmdPath, err := exec.LookPath("kubectl")
-	if err != nil {
-		return false, err
-	}
-	slashName := fmt.Sprintf("deployment/%s", name)
-	nsFlag := fmt.Sprintf("--namespace=%s", ns)
-	args := []string{"logs", slashName, "-c", container, nsFlag}
-	found, err := lookForString(cmdPath, args, expectedString)
-	if err != nil {
-		return false, err
-	}
-	if found {
-		return true, nil
-	}
-	return false, nil
-}
-
 // StringInPodExec parses the output of cmd for expectedString executed in the specified
 // pod ns/name, returning an error if expectedString was not found.
 func StringInPodExec(ns, name, expectedString string, cmd []string) error {
