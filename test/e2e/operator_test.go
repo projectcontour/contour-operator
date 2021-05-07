@@ -253,6 +253,7 @@ func TestContourNodePortService(t *testing.T) {
 	// testURL is the url used to test e2e functionality.
 	testURL := "http://local.projectcontour.io/"
 
+	var ip string
 	if isKind {
 		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
@@ -260,7 +261,7 @@ func TestContourNodePortService(t *testing.T) {
 		t.Logf("received http response for %q", testURL)
 	} else {
 		// Get the IP of a worker node to test the nodeport service.
-		ip, err := getWorkerNodeIP(ctx, kclient)
+		ip, err = getWorkerNodeIP(ctx, kclient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -320,11 +321,23 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("updated ingress %s/%s", cfg.SpecNs, appName)
 
-	// Curl the kuard ingress
-	if err := waitForHTTPResponse("http://local.projectcontour.io:81/", 1*time.Minute); err != nil {
-		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+	// Update the testURL port.
+	testURL = "http://local.projectcontour.io:81/"
+
+	if isKind {
+		if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
+	} else {
+		// Curl the ingress from a client pod.
+		testURL = fmt.Sprintf("http://%s:30081/", ip)
+		cliName := "test-client"
+		if err := podWaitForHTTPResponse(ctx, kclient, cfg.SpecNs, cliName, testURL, 3*time.Minute); err != nil {
+			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
+		}
+		t.Logf("received http response for %q", testURL)
 	}
-	t.Logf("received http response for %q", testURL)
 
 	// Ensure the default contour can be deleted and clean-up.
 	if err := deleteContour(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace); err != nil {
