@@ -26,6 +26,10 @@ jobs:
       - name: test
         run: |
           make test
+      - name: codeCoverage
+        if: ${{ success() }}
+        run: |
+          CODECOV_NAME=coverage.out bash <(curl -s https://codecov.io/bash)
   test-example-linux:
     runs-on: ubuntu-latest
     steps:

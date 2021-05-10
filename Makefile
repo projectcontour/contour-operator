@@ -76,7 +76,11 @@ check: test lint-golint lint-codespell
 
 # Run tests
 test: generate fmt vet manifests verify-image
-	go test -mod=readonly ./... -coverprofile cover.out
+	go test \
+	  -mod=readonly \
+	  -covermode=atomic \
+	  -coverprofile coverage.out \
+	  ./...
 
 lint-golint:
 	@echo Running Go linter ...
