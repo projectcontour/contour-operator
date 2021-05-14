@@ -44,9 +44,7 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-example
         env:
-          # TODO: Use official upstream image once it is available
-          # See https://github.com/projectcontour/contour/issues/3610
-          NODEIMAGE: "stevesloka/kind-node:v1.21.0"
+          NODEIMAGE: "docker.io/kindest/node:v1.21.1"
         run: |
           make local-cluster load-image example test-example
   test-e2e-linux:
@@ -63,9 +61,7 @@ jobs:
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-e2e
         env:
-          # TODO: Use official upstream image once it is available
-          # See https://github.com/projectcontour/contour/issues/3610
-          NODEIMAGE: "stevesloka/kind-node:v1.21.0"
+          NODEIMAGE: "docker.io/kindest/node:v1.21.1"
         run: |
           make local-cluster load-image test-e2e
   codespell:
