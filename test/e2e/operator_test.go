@@ -24,6 +24,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	"github.com/projectcontour/contour-operator/internal/operator/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -933,7 +934,7 @@ func TestGatewayOwnership(t *testing.T) {
 }
 
 // TestOperatorUpgrade tests an instance of the Contour custom resource while
-// upgrading the operator from release "latest" to main.
+// upgrading the operator from release "latest" to the current version/branch.
 func TestOperatorUpgrade(t *testing.T) {
 	// Get the current image to use for upgrade testing.
 	current, err := getDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName)
@@ -1037,12 +1038,12 @@ func TestOperatorUpgrade(t *testing.T) {
 	}
 	t.Logf("observed image %s for deployment %s/%s", current, operatorNs, operatorName)
 
-	// Wait for the contour containers to use the "main" tag.
-	main := "docker.io/projectcontour/contour:main"
-	if err := waitForImage(ctx, kclient, 3*time.Minute, cfg.SpecNs, "app", "contour", "contour", main); err != nil {
-		t.Fatalf("failed to observe image %s for deployment %s/contour: %v", main, cfg.SpecNs, err)
+	// Wait for the contour containers to use the current tag.
+	wantContourImage := config.DefaultContourImage
+	if err := waitForImage(ctx, kclient, 3*time.Minute, cfg.SpecNs, "app", "contour", "contour", wantContourImage); err != nil {
+		t.Fatalf("failed to observe image %s for deployment %s/contour: %v", wantContourImage, cfg.SpecNs, err)
 	}
-	t.Logf("observed image %s for deployment %s/contour", main, cfg.SpecNs)
+	t.Logf("observed image %s for deployment %s/contour", wantContourImage, cfg.SpecNs)
 
 	// The contour should now report available.
 	if err := waitForContourStatusConditions(ctx, kclient, 3*time.Minute, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {

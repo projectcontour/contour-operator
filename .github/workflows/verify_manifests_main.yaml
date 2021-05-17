@@ -1,0 +1,20 @@
+name: Verify :main manifests
+on:
+  # Only run on pushes or PRs to the `main`
+  # branch since those are expected to use
+  # the `main` image tag whereas release
+  # branches will typically use a release tag.
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  verify-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: verify-manifests
+        run: |
+          make verify-image
