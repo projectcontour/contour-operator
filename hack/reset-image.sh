@@ -36,7 +36,7 @@ for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
   else
     echo "resetting image to \"${IMAGE}:${OLD_VERSION}\" for $file"
     run::sed \
-    "-es|image: ${IMAGE}:${VERSION}|image: ${IMAGE}:${OLD_VERSION}|" \
+    "-es|image: ${IMAGE}:.*$|image: ${IMAGE}:${OLD_VERSION}|" \
       "$file"
   fi
 done

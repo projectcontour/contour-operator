@@ -1,0 +1,16 @@
+name: Verify :main manifests
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  verify-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: verify-manifests
+        run: |
+          make verify-image

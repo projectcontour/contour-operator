@@ -75,7 +75,7 @@ all: manager
 check: test lint-golint lint-codespell
 
 # Run tests
-test: generate fmt vet manifests verify-image
+test: generate fmt vet manifests
 	go test -mod=readonly ./... -coverprofile cover.out
 
 lint-golint:

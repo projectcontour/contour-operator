@@ -56,7 +56,7 @@ done
 for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   echo "setting \"image: ${IMAGE}:${VERSION}\" for $file"
   run::sed \
-    "-es|image: ${IMAGE}:${OLD_VERSION}|image: ${IMAGE}:${VERSION}|" \
+    "-es|image: ${IMAGE}:.*$|image: ${IMAGE}:${VERSION}|" \
     "$file"
 done
 
