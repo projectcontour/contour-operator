@@ -8,10 +8,9 @@ readonly PULL_POLICY="Always"
 readonly PROGNAME=$(basename "$0")
 readonly IMAGE="$1"
 readonly VERSION="$2"
-readonly OLD_VERSION="$3"
 
-if [ -z "$IMAGE" ] || [ -z "$VERSION" ] || [ -z "$OLD_VERSION" ]; then
-    printf "Usage: %s IMAGE VERSION OLD_VERSION\n" "$PROGNAME"
+if [ -z "$IMAGE" ] || [ -z "$VERSION" ]; then
+    printf "Usage: %s IMAGE VERSION\n" "$PROGNAME"
     exit 1
 fi
 
@@ -31,12 +30,12 @@ run::sed() {
 }
 
 for file in ${EXAMPLE_FILE} ${MANAGER_FILE} ; do
-  if grep -q "image: ${IMAGE}:${OLD_VERSION}" $file; then
-    echo "$file contains image: ${IMAGE}:${OLD_VERSION}"
+  if grep -q "image: ${IMAGE}:${VERSION}" $file; then
+    echo "$file contains image: ${IMAGE}:${VERSION}"
   else
-    echo "resetting image to \"${IMAGE}:${OLD_VERSION}\" for $file"
+    echo "resetting image to \"${IMAGE}:${VERSION}\" for $file"
     run::sed \
-    "-es|image: ${IMAGE}:${VERSION}|image: ${IMAGE}:${OLD_VERSION}|" \
+    "-es|image: ${IMAGE}:.*$|image: ${IMAGE}:${VERSION}|" \
       "$file"
   fi
 done
