@@ -289,6 +289,15 @@ type ProviderLoadBalancerParameters struct {
 	// +unionDiscriminator
 	// +kubebuilder:default=AWS
 	Type LoadBalancerProviderType `json:"type,omitempty"`
+
+	// AWS provides configuration settings that are specific to AWS
+	// load balancers.
+	//
+	// If empty, defaults will be applied. See specific aws fields for
+	// details about their defaults.
+	//
+	// +optional
+	AWS *AWSLoadBalancerParameters `json:"aws,omitempty"`
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the
@@ -301,6 +310,39 @@ const (
 	AWSLoadBalancerProvider   LoadBalancerProviderType = "AWS"
 	AzureLoadBalancerProvider LoadBalancerProviderType = "Azure"
 	GCPLoadBalancerProvider   LoadBalancerProviderType = "GCP"
+)
+
+// AWSLoadBalancerParameters provides configuration settings that are specific to
+// AWS load balancers.
+type AWSLoadBalancerParameters struct {
+	// Type is the type of AWS load balancer to use.
+	//
+	// Valid values are:
+	//
+	// * "Classic": A Classic load balancer makes routing decisions at either the
+	//   transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See
+	//   the following for additional details:
+	//
+	//     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb
+	//
+	// * "NLB": A Network load balancer makes routing decisions at the transport
+	//   layer (TCP/SSL). See the following for additional details:
+	//
+	//     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb
+	//
+	// If unset, defaults to "Classic".
+	//
+	// +kubebuilder:default=Classic
+	Type AWSLoadBalancerType `json:"type,omitempty"`
+}
+
+// AWSLoadBalancerType is the type of AWS load balancer to instantiate.
+// +kubebuilder:validation:Enum=Classic;NLB
+type AWSLoadBalancerType string
+
+const (
+	AWSClassicLoadBalancer AWSLoadBalancerType = "Classic"
+	AWSNetworkLoadBalancer AWSLoadBalancerType = "NLB"
 )
 
 // NodePort is the schema to specify a network port for a NodePort Service.

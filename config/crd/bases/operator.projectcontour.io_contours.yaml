@@ -175,6 +175,30 @@ spec:
                               information specific to the underlying infrastructure
                               provider.
                             properties:
+                              aws:
+                                description: "AWS provides configuration settings
+                                  that are specific to AWS load balancers. \n If empty,
+                                  defaults will be applied. See specific aws fields
+                                  for details about their defaults."
+                                properties:
+                                  type:
+                                    default: Classic
+                                    description: "Type is the type of AWS load balancer
+                                      to use. \n Valid values are: \n * \"Classic\":
+                                      A Classic load balancer makes routing decisions
+                                      at either the   transport layer (TCP/SSL) or
+                                      the application layer (HTTP/HTTPS). See   the
+                                      following for additional details: \n     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb
+                                      \n * \"NLB\": A Network load balancer makes
+                                      routing decisions at the transport   layer (TCP/SSL).
+                                      See the following for additional details: \n
+                                      \    https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb
+                                      \n If unset, defaults to \"Classic\"."
+                                    enum:
+                                    - Classic
+                                    - NLB
+                                    type: string
+                                type: object
                               type:
                                 default: AWS
                                 description: Type is the underlying infrastructure
