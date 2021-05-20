@@ -43,9 +43,7 @@ jobs:
         # image to use) for each kubernetes_version value.
         include:
           - kubernetes_version: "kubernetes:latest"
-            # TODO: Use official upstream image once it is available
-            # See https://github.com/projectcontour/contour/issues/3610
-            node_image: "docker.io/stevesloka/kind-node:v1.21.0"
+            node_image: "docker.io/kindest/node:v1.21.1"
           - kubernetes_version: "kubernetes:n-1"
             node_image: "docker.io/kindest/node:v1.20.2"
           - kubernetes_version: "kubernetes:n-2"
@@ -78,9 +76,7 @@ jobs:
         # image to use) for each kubernetes_version value.
         include:
           - kubernetes_version: "kubernetes:latest"
-            # TODO: Use official upstream image once it is available
-            # See https://github.com/projectcontour/contour/issues/3610
-            node_image: "docker.io/stevesloka/kind-node:v1.21.0"
+            node_image: "docker.io/kindest/node:v1.21.1"
           - kubernetes_version: "kubernetes:n-1"
             node_image: "docker.io/kindest/node:v1.20.2"
           - kubernetes_version: "kubernetes:n-2"
