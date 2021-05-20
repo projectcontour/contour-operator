@@ -180,7 +180,7 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:default=LoadBalancerService
 	Type NetworkPublishingType `json:"type,omitempty"`
 
-	// loadBalancer holds parameters for the load balancer. Present only if type is
+	// LoadBalancer holds parameters for the load balancer. Present only if type is
 	// LoadBalancerService.
 	//
 	// If unspecified, defaults to an external Classic AWS ELB.
@@ -231,16 +231,17 @@ type EnvoyNetworkPublishing struct {
 	ContainerPorts []ContainerPort `json:"containerPorts,omitempty"`
 }
 
-// EndpointPublishingType is a way to publish network endpoints.
+// NetworkPublishingType is a way to publish network endpoints.
 // +kubebuilder:validation:Enum=LoadBalancerService;NodePortService;ClusterIPService
 type NetworkPublishingType string
 
 const (
-	// LoadBalancerService publishes a network endpoint using a Kubernetes LoadBalancer
-	// Service.
+	// LoadBalancerServicePublishingType publishes a network endpoint using a Kubernetes
+	// LoadBalancer Service.
 	LoadBalancerServicePublishingType NetworkPublishingType = "LoadBalancerService"
 
-	// NodePortService publishes a network endpoint using a Kubernetes NodePort Service.
+	// NodePortServicePublishingType publishes a network endpoint using a Kubernetes
+	// NodePort Service.
 	NodePortServicePublishingType NetworkPublishingType = "NodePortService"
 
 	// ClusterIPServicePublishingType publishes a network endpoint using a Kubernetes
@@ -256,7 +257,7 @@ type LoadBalancerStrategy struct {
 	// +kubebuilder:default=External
 	Scope LoadBalancerScope `json:"scope,omitempty"`
 
-	// providerParameters contains load balancer information specific to
+	// ProviderParameters contains load balancer information specific to
 	// the underlying infrastructure provider.
 	//
 	// +kubebuilder:default={type: "AWS"}
@@ -282,7 +283,7 @@ var (
 //
 // +union
 type ProviderLoadBalancerParameters struct {
-	// type is the underlying infrastructure provider for the load balancer.
+	// Type is the underlying infrastructure provider for the load balancer.
 	// Allowed values are "AWS", "Azure", and "GCP".
 	//
 	// +unionDiscriminator
@@ -346,7 +347,8 @@ type ContainerPort struct {
 }
 
 const (
-	// Available indicates that the contour is running and available.
+	// ContourAvailableConditionType indicates that the contour is running
+	// and available.
 	ContourAvailableConditionType = "Available"
 )
 
@@ -366,9 +368,6 @@ type ContourStatus struct {
 	// Conditions represent the observations of a contour's current state.
 	// Known condition types are "Available". Reference the condition type
 	// for additional details.
-	//
-	// TODO [danehans]: Add support for "Progressing" and "Degraded"
-	// condition types.
 	//
 	// +patchMergeKey=type
 	// +patchStrategy=merge
