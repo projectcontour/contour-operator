@@ -62,6 +62,10 @@ const (
 	// gcpLBTypeAnnotation is the annotation used on a service to specify a GCP load balancer
 	// type.
 	gcpLBTypeAnnotation = "cloud.google.com/load-balancer-type"
+	// awsLBProxyProtocolAnnotation is used to enable the PROXY protocol for an AWS Classic
+	// load balancer. For additional details, see:
+	// https://kubernetes.io/docs/concepts/services-networking/service/#proxy-protocol-support-on-aws
+	awsLBProxyProtocolAnnotation = "service.beta.kubernetes.io/aws-load-balancer-proxy-protocol"
 	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
 	EnvoyServiceHTTPPort = int32(80)
 	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
@@ -240,13 +244,16 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		},
 	}
 
-	// Add the NLB annotation if specified by AWS provider parameters.
-	if nlbNeeded(&contour.Spec) {
-		svc.Annotations[awsLBTypeAnnotation] = "nlb"
-	}
-	// Add the TCP backend protocol annotation for AWS classic load balancers.
-	if backendTCPNeeded(&contour.Spec) {
-		svc.Annotations[awsLbBackendProtoAnnotation] = "tcp"
+	// Add AWS LB annotations based on the network publishing strategy and provider type.
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType {
+		// Add the TCP backend protocol annotation for AWS classic load balancers.
+		if isELB(&contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters) {
+			svc.Annotations[awsLbBackendProtoAnnotation] = "tcp"
+			svc.Annotations[awsLBProxyProtocolAnnotation] = "*"
+		} else {
+			// Annotate the service for an NLB.
+			svc.Annotations[awsLBTypeAnnotation] = "nlb"
+		}
 	}
 
 	epType := contour.Spec.NetworkPublishing.Envoy.Type
@@ -362,20 +369,8 @@ func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour 
 	return nil
 }
 
-// nlbNeeded returns true if the "service.beta.kubernetes.io/aws-load-balancer-type"
-// annotation is needed based on the provided spec.
-func nlbNeeded(spec *operatorv1alpha1.ContourSpec) bool {
-	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
-		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
-		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil &&
-		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1alpha1.AWSNetworkLoadBalancer
-}
-
-// backendTCPNeeded returns true if the "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
-// annotation is needed based on the provided spec.
-func backendTCPNeeded(spec *operatorv1alpha1.ContourSpec) bool {
-	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
-		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
-		(spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS == nil ||
-			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1alpha1.AWSClassicLoadBalancer)
+// isELB returns true if params is an AWS Classic ELB.
+func isELB(params *operatorv1alpha1.ProviderLoadBalancerParameters) bool {
+	return params.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
+		(params.AWS == nil || params.AWS.Type == operatorv1alpha1.AWSClassicLoadBalancer)
 }
