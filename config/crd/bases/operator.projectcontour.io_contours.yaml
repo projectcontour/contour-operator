@@ -184,7 +184,7 @@ spec:
                                   type:
                                     default: Classic
                                     description: "Type is the type of AWS load balancer
-                                      to use. \n Valid values are: \n * \"Classic\":
+                                      to manage. \n Valid values are: \n * \"Classic\":
                                       A Classic load balancer makes routing decisions
                                       at either the   transport layer (TCP/SSL) or
                                       the application layer (HTTP/HTTPS). See   the

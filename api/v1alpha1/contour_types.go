@@ -315,7 +315,7 @@ const (
 // AWSLoadBalancerParameters provides configuration settings that are specific to
 // AWS load balancers.
 type AWSLoadBalancerParameters struct {
-	// Type is the type of AWS load balancer to use.
+	// Type is the type of AWS load balancer to manage.
 	//
 	// Valid values are:
 	//
@@ -336,7 +336,7 @@ type AWSLoadBalancerParameters struct {
 	Type AWSLoadBalancerType `json:"type,omitempty"`
 }
 
-// AWSLoadBalancerType is the type of AWS load balancer to instantiate.
+// AWSLoadBalancerType is the type of AWS load balancer to manage.
 // +kubebuilder:validation:Enum=Classic;NLB
 type AWSLoadBalancerType string
 
