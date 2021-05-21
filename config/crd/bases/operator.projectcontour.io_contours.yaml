@@ -164,20 +164,20 @@ spec:
                           providerParameters:
                             type: AWS
                           scope: External
-                        description: "loadBalancer holds parameters for the load balancer.
+                        description: "LoadBalancer holds parameters for the load balancer.
                           Present only if type is LoadBalancerService. \n If unspecified,
                           defaults to an external Classic AWS ELB."
                         properties:
                           providerParameters:
                             default:
                               type: AWS
-                            description: providerParameters contains load balancer
+                            description: ProviderParameters contains load balancer
                               information specific to the underlying infrastructure
                               provider.
                             properties:
                               type:
                                 default: AWS
-                                description: type is the underlying infrastructure
+                                description: Type is the underlying infrastructure
                                   provider for the load balancer. Allowed values are
                                   "AWS", "Azure", and "GCP".
                                 enum:
@@ -294,10 +294,9 @@ spec:
                 format: int32
                 type: integer
               conditions:
-                description: "Conditions represent the observations of a contour's
-                  current state. Known condition types are \"Available\". Reference
-                  the condition type for additional details. \n TODO [danehans]: Add
-                  support for \"Progressing\" and \"Degraded\" condition types."
+                description: Conditions represent the observations of a contour's
+                  current state. Known condition types are "Available". Reference
+                  the condition type for additional details.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
