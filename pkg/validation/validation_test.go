@@ -16,10 +16,10 @@ package validation_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/internal/operator"
 	"github.com/projectcontour/contour-operator/pkg/validation"
 
@@ -406,75 +406,70 @@ func TestGatewayClass(t *testing.T) {
 }
 
 func TestGateway(t *testing.T) {
-	// Initialize the gateway dependent resources.
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "projectcontour",
+			Name: "test-gateway",
 		},
-	}
-
-	gcName := "test-gc"
-
-	cfg := objcontour.Config{
-		Name:         "test",
-		Namespace:    "projectcontour",
-		SpecNs:       ns.Name,
-		RemoveNs:     true,
-		Replicas:     1,
-		NetworkType:  operatorv1alpha1.ClusterIPServicePublishingType,
-		NodePorts:    nil,
-		GatewayClass: &gcName,
-	}
-
-	cntr := objcontour.New(cfg)
-
-	gc := &gatewayv1alpha1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: gcName,
-		},
-		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller: operatorv1alpha1.GatewayClassControllerRef,
-			ParametersRef: &gatewayv1alpha1.ParametersReference{
-				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
-				Kind:      "Contour",
-				Name:      cntr.Name,
-				Scope:     pointer.StringPtr("Namespace"),
-				Namespace: pointer.StringPtr(cntr.Namespace),
-			},
-		},
-		Status: gatewayv1alpha1.GatewayClassStatus{},
 	}
 
 	// Hostnames used by test cases.
+	empty := gatewayv1alpha1.Hostname("")
 	wildcard := gatewayv1alpha1.Hostname("*")
 	subWildcard := gatewayv1alpha1.Hostname("*.foo.com")
-	invalidWildcard := gatewayv1alpha1.Hostname("foo.*.com")
-	empty := gatewayv1alpha1.Hostname("")
+	invalidSubomain := gatewayv1alpha1.Hostname(".com.")
 	ip := gatewayv1alpha1.Hostname("1.2.3.4")
+	invalidWildcard := gatewayv1alpha1.Hostname("foo.*.com")
 
 	// Address types used by test cases.
 	ipType := gatewayv1alpha1.IPAddressType
 	namedType := gatewayv1alpha1.NamedAddressType
 
 	testCases := map[string]struct {
-		gw       *gatewayv1alpha1.Gateway
+		contour  *operatorv1alpha1.Contour
+		gc       *gatewayv1alpha1.GatewayClass
+		gateway  *gatewayv1alpha1.Gateway
 		expected bool
 	}{
 		"valid nil host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "valid-nil-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("valid-nil-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-nil-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "valid-nil-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "valid-nil-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "valid-nil-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -483,21 +478,46 @@ func TestGateway(t *testing.T) {
 			expected: true,
 		},
 		"valid zero value host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "valid-zero-value-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("valid-zero-value-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-zero-value-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "valid-zero-value-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "valid-zero-value-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "valid-zero-value-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Hostname: &empty,
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -506,21 +526,46 @@ func TestGateway(t *testing.T) {
 			expected: true,
 		},
 		"valid wildcard host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "valid-wildcard-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("valid-wildcard-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-wildcard-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "valid-wildcard-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "valid-wildcard-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "valid-wildcard-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Hostname: &wildcard,
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -529,21 +574,46 @@ func TestGateway(t *testing.T) {
 			expected: true,
 		},
 		"valid wildcard subdomain host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "valid-wildcard-subdomain-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("valid-wildcard-subdomain-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-wildcard-subdomain-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "valid-wildcard-subdomain-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "valid-wildcard-subdomain-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "valid-wildcard-subdomain-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Hostname: &subWildcard,
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -551,22 +621,95 @@ func TestGateway(t *testing.T) {
 			},
 			expected: true,
 		},
+		"invalid subdomain host gateway": {
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-subdomain-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-subdomain-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-subdomain-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-subdomain-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-subdomain-host-gateway",
+				},
+				Spec: gatewayv1alpha1.GatewaySpec{
+					GatewayClassName: "invalid-subdomain-host-gc",
+					Listeners: []gatewayv1alpha1.Listener{
+						{
+							Hostname: &invalidSubomain,
+							Port:     gatewayv1alpha1.PortNumber(int32(1)),
+							Protocol: gatewayv1alpha1.HTTPProtocolType,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
 		"invalid ip host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-ip-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-ip-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-ip-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-ip-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "invalid-ip-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-ip-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Hostname: &ip,
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -575,22 +718,94 @@ func TestGateway(t *testing.T) {
 			expected: false,
 		},
 		"invalid wildcard host gateway": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-wildcard-host-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-wildcard-host-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-wildcard-host-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-wildcard-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      "invalid-wildcard-host-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-wildcard-host-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Hostname: &invalidWildcard,
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		"invalid listener, tls protocol without config": {
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-listener-protocol-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-listener-protocol-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-listener-protocol-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-wildcard-host-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-listener-protocol-gateway",
+				},
+				Spec: gatewayv1alpha1.GatewaySpec{
+					GatewayClassName: "invalid-listener-protocol-gc",
+					Listeners: []gatewayv1alpha1.Listener{
+						{
+							Port:     gatewayv1alpha1.PortNumber(int32(1)),
+							Protocol: gatewayv1alpha1.TLSProtocolType,
 						},
 					},
 				},
@@ -598,20 +813,45 @@ func TestGateway(t *testing.T) {
 			expected: false,
 		},
 		"invalid gatewayclass reference": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-gatewayclass-reference",
+					Name:      "invalid-gatewayclass-reference-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-reference-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-gatewayclass-reference-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-gatewayclass-reference-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-gatewayclass-reference-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
 					GatewayClassName: "nonexistent",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -619,37 +859,51 @@ func TestGateway(t *testing.T) {
 			},
 			expected: false,
 		},
-		"invalid number of gateway listeners": {
-			gw: &gatewayv1alpha1.Gateway{
+		"invalid gatewayclass status": {
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-number-of-gateway-listeners",
+					Name:      "invalid-gatewayclass-status-contour",
 				},
-				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
-					Listeners: []gatewayv1alpha1.Listener{
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-status-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-gatewayclass-status-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-gatewayclass-status-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: gatewayv1alpha1.GatewayClassStatus{
+					Conditions: []metav1.Condition{
 						{
-							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
+							Type:   string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+							Status: metav1.ConditionFalse,
 						},
 					},
 				},
 			},
-			expected: false,
-		},
-		"duplicate listener port numbers": {
-			gw: &gatewayv1alpha1.Gateway{
+			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "duplicate-listener-port-numbers",
+					Name:      "invalid-gatewayclass-status-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-gatewayclass-status-gc",
 					Listeners: []gatewayv1alpha1.Listener{
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
@@ -659,21 +913,45 @@ func TestGateway(t *testing.T) {
 			},
 			expected: false,
 		},
-		"invalid listener protocol": {
-			gw: &gatewayv1alpha1.Gateway{
+		"invalid contour spec ns": {
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-listener-protocol",
+					Name:      "invalid-contour-spec-ns-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: "not-gw-ns",
+					},
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-contour-spec-ns-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-contour-spec-ns-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-contour-spec-ns-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-contour-spec-ns-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.TLSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -682,20 +960,45 @@ func TestGateway(t *testing.T) {
 			expected: false,
 		},
 		"valid gateway ip address": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "valid-gateway-ip-address",
+					Name:      "valid-gateway-ip-address-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("valid-gateway-ip-address-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-gateway-ip-address-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "valid-gateway-ip-address-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "valid-gateway-ip-address-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "valid-gateway-ip-address-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -710,27 +1013,52 @@ func TestGateway(t *testing.T) {
 			expected: true,
 		},
 		"invalid gateway ip address": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-gateway-ip-address",
+					Name:      "invalid-gateway-ip-address-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-gateway-ip-address-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-gateway-ip-address-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-gateway-ip-address-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-gateway-ip-address-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-gateway-ip-address-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
 					Addresses: []gatewayv1alpha1.GatewayAddress{
 						{
 							Type:  &ipType,
-							Value: "1..2.3.4",
+							Value: "1.2..3.4",
 						},
 					},
 				},
@@ -738,20 +1066,45 @@ func TestGateway(t *testing.T) {
 			expected: false,
 		},
 		"invalid gateway address type": {
-			gw: &gatewayv1alpha1.Gateway{
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-gateway-address-type",
+					Name:      "invalid-gateway-address-type-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-gateway-address-type-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-gateway-address-type-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+					ParametersRef: &gatewayv1alpha1.ParametersReference{
+						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
+						Kind:      "Contour",
+						Name:      "invalid-gateway-address-type-contour",
+						Scope:     pointer.StringPtr("Namespace"),
+						Namespace: pointer.StringPtr(ns.Name),
+					},
+				},
+				Status: newGatewayClassAdmittedStatus(),
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-gateway-address-type-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: gc.Name,
+					GatewayClassName: "invalid-gateway-address-type-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
-							Protocol: gatewayv1alpha1.HTTPSProtocolType,
-						},
-						{
-							Port:     gatewayv1alpha1.PortNumber(int32(2)),
 							Protocol: gatewayv1alpha1.HTTPProtocolType,
 						},
 					},
@@ -771,30 +1124,47 @@ func TestGateway(t *testing.T) {
 	builder := fake.NewClientBuilder()
 	builder.WithScheme(operator.GetOperatorScheme())
 	cl := builder.Build()
-
-	// Create gateway dependent resources
+	// Create dependent resources of a gateway.
 	if err := cl.Create(context.TODO(), ns); err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
-	}
-	if err := cl.Create(context.TODO(), cntr); err != nil {
-		t.Fatalf("failed to create contour: %v", err)
-	}
-	if err := cl.Create(context.TODO(), gc); err != nil {
-		t.Fatalf("failed to create gatewayclass: %v", err)
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if err := cl.Create(context.TODO(), tc.gw); err != nil {
+			if err := cl.Create(context.TODO(), tc.contour); err != nil {
+				t.Fatalf("failed to create contour: %v", err)
+			}
+
+			if err := cl.Create(context.TODO(), tc.gc); err != nil {
+				t.Fatalf("failed to create gatewayclass: %v", err)
+			}
+
+			if err := cl.Create(context.TODO(), tc.gateway); err != nil {
 				t.Fatalf("failed to create gateway: %v", err)
 			}
-			_, err := validation.Gateway(context.TODO(), cl, tc.gw)
-			if tc.expected && err != nil {
+
+			cntr, err := validation.Gateway(context.TODO(), cl, tc.gateway)
+			switch {
+			case tc.expected && err != nil:
 				t.Fatalf("expected gateway to be valid: %v", err)
-			}
-			if !tc.expected && err == nil {
+			case !tc.expected && err == nil:
 				t.Fatal("expected gateway to be invalid")
+			default:
+				if reflect.DeepEqual(cntr, tc.contour) {
+					t.Fatalf("expected %v; got %v", tc.contour, cntr)
+				}
 			}
 		})
+	}
+}
+
+func newGatewayClassAdmittedStatus() gatewayv1alpha1.GatewayClassStatus {
+	return gatewayv1alpha1.GatewayClassStatus{
+		Conditions: []metav1.Condition{
+			{
+				Type:   string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+				Status: metav1.ConditionTrue,
+			},
+		},
 	}
 }

@@ -703,8 +703,7 @@ func newGatewayClass(ctx context.Context, cl client.Client, name string) error {
 
 // newGateway creates a Gateway object using the provided ns/name for the object's
 // ns/name, gc for the gatewayClassName, and k/v for the key-value pair used for
-// route selection. The Gateway will contain an HTTP listener on port 80 and an
-// HTTPS listener on port 443.
+// route selection. The Gateway will contain an HTTP listener on port 80.
 func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string) error {
 	routes := &metav1.LabelSelector{
 		MatchLabels: map[string]string{k: v},
@@ -717,14 +716,6 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 			Selector: routes,
 		},
 	}
-	https := gatewayv1alpha1.Listener{
-		Port:     gatewayv1alpha1.PortNumber(int32(443)),
-		Protocol: gatewayv1alpha1.HTTPSProtocolType,
-		Routes: gatewayv1alpha1.RouteBindingSelector{
-			Kind:     "HTTPRoute",
-			Selector: routes,
-		},
-	}
 	gw := &gatewayv1alpha1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
@@ -732,7 +723,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 		},
 		Spec: gatewayv1alpha1.GatewaySpec{
 			GatewayClassName: gc,
-			Listeners:        []gatewayv1alpha1.Listener{http, https},
+			Listeners:        []gatewayv1alpha1.Listener{http},
 		},
 	}
 	if err := cl.Create(ctx, gw); err != nil {
