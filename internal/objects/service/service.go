@@ -49,12 +49,10 @@ const (
 	// TODO [danehans]: Make proxy protocol configurable or automatically enabled. See
 	// https://github.com/projectcontour/contour-operator/issues/49 for details.
 	awsLbBackendProtoAnnotation = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
-	// awsProviderType is the name of the Amazon Web Services provider.
-	awsProviderType = "AWS"
-	// azureProviderType is the name of the Microsoft Azure provider.
-	azureProviderType = "Azure"
-	// gcpProviderType is the name of the Google Cloud Platform provider.
-	gcpProviderType = "GCP"
+	// awsLBTypeAnnotation is a Service annotation used to specify an AWS load
+	// balancer type. See the following for additional details:
+	// https://kubernetes.io/docs/concepts/services-networking/service/#aws-nlb-support
+	awsLBTypeAnnotation = "service.beta.kubernetes.io/aws-load-balancer-type"
 	// awsInternalLBAnnotation is the annotation used on a service to specify an AWS
 	// load balancer as being internal.
 	awsInternalLBAnnotation = "service.beta.kubernetes.io/aws-load-balancer-internal"
@@ -77,31 +75,20 @@ const (
 )
 
 var (
-	// LbAnnotations maps cloud providers to the provider's annotation
-	// key/value pair used for managing a load balancer. For additional
-	// details see:
-	//  https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
-	//
-	LbAnnotations = map[operatorv1alpha1.LoadBalancerProviderType]map[string]string{
-		awsProviderType: {
-			awsLbBackendProtoAnnotation: "tcp",
-		},
-	}
-
 	// InternalLBAnnotations maps cloud providers to the provider's annotation
 	// key/value pair used for managing an internal load balancer. For additional
 	// details see:
 	//  https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
 	//
 	InternalLBAnnotations = map[operatorv1alpha1.LoadBalancerProviderType]map[string]string{
-		awsProviderType: {
-			awsInternalLBAnnotation: "0.0.0.0/0",
+		operatorv1alpha1.AWSLoadBalancerProvider: {
+			awsInternalLBAnnotation: "true",
 		},
-		azureProviderType: {
+		operatorv1alpha1.AzureLoadBalancerProvider: {
 			// Azure load balancers are not customizable and are set to (2 fail @ 5s interval, 2 healthy)
 			azureInternalLBAnnotation: "true",
 		},
-		gcpProviderType: {
+		operatorv1alpha1.GCPLoadBalancerProvider: {
 			gcpLBTypeAnnotation: "Internal",
 		},
 	}
@@ -252,6 +239,16 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			SessionAffinity: corev1.ServiceAffinityNone,
 		},
 	}
+
+	// Add the NLB annotation if specified by AWS provider parameters.
+	if nlbNeeded(&contour.Spec) {
+		svc.Annotations[awsLBTypeAnnotation] = "nlb"
+	}
+	// Add the TCP backend protocol annotation for AWS classic load balancers.
+	if backendTCPNeeded(&contour.Spec) {
+		svc.Annotations[awsLbBackendProtoAnnotation] = "tcp"
+	}
+
 	epType := contour.Spec.NetworkPublishing.Envoy.Type
 	if epType == operatorv1alpha1.LoadBalancerServicePublishingType ||
 		epType == operatorv1alpha1.NodePortServicePublishingType {
@@ -260,13 +257,9 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	switch epType {
 	case operatorv1alpha1.LoadBalancerServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
-		provider := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
-		lbAnnotations := LbAnnotations[provider]
-		for name, value := range lbAnnotations {
-			svc.Annotations[name] = value
-		}
 		isInternal := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope == operatorv1alpha1.InternalLoadBalancer
 		if isInternal {
+			provider := contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
 			internalAnnotations := InternalLBAnnotations[provider]
 			for name, value := range internalAnnotations {
 				svc.Annotations[name] = value
@@ -367,4 +360,22 @@ func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour 
 		}
 	}
 	return nil
+}
+
+// nlbNeeded returns true if the "service.beta.kubernetes.io/aws-load-balancer-type"
+// annotation is needed based on the provided spec.
+func nlbNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1alpha1.AWSNetworkLoadBalancer
+}
+
+// backendTCPNeeded returns true if the "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
+// annotation is needed based on the provided spec.
+func backendTCPNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
+		(spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS == nil ||
+			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1alpha1.AWSClassicLoadBalancer)
 }

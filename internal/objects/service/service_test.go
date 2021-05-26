@@ -81,19 +81,29 @@ func checkServiceHasPortProtocol(t *testing.T, svc *corev1.Service, protocol cor
 	t.Errorf("service is missing port protocol %q", protocol)
 }
 
-func checkServiceHasAnnotation(t *testing.T, svc *corev1.Service, key string) {
+func checkServiceHasAnnotation(t *testing.T, svc *corev1.Service, expect bool, key string) {
 	t.Helper()
 
 	if svc.Annotations == nil {
+		if !expect {
+			return
+		}
 		t.Errorf("service is missing annotations")
 	}
+
+	found := false
 	for k := range svc.Annotations {
 		if k == key {
-			return
+			found = true
 		}
 	}
 
-	t.Errorf("service is missing annotation %q", key)
+	if found && !expect {
+		t.Errorf("service contains annotation %q", key)
+	}
+	if !found && expect {
+		t.Errorf("service is missing annotation %q", key)
+	}
 }
 
 func checkServiceHasType(t *testing.T, svc *corev1.Service, svcType corev1.ServiceType) {
@@ -161,16 +171,25 @@ func TestDesiredEnvoyService(t *testing.T) {
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
-	checkServiceHasAnnotation(t, svc, awsLbBackendProtoAnnotation)
+	checkServiceHasAnnotation(t, svc, true, awsLbBackendProtoAnnotation)
+	// Check AWS NLB load balancer type.
+	awsParams := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type: operatorv1alpha1.AWSLoadBalancerProvider,
+		AWS:  &operatorv1alpha1.AWSLoadBalancerParameters{Type: operatorv1alpha1.AWSNetworkLoadBalancer},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = awsParams
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasAnnotation(t, svc, true, awsLBTypeAnnotation)
+	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, awsInternalLBAnnotation)
+	checkServiceHasAnnotation(t, svc, true, awsInternalLBAnnotation)
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, azureInternalLBAnnotation)
+	checkServiceHasAnnotation(t, svc, true, azureInternalLBAnnotation)
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, gcpLBTypeAnnotation)
+	checkServiceHasAnnotation(t, svc, true, gcpLBTypeAnnotation)
 	// Set network publishing type to ClusterIPService and verify the service type is as expected.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.ClusterIPServicePublishingType
 	svc = DesiredEnvoyService(cntr)
