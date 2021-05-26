@@ -16,13 +16,16 @@ package validation
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
@@ -42,12 +45,12 @@ func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.C
 		return fmt.Errorf("other contours exist in namespace %s", contour.Spec.Namespace.Name)
 	}
 
-	if err := containerPorts(contour); err != nil {
+	if err := ContainerPorts(contour); err != nil {
 		return err
 	}
 
 	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-		if err := nodePorts(contour); err != nil {
+		if err := NodePorts(contour); err != nil {
 			return err
 		}
 	}
@@ -55,9 +58,9 @@ func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.C
 	return nil
 }
 
-// containerPorts validates container ports of contour, returning an
+// ContainerPorts validates container ports of contour, returning an
 // error if the container ports do not meet the API specification.
-func containerPorts(contour *operatorv1alpha1.Contour) error {
+func ContainerPorts(contour *operatorv1alpha1.Contour) error {
 	var numsFound []int32
 	var namesFound []string
 	httpFound := false
@@ -84,9 +87,9 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 	return fmt.Errorf("http and https container ports are unspecified")
 }
 
-// nodePorts validates nodeports of contour, returning an error if the nodeports
+// NodePorts validates nodeports of contour, returning an error if the nodeports
 // do not meet the API specification.
-func nodePorts(contour *operatorv1alpha1.Contour) error {
+func NodePorts(contour *operatorv1alpha1.Contour) error {
 	ports := contour.Spec.NetworkPublishing.Envoy.NodePorts
 	if ports == nil {
 		// When unspecified, API server will auto-assign port numbers.
@@ -138,57 +141,84 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 	return nil
 }
 
-// Gateway returns an error if gw is an invalid Gateway.
-func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) error {
+// Gateway returns an error if gw is an invalid Gateway. Otherwise, the referenced Contour is returned.
+func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*operatorv1alpha1.Contour, error) {
 	var errs []error
 
-	if _, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName); err != nil {
-		errs = append(errs, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err))
+	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
+			gw.Name, err)
 	}
+
+	admitted := false
+	for _, c := range gc.Status.Conditions {
+		if c.Type == string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted) &&
+			c.Status == metav1.ConditionTrue {
+			admitted = true
+		}
+	}
+	if !admitted {
+		errs = append(errs, fmt.Errorf("invalid gatewayclass %s; status must be %s=%s", gc.Name,
+			gatewayv1alpha1.GatewayClassConditionStatusAdmitted, metav1.ConditionTrue))
+	}
+
 	if err := gatewayListeners(gw); err != nil {
 		errs = append(errs, fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,
 			gw.Name, err))
 	}
+
 	if err := gatewayAddresses(gw); err != nil {
 		errs = append(errs, fmt.Errorf("failed to validate addresses for gateway %s/%s: %w", gw.Namespace,
 			gw.Name, err))
 	}
-	if len(errs) != 0 {
-		return retryable.NewMaybeRetryableAggregate(errs)
+
+	contour, err := gatewayContour(ctx, cli, gw)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to validate contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err))
 	}
-	return nil
+
+	if len(errs) != 0 {
+		return nil, retryable.NewMaybeRetryableAggregate(errs)
+	}
+
+	return contour, nil
 }
 
 // gatewayListeners returns an error if the listeners of the provided gw are invalid.
 // TODO [danehans]: Refactor when more than 2 listeners are supported.
 func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 	listeners := gw.Spec.Listeners
-	if len(listeners) != 2 {
-		return fmt.Errorf("%d is an invalid number of listeners", len(gw.Spec.Listeners))
-	}
-	if listeners[0].Port == listeners[1].Port {
-		return fmt.Errorf("invalid listeners, port %v is non-unique", listeners[0].Port)
-	}
 	for _, listener := range listeners {
-		if listener.Protocol != gatewayv1alpha1.HTTPProtocolType && listener.Protocol != gatewayv1alpha1.HTTPSProtocolType {
+		switch listener.Protocol {
+		case gatewayv1alpha1.HTTPSProtocolType, gatewayv1alpha1.TLSProtocolType:
+			if listener.TLS == nil {
+				return fmt.Errorf("invalid listener; tls is required for protocol %s", listener.Protocol)
+			}
+		case gatewayv1alpha1.HTTPProtocolType:
+			break
+		default:
 			return fmt.Errorf("invalid listener protocol %s", listener.Protocol)
 		}
 		// TODO [danehans]: Enable TLS validation for HTTPS/TLS listeners.
 		// xref: https://github.com/projectcontour/contour-operator/issues/214
-		empty := gatewayv1alpha1.Hostname("")
-		wildcard := gatewayv1alpha1.Hostname("*")
-		if listener.Hostname != nil {
-			if listener.Hostname != &empty || listener.Hostname != &wildcard {
-				hostname := string(*listener.Hostname)
-				// According to the Gateway spec, a listener hostname cannot be an IP address.
-				if ip := validation.IsValidIP(hostname); ip == nil {
-					return fmt.Errorf("invalid listener hostname %s", hostname)
-				}
-				if parsed := validation.IsDNS1123Subdomain(hostname); parsed != nil {
-					return fmt.Errorf("invalid listener hostname %s", hostname)
-				}
-			}
+		// Validate the listener hostname.
+		// When unspecified, “”, or *, all hostnames are matched.
+		if listener.Hostname == nil || (*listener.Hostname == "" || *listener.Hostname == "*") {
+			continue
+		}
+		hostname := string(*listener.Hostname)
+		if ip := validation.IsValidIP(hostname); ip == nil {
+			return fmt.Errorf("invalid listener hostname %s", hostname)
+		}
+		var errs []string
+		if strings.Contains(hostname, "*") {
+			errs = append(errs, validation.IsWildcardDNS1123Subdomain(hostname)...)
+		} else {
+			errs = append(errs, validation.IsDNS1123Subdomain(hostname)...)
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("invalid listener hostname %s: %s", hostname, strings.Join(errs, ", "))
 		}
 	}
 	// TODO [danehans]: Validate routes of a gateway.
@@ -211,4 +241,17 @@ func gatewayAddresses(gw *gatewayv1alpha1.Gateway) error {
 		}
 	}
 	return nil
+}
+
+// gatewayContour returns the contour associated with gw, if valid.
+func gatewayContour(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*operatorv1alpha1.Contour, error) {
+	contour, err := objgw.ContourForGateway(ctx, cli, gw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+	}
+	if contour.Spec.Namespace.Name != gw.Namespace {
+		return nil, fmt.Errorf("invalid contour namespace %q; namespace must match gateway namespace %q",
+			contour.Spec.Namespace.Name, gw.Namespace)
+	}
+	return contour, nil
 }

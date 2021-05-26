@@ -138,12 +138,13 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The gateway is safe to process.
 	desired := gw.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
+		cntr, err := validation.Gateway(ctx, r.client, gw)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to validate gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+		}
 		switch {
 		case objgw.IsFinalized(gw):
-			if err := validation.Gateway(ctx, r.client, gw); err != nil {
-				errs = append(errs, fmt.Errorf("failed to validate gateway %s/%s: %w", gw.Namespace, gw.Name, err))
-			}
-			if err := r.ensureGateway(ctx, gw); err != nil {
+			if err := r.ensureGateway(ctx, gw, cntr); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get ensure gateway %s/%s: %w", req.Namespace, req.Name, err)
 			}
 			// The gateway is valid, so finalize dependent resources of gateway.
@@ -194,14 +195,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 // ensureGateway ensures all necessary resources exist for the given gw.
-func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gateway) error {
+func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gateway, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	cli := r.client
-
-	contour, err := objgw.ContourForGateway(ctx, cli, gw)
-	if err != nil {
-		return fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)
-	}
 
 	handleResult := func(resource string, err error) {
 		if err != nil {

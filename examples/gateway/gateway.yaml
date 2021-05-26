@@ -39,10 +39,3 @@ spec:
         selector:
           matchLabels:
             app: kuard
-    - protocol: HTTPS
-      port: 443
-      routes:
-        kind: HTTPRoute
-        selector:
-          matchLabels:
-            app: kuard
