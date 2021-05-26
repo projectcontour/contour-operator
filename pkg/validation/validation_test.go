@@ -913,6 +913,53 @@ func TestGateway(t *testing.T) {
 			},
 			expected: false,
 		},
+		"invalid gatewayclass no parameters ref": {
+			contour: &operatorv1alpha1.Contour{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-gatewayclass-no-parameters-ref-contour",
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name: ns.Name,
+					},
+					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-no-parameters-ref-gc"),
+				},
+			},
+			gc: &gatewayv1alpha1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-gatewayclass-no-parameters-ref-gc",
+				},
+				Spec: gatewayv1alpha1.GatewayClassSpec{
+					Controller: operatorv1alpha1.GatewayClassControllerRef,
+				},
+				Status: gatewayv1alpha1.GatewayClassStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted),
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			gateway: &gatewayv1alpha1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "invalid-gatewayclass-no-parameters-ref-gateway",
+				},
+				Spec: gatewayv1alpha1.GatewaySpec{
+					GatewayClassName: "invalid-gatewayclass-no-parameters-ref-gc",
+					Listeners: []gatewayv1alpha1.Listener{
+						{
+							Port:     gatewayv1alpha1.PortNumber(int32(1)),
+							Protocol: gatewayv1alpha1.HTTPProtocolType,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
 		"invalid contour spec ns": {
 			contour: &operatorv1alpha1.Contour{
 				TypeMeta: metav1.TypeMeta{},
