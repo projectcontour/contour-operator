@@ -225,7 +225,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      contourDeploymentName,
-			Labels:    makeDeploymentLabels(contour, objutil.TagFromImage(image)),
+			Labels:    makeDeploymentLabels(contour),
 		},
 		Spec: appsv1.DeploymentSpec{
 			ProgressDeadlineSeconds: pointer.Int32Ptr(int32(600)),
@@ -348,14 +348,11 @@ func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *o
 	return nil
 }
 
-// makeDeploymentLabels returns labels for a Contour deployment, using
-// "app.kubernetes.io/version: image" and contour fields for other label values.
-func makeDeploymentLabels(contour *operatorv1alpha1.Contour, image string) map[string]string {
+// makeDeploymentLabels returns labels for a Contour deployment.
+func makeDeploymentLabels(contour *operatorv1alpha1.Contour) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":     "contour",
-		"app.kubernetes.io/instance": contour.Name,
-		// The image tag is used as the version.
-		"app.kubernetes.io/version":    image,
+		"app.kubernetes.io/name":       "contour",
+		"app.kubernetes.io/instance":   contour.Name,
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// Associate the deployment with the provided contour.
