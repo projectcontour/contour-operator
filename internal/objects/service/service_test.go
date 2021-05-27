@@ -173,6 +173,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasAnnotation(t, svc, true, awsLbBackendProtoAnnotation)
 	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	// Ensure the NLB annotation was not applied since a Classic ELB is used by default.
+	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
 	// Test proxy protocol for AWS Classic load balancer (when provider params are specified).
 	elbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,
@@ -181,6 +183,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = elbParams
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	// Ensure the NLB annotation was not applied.
+	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
 	// Check AWS NLB load balancer type.
 	nlbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,

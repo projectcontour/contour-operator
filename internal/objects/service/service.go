@@ -245,7 +245,8 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	}
 
 	// Add AWS LB annotations based on the network publishing strategy and provider type.
-	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType {
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider {
 		// Add the TCP backend protocol annotation for AWS classic load balancers.
 		if isELB(&contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters) {
 			svc.Annotations[awsLbBackendProtoAnnotation] = "tcp"
