@@ -164,7 +164,7 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasPortName(t, svc, "http")
 	checkServiceHasPortName(t, svc, "https")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
-	// Check LB annotations for the different provider types.
+	// Check LB annotations for the different provider types, starting with AWS ELB.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
@@ -172,24 +172,50 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasAnnotation(t, svc, true, awsLbBackendProtoAnnotation)
+	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	// Ensure the NLB annotation was not applied since a Classic ELB is used by default.
+	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
+	// Test proxy protocol for AWS Classic load balancer (when provider params are specified).
+	elbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type: operatorv1alpha1.AWSLoadBalancerProvider,
+		AWS:  &operatorv1alpha1.AWSLoadBalancerParameters{Type: operatorv1alpha1.AWSClassicLoadBalancer},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = elbParams
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	// Ensure the NLB annotation was not applied.
+	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
 	// Check AWS NLB load balancer type.
-	awsParams := operatorv1alpha1.ProviderLoadBalancerParameters{
+	nlbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,
 		AWS:  &operatorv1alpha1.AWSLoadBalancerParameters{Type: operatorv1alpha1.AWSNetworkLoadBalancer},
 	}
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = awsParams
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = nlbParams
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, true, awsLBTypeAnnotation)
+	// NLBs should not have PROXY protocol or backend protocol annotations.
 	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
+	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
+	// Test an internal ELB
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = elbParams
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, true, awsInternalLBAnnotation)
+	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	// Test an internal Azure LB.
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, true, azureInternalLBAnnotation)
+	// Azure LBs should not should not have AWS PROXY protocol or backend protocol annotations.
+	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
+	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
+	// Test an internal GCP LB.
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasAnnotation(t, svc, true, gcpLBTypeAnnotation)
+	// GCP LBs should not should not have AWS PROXY protocol or backend protocol annotations.
+	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
+	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
 	// Set network publishing type to ClusterIPService and verify the service type is as expected.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.ClusterIPServicePublishingType
 	svc = DesiredEnvoyService(cntr)
