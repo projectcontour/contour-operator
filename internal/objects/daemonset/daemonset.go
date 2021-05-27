@@ -113,10 +113,8 @@ func EnsureDaemonSetDeleted(ctx context.Context, cli client.Client, contour *ope
 // envoyImage as Envoy's container image.
 func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImage string) *appsv1.DaemonSet {
 	labels := map[string]string{
-		"app.kubernetes.io/name":     "contour",
-		"app.kubernetes.io/instance": contour.Name,
-		// The contourImage tag is used as the version.
-		"app.kubernetes.io/version":    objutil.TagFromImage(contourImage),
+		"app.kubernetes.io/name":       "contour",
+		"app.kubernetes.io/instance":   contour.Name,
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
 		// Associate the daemonset with the provided contour.
