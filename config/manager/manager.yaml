@@ -20,8 +20,8 @@ spec:
         - /contour-operator
         args:
         - --enable-leader-election
-        image: docker.io/projectcontour/contour-operator:main
-        imagePullPolicy: Always
+        image: docker.io/projectcontour/contour-operator:v1.16.0
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:
