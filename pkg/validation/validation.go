@@ -159,8 +159,8 @@ func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway
 		}
 	}
 	if !admitted {
-		errs = append(errs, fmt.Errorf("invalid gatewayclass %s; status must be %s=%s", gc.Name,
-			gatewayv1alpha1.GatewayClassConditionStatusAdmitted, metav1.ConditionTrue))
+		return nil, fmt.Errorf("invalid gatewayclass %s; status must be %s=%s", gc.Name,
+			gatewayv1alpha1.GatewayClassConditionStatusAdmitted, metav1.ConditionTrue)
 	}
 
 	if err := gatewayListeners(gw); err != nil {
