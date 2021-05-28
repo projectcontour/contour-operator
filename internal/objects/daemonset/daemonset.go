@@ -290,6 +290,17 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		},
 	}
 
+	tolerations := []corev1.Toleration{}
+	for _, t := range contour.Spec.NetworkPublishing.Envoy.Tolerations {
+		tolerations = append(tolerations, corev1.Toleration{
+			Effect:            corev1.TaintEffect(t.Effect),
+			TolerationSeconds: t.TolerationSeconds,
+			Key:               t.Key,
+			Value:             t.Value,
+			Operator:          corev1.TolerationOperator(t.Operator),
+		})
+	}
+
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
@@ -345,6 +356,8 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
+					NodeSelector:                  contour.Spec.NetworkPublishing.Envoy.NodeSelector,
+					Tolerations:                   tolerations,
 				},
 			},
 		},

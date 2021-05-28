@@ -229,6 +229,41 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:validation:MaxItems=2
 	// +kubebuilder:default={{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}
 	ContainerPorts []ContainerPort `json:"containerPorts,omitempty"`
+
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty"`
+}
+
+type Toleration struct {
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+	// +optional
+	Key string `json:"key,omitempty"`
+	// Operator represents a key's relationship to the value.
+	// Valid operators are Exists and Equal. Defaults to Equal.
+	// Exists is equivalent to wildcard for value, so that a pod can
+	// tolerate all taints of a particular category.
+	// +kubebuilder:validation:Enum=Exists;Equal
+	// +optional
+	Operator string `json:"operator,omitempty"`
+	// Value is the taint value the toleration matches to.
+	// If the operator is Exists, the value should be empty, otherwise just a regular string.
+	// +optional
+	Value string `json:"value,omitempty"`
+	// Effect indicates the taint effect to match. Empty means match all taint effects.
+	// When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+	// +kubebuilder:validation:Enum=NoSchedule;PreferNoSchedule;NoExecute
+	// +optional
+	Effect string `json:"effect,omitempty"`
+	// TolerationSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values will be treated as 0 (evict immediately) by the system.
+	// +optional
+	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty"`
 }
 
 // NetworkPublishingType is a way to publish network endpoints.
