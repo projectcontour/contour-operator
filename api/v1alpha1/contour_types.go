@@ -106,26 +106,79 @@ type ContourSpec struct {
 	IngressClassName *string `json:"ingressClassName,omitempty"`
 
 	// NodePlacement enables scheduling of Contour and Envoy pods onto specific nodes.
+	//
+	// See each field for additional details.
+	//
 	// +optional
-	NodePlacement NodePlacement `json:"nodePlacment,omitempty"`
+	NodePlacement *NodePlacement `json:"nodePlacement,omitempty"`
 }
 
-// NodePlacement describes node scheduling configuration for pods.
+// NodePlacement describes node scheduling configuration of Contour and Envoy pods.
 type NodePlacement struct {
-	Contour ContourNodePlacement `json:"contour,omitempty"`
-	Envoy   EnvoyNodePlacement   `json:"envoy,omitempty"`
+	// Contour describes node scheduling configuration of Contour pods.
+	//
+	// +optional
+	Contour *ContourNodePlacement `json:"contour,omitempty"`
+
+	// Envoy describes node scheduling configuration of Envoy pods.
+	//
+	// +optional
+	Envoy *EnvoyNodePlacement `json:"envoy,omitempty"`
 }
 
 // ContourNodePlacement describes node scheduling configuration for Contour pods.
+// If nodeSelector and tolerations are specified, the scheduler will use both to
+// determine where to place the Contour pod(s).
 type ContourNodePlacement struct {
-	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	// NodeSelector is the simplest recommended form of node selection constraint
+	// and specifies a map of key-value pairs. For the Contour pod to be eligible
+	// to run on a node, the node must have each of the indicated key-value pairs
+	// as labels (it can have additional labels as well).
+	//
+	// If unset, the Contour pod(s) will be scheduled to any available node.
+	//
+	// +optional
+	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+
+	// Tolerations work with taints to ensure that Envoy pods are not scheduled
+	// onto inappropriate nodes. One or more taints are applied to a node; this
+	// marks that the node should not accept any pods that do not tolerate the
+	// taints.
+	//
+	// The default is an empty list.
+	//
+	// See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+	// for additional details.
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // EnvoyNodePlacement describes node scheduling configuration for Envoy pods.
+// If nodeSelector and tolerations are specified, the scheduler will use both
+// to determine where to place the Envoy pod(s).
 type EnvoyNodePlacement struct {
-	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	// NodeSelector is the simplest recommended form of node selection constraint
+	// and specifies a map of key-value pairs. For the Envoy pod to be eligible to
+	// run on a node, the node must have each of the indicated key-value pairs as
+	// labels (it can have additional labels as well).
+	//
+	// If unset, the Envoy pod(s) will be scheduled to any available node.
+	//
+	// +optional
+	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+
+	// Tolerations work with taints to ensure that Envoy pods are not scheduled
+	// onto inappropriate nodes. One or more taints are applied to a node; this
+	// marks that the node should not accept any pods that do not tolerate the taints.
+	//
+	// The default is an empty list.
+	//
+	// See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+	// for additional details.
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.

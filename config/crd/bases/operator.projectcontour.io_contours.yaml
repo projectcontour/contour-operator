@@ -293,19 +293,72 @@ spec:
                         type: string
                     type: object
                 type: object
-              nodePlacment:
-                description: NodePlacement enables scheduling of Contour and Envoy
-                  pods onto specific nodes.
+              nodePlacement:
+                description: "NodePlacement enables scheduling of Contour and Envoy
+                  pods onto specific nodes. \n See each field for additional details."
                 properties:
                   contour:
-                    description: ContourNodePlacement describes node scheduling configuration
-                      for Contour pods.
+                    description: Contour describes node scheduling configuration of
+                      Contour pods.
                     properties:
                       nodeSelector:
-                        additionalProperties:
-                          type: string
+                        description: "NodeSelector is the simplest recommended form
+                          of node selection constraint and specifies a map of key-value
+                          pairs. For the Contour pod to be eligible to run on a node,
+                          the node must have each of the indicated key-value pairs
+                          as labels (it can have additional labels as well). \n If
+                          unset, the Contour pod(s) will be scheduled to any available
+                          node."
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
                         type: object
                       tolerations:
+                        description: "Tolerations work with taints to ensure that
+                          Envoy pods are not scheduled onto inappropriate nodes. One
+                          or more taints are applied to a node; this marks that the
+                          node should not accept any pods that do not tolerate the
+                          taints. \n The default is an empty list. \n See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+                          for additional details."
                         items:
                           description: The pod this Toleration is attached to tolerates
                             any taint that matches the triple <key,value,effect> using
@@ -348,14 +401,67 @@ spec:
                         type: array
                     type: object
                   envoy:
-                    description: EnvoyNodePlacement describes node scheduling configuration
-                      for Envoy pods.
+                    description: Envoy describes node scheduling configuration of
+                      Envoy pods.
                     properties:
                       nodeSelector:
-                        additionalProperties:
-                          type: string
+                        description: "NodeSelector is the simplest recommended form
+                          of node selection constraint and specifies a map of key-value
+                          pairs. For the Envoy pod to be eligible to run on a node,
+                          the node must have each of the indicated key-value pairs
+                          as labels (it can have additional labels as well). \n If
+                          unset, the Envoy pod(s) will be scheduled to any available
+                          node."
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
                         type: object
                       tolerations:
+                        description: "Tolerations work with taints to ensure that
+                          Envoy pods are not scheduled onto inappropriate nodes. One
+                          or more taints are applied to a node; this marks that the
+                          node should not accept any pods that do not tolerate the
+                          taints. \n The default is an empty list. \n See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+                          for additional details."
                         items:
                           description: The pod this Toleration is attached to tolerates
                             any taint that matches the triple <key,value,effect> using

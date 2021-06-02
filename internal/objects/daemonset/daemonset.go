@@ -345,11 +345,17 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
-					NodeSelector:                  contour.Spec.NodePlacement.Envoy.NodeSelector,
-					Tolerations:                   contour.Spec.NodePlacement.Envoy.Tolerations,
 				},
 			},
 		},
+	}
+
+	if contour.EnvoyNodeSelectorExists() {
+		ds.Spec.Template.Spec.NodeSelector = contour.Spec.NodePlacement.Contour.NodeSelector.MatchLabels
+	}
+
+	if contour.EnvoyTolerationsExist() {
+		ds.Spec.Template.Spec.Tolerations = contour.Spec.NodePlacement.Contour.Tolerations
 	}
 
 	return ds

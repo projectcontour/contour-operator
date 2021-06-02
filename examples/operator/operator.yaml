@@ -403,6 +403,30 @@ spec:
                               information specific to the underlying infrastructure
                               provider.
                             properties:
+                              aws:
+                                description: "AWS provides configuration settings
+                                  that are specific to AWS load balancers. \n If empty,
+                                  defaults will be applied. See specific aws fields
+                                  for details about their defaults."
+                                properties:
+                                  type:
+                                    default: Classic
+                                    description: "Type is the type of AWS load balancer
+                                      to manage. \n Valid values are: \n * \"Classic\":
+                                      A Classic load balancer makes routing decisions
+                                      at either the   transport layer (TCP/SSL) or
+                                      the application layer (HTTP/HTTPS). See   the
+                                      following for additional details: \n     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb
+                                      \n * \"NLB\": A Network load balancer makes
+                                      routing decisions at the transport   layer (TCP/SSL).
+                                      See the following for additional details: \n
+                                      \    https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb
+                                      \n If unset, defaults to \"Classic\"."
+                                    enum:
+                                    - Classic
+                                    - NLB
+                                    type: string
+                                type: object
                               type:
                                 default: AWS
                                 description: Type is the underlying infrastructure
@@ -495,6 +519,217 @@ spec:
                         - NodePortService
                         - ClusterIPService
                         type: string
+                    type: object
+                type: object
+              nodePlacement:
+                description: "NodePlacement enables scheduling of Contour and Envoy
+                  pods onto specific nodes. \n See each field for additional details."
+                properties:
+                  contour:
+                    description: Contour describes node scheduling configuration of
+                      Contour pods.
+                    properties:
+                      nodeSelector:
+                        description: "NodeSelector is the simplest recommended form
+                          of node selection constraint and specifies a map of key-value
+                          pairs. For the Contour pod to be eligible to run on a node,
+                          the node must have each of the indicated key-value pairs
+                          as labels (it can have additional labels as well). \n If
+                          unset, the Contour pod(s) will be scheduled to any available
+                          node."
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                      tolerations:
+                        description: "Tolerations work with taints to ensure that
+                          Envoy pods are not scheduled onto inappropriate nodes. One
+                          or more taints are applied to a node; this marks that the
+                          node should not accept any pods that do not tolerate the
+                          taints. \n The default is an empty list. \n See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+                          for additional details."
+                        items:
+                          description: The pod this Toleration is attached to tolerates
+                            any taint that matches the triple <key,value,effect> using
+                            the matching operator <operator>.
+                          properties:
+                            effect:
+                              description: Effect indicates the taint effect to match.
+                                Empty means match all taint effects. When specified,
+                                allowed values are NoSchedule, PreferNoSchedule and
+                                NoExecute.
+                              type: string
+                            key:
+                              description: Key is the taint key that the toleration
+                                applies to. Empty means match all taint keys. If the
+                                key is empty, operator must be Exists; this combination
+                                means to match all values and all keys.
+                              type: string
+                            operator:
+                              description: Operator represents a key's relationship
+                                to the value. Valid operators are Exists and Equal.
+                                Defaults to Equal. Exists is equivalent to wildcard
+                                for value, so that a pod can tolerate all taints of
+                                a particular category.
+                              type: string
+                            tolerationSeconds:
+                              description: TolerationSeconds represents the period
+                                of time the toleration (which must be of effect NoExecute,
+                                otherwise this field is ignored) tolerates the taint.
+                                By default, it is not set, which means tolerate the
+                                taint forever (do not evict). Zero and negative values
+                                will be treated as 0 (evict immediately) by the system.
+                              format: int64
+                              type: integer
+                            value:
+                              description: Value is the taint value the toleration
+                                matches to. If the operator is Exists, the value should
+                                be empty, otherwise just a regular string.
+                              type: string
+                          type: object
+                        type: array
+                    type: object
+                  envoy:
+                    description: Envoy describes node scheduling configuration of
+                      Envoy pods.
+                    properties:
+                      nodeSelector:
+                        description: "NodeSelector is the simplest recommended form
+                          of node selection constraint and specifies a map of key-value
+                          pairs. For the Envoy pod to be eligible to run on a node,
+                          the node must have each of the indicated key-value pairs
+                          as labels (it can have additional labels as well). \n If
+                          unset, the Envoy pod(s) will be scheduled to any available
+                          node."
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                      tolerations:
+                        description: "Tolerations work with taints to ensure that
+                          Envoy pods are not scheduled onto inappropriate nodes. One
+                          or more taints are applied to a node; this marks that the
+                          node should not accept any pods that do not tolerate the
+                          taints. \n The default is an empty list. \n See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+                          for additional details."
+                        items:
+                          description: The pod this Toleration is attached to tolerates
+                            any taint that matches the triple <key,value,effect> using
+                            the matching operator <operator>.
+                          properties:
+                            effect:
+                              description: Effect indicates the taint effect to match.
+                                Empty means match all taint effects. When specified,
+                                allowed values are NoSchedule, PreferNoSchedule and
+                                NoExecute.
+                              type: string
+                            key:
+                              description: Key is the taint key that the toleration
+                                applies to. Empty means match all taint keys. If the
+                                key is empty, operator must be Exists; this combination
+                                means to match all values and all keys.
+                              type: string
+                            operator:
+                              description: Operator represents a key's relationship
+                                to the value. Valid operators are Exists and Equal.
+                                Defaults to Equal. Exists is equivalent to wildcard
+                                for value, so that a pod can tolerate all taints of
+                                a particular category.
+                              type: string
+                            tolerationSeconds:
+                              description: TolerationSeconds represents the period
+                                of time the toleration (which must be of effect NoExecute,
+                                otherwise this field is ignored) tolerates the taint.
+                                By default, it is not set, which means tolerate the
+                                taint forever (do not evict). Zero and negative values
+                                will be treated as 0 (evict immediately) by the system.
+                              format: int64
+                              type: integer
+                            value:
+                              description: Value is the taint value the toleration
+                                matches to. If the operator is Exists, the value should
+                                be empty, otherwise just a regular string.
+                              type: string
+                          type: object
+                        type: array
                     type: object
                 type: object
               replicas:
