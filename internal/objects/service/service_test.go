@@ -15,6 +15,7 @@ package service
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -81,28 +82,30 @@ func checkServiceHasPortProtocol(t *testing.T, svc *corev1.Service, protocol cor
 	t.Errorf("service is missing port protocol %q", protocol)
 }
 
-func checkServiceHasAnnotation(t *testing.T, svc *corev1.Service, expect bool, key string) {
+func checkServiceHasAnnotations(t *testing.T, svc *corev1.Service, expectedKeys ...string) {
 	t.Helper()
 
-	if svc.Annotations == nil {
-		if !expect {
+	// get all of the actual annotation keys from the service
+	var actualKeys []string
+	for k := range svc.Annotations {
+		actualKeys = append(actualKeys, k)
+	}
+
+	sort.Strings(actualKeys)
+	sort.Strings(expectedKeys)
+
+	// short-cut to an error if the slices are different lengths
+	if len(expectedKeys) != len(actualKeys) {
+		t.Errorf("expected service annotation keys %v, got %v", expectedKeys, actualKeys)
+		return
+	}
+
+	// now that the slices are sorted & same length we can compare item by item
+	for i, want := range expectedKeys {
+		if actualKeys[i] != want {
+			t.Errorf("expected service annotation keys %v, got %v", expectedKeys, actualKeys)
 			return
 		}
-		t.Errorf("service is missing annotations")
-	}
-
-	found := false
-	for k := range svc.Annotations {
-		if k == key {
-			found = true
-		}
-	}
-
-	if found && !expect {
-		t.Errorf("service contains annotation %q", key)
-	}
-	if !found && expect {
-		t.Errorf("service is missing annotation %q", key)
 	}
 }
 
@@ -164,17 +167,17 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasPortName(t, svc, "http")
 	checkServiceHasPortName(t, svc, "https")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
-	// Check LB annotations for the different provider types, starting with AWS ELB.
+
+	// Check LB annotations for the different provider types, starting with AWS ELB (the default
+	// if AWS provider params are not passed).
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasType(t, svc, corev1.ServiceTypeLoadBalancer)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
-	checkServiceHasAnnotation(t, svc, true, awsLbBackendProtoAnnotation)
-	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
-	// Ensure the NLB annotation was not applied since a Classic ELB is used by default.
-	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
+	checkServiceHasAnnotations(t, svc, awsLbBackendProtoAnnotation, awsLBProxyProtocolAnnotation)
+
 	// Test proxy protocol for AWS Classic load balancer (when provider params are specified).
 	elbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,
@@ -182,9 +185,8 @@ func TestDesiredEnvoyService(t *testing.T) {
 	}
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = elbParams
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
-	// Ensure the NLB annotation was not applied.
-	checkServiceHasAnnotation(t, svc, false, awsLBTypeAnnotation)
+	checkServiceHasAnnotations(t, svc, awsLbBackendProtoAnnotation, awsLBProxyProtocolAnnotation)
+
 	// Check AWS NLB load balancer type.
 	nlbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,
@@ -192,32 +194,28 @@ func TestDesiredEnvoyService(t *testing.T) {
 	}
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = nlbParams
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, true, awsLBTypeAnnotation)
 	// NLBs should not have PROXY protocol or backend protocol annotations.
-	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
-	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
+	checkServiceHasAnnotations(t, svc, awsLBTypeAnnotation)
+
 	// Test an internal ELB
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = elbParams
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, true, awsInternalLBAnnotation)
-	checkServiceHasAnnotation(t, svc, true, awsLBProxyProtocolAnnotation)
+	checkServiceHasAnnotations(t, svc, awsInternalLBAnnotation, awsLbBackendProtoAnnotation, awsLBProxyProtocolAnnotation)
+
 	// Test an internal Azure LB.
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, true, azureInternalLBAnnotation)
-	// Azure LBs should not should not have AWS PROXY protocol or backend protocol annotations.
-	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
-	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
+	checkServiceHasAnnotations(t, svc, azureInternalLBAnnotation)
+
 	// Test an internal GCP LB.
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotation(t, svc, true, gcpLBTypeAnnotation)
-	// GCP LBs should not should not have AWS PROXY protocol or backend protocol annotations.
-	checkServiceHasAnnotation(t, svc, false, awsLbBackendProtoAnnotation)
-	checkServiceHasAnnotation(t, svc, false, awsLBProxyProtocolAnnotation)
+	checkServiceHasAnnotations(t, svc, gcpLBTypeAnnotation)
+
 	// Set network publishing type to ClusterIPService and verify the service type is as expected.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.ClusterIPServicePublishingType
 	svc = DesiredEnvoyService(cntr)
 	checkServiceHasType(t, svc, corev1.ServiceTypeClusterIP)
+	checkServiceHasAnnotations(t, svc) // passing no keys means we expect no annotations
 }
