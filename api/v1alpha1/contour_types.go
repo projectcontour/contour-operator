@@ -14,6 +14,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -103,6 +104,28 @@ type ContourSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty"`
+
+	// NodePlacement enables scheduling of Contour and Envoy pods onto specific nodes.
+	// +optional
+	NodePlacement NodePlacement `json:"nodePlacment,omitempty"`
+}
+
+// NodePlacement describes node scheduling configuration for pods.
+type NodePlacement struct {
+	Contour ContourNodePlacement `json:"contour,omitempty"`
+	Envoy   EnvoyNodePlacement   `json:"envoy,omitempty"`
+}
+
+// ContourNodePlacement describes node scheduling configuration for Contour pods.
+type ContourNodePlacement struct {
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// EnvoyNodePlacement describes node scheduling configuration for Envoy pods.
+type EnvoyNodePlacement struct {
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // NamespaceSpec defines the schema of a Contour namespace.
@@ -229,41 +252,6 @@ type EnvoyNetworkPublishing struct {
 	// +kubebuilder:validation:MaxItems=2
 	// +kubebuilder:default={{name: http, portNumber: 8080}, {name: https, portNumber: 8443}}
 	ContainerPorts []ContainerPort `json:"containerPorts,omitempty"`
-
-	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// +optional
-	Tolerations []Toleration `json:"tolerations,omitempty"`
-}
-
-type Toleration struct {
-	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
-	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
-	// +optional
-	Key string `json:"key,omitempty"`
-	// Operator represents a key's relationship to the value.
-	// Valid operators are Exists and Equal. Defaults to Equal.
-	// Exists is equivalent to wildcard for value, so that a pod can
-	// tolerate all taints of a particular category.
-	// +kubebuilder:validation:Enum=Exists;Equal
-	// +optional
-	Operator string `json:"operator,omitempty"`
-	// Value is the taint value the toleration matches to.
-	// If the operator is Exists, the value should be empty, otherwise just a regular string.
-	// +optional
-	Value string `json:"value,omitempty"`
-	// Effect indicates the taint effect to match. Empty means match all taint effects.
-	// When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
-	// +kubebuilder:validation:Enum=NoSchedule;PreferNoSchedule;NoExecute
-	// +optional
-	Effect string `json:"effect,omitempty"`
-	// TolerationSeconds represents the period of time the toleration (which must be
-	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
-	// it is not set, which means tolerate the taint forever (do not evict). Zero and
-	// negative values will be treated as 0 (evict immediately) by the system.
-	// +optional
-	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty"`
 }
 
 // NetworkPublishingType is a way to publish network endpoints.

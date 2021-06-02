@@ -306,6 +306,8 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 					SchedulerName:                 "default-scheduler",
 					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
+					NodeSelector:                  contour.Spec.NodePlacement.Contour.NodeSelector,
+					Tolerations:                   contour.Spec.NodePlacement.Contour.Tolerations,
 				},
 			},
 		},
