@@ -125,6 +125,14 @@ func checkServiceHasExternalTrafficPolicy(t *testing.T, svc *corev1.Service, pol
 	}
 }
 
+func checkServiceHasLoadBalancerAddress(t *testing.T, svc *corev1.Service, address string) {
+	t.Helper()
+
+	if svc.Spec.LoadBalancerIP != address {
+		t.Errorf("service is missing predefined load balancer ip %s", address)
+	}
+}
+
 func TestDesiredContourService(t *testing.T) {
 	name := "svc-test"
 	cfg := objcontour.Config{
@@ -145,6 +153,10 @@ func TestDesiredContourService(t *testing.T) {
 
 func TestDesiredEnvoyService(t *testing.T) {
 	name := "svc-test"
+	loadBalancerAddress := "1.2.3.4"
+	allocationIDs := []string{"eipalloc-0123456789", "eipalloc-1234567890"}
+	resourceGroup := "contour-rg-test"
+	subnet := "contour-subnet-test"
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
@@ -190,12 +202,31 @@ func TestDesiredEnvoyService(t *testing.T) {
 	// Check AWS NLB load balancer type.
 	nlbParams := operatorv1alpha1.ProviderLoadBalancerParameters{
 		Type: operatorv1alpha1.AWSLoadBalancerProvider,
-		AWS:  &operatorv1alpha1.AWSLoadBalancerParameters{Type: operatorv1alpha1.AWSNetworkLoadBalancer},
+		AWS:  &operatorv1alpha1.AWSLoadBalancerParameters{Type: operatorv1alpha1.AWSNetworkLoadBalancer, AllocationIDs: allocationIDs},
 	}
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = nlbParams
 	svc = DesiredEnvoyService(cntr)
 	// NLBs should not have PROXY protocol or backend protocol annotations.
-	checkServiceHasAnnotations(t, svc, awsLBTypeAnnotation)
+	checkServiceHasAnnotations(t, svc, awsLBTypeAnnotation, awsLBAllocationIDsAnnotation)
+
+	// Check Azure external load balancer type.
+	azureParams := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type:  operatorv1alpha1.AzureLoadBalancerProvider,
+		Azure: &operatorv1alpha1.AzureLoadBalancerParameters{Address: &loadBalancerAddress, ResourceGroup: &resourceGroup},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = azureParams
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasLoadBalancerAddress(t, svc, loadBalancerAddress)
+	checkServiceHasAnnotations(t, svc, azureLBResourceGroupAnnotation)
+
+	// Check GCP external load balancer type.
+	gcpParams := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type: operatorv1alpha1.GCPLoadBalancerProvider,
+		GCP:  &operatorv1alpha1.GCPLoadBalancerParameters{Address: &loadBalancerAddress},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = gcpParams
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasLoadBalancerAddress(t, svc, loadBalancerAddress)
 
 	// Test an internal ELB
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.InternalLoadBalancer
@@ -204,14 +235,24 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasAnnotations(t, svc, awsInternalLBAnnotation, awsLbBackendProtoAnnotation, awsLBProxyProtocolAnnotation)
 
 	// Test an internal Azure LB.
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
+	azureParamsInternal := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type:  operatorv1alpha1.AzureLoadBalancerProvider,
+		Azure: &operatorv1alpha1.AzureLoadBalancerParameters{Address: &loadBalancerAddress, Subnet: &subnet},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = azureParamsInternal
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotations(t, svc, azureInternalLBAnnotation)
+	checkServiceHasLoadBalancerAddress(t, svc, loadBalancerAddress)
+	checkServiceHasAnnotations(t, svc, azureInternalLBAnnotation, azureLBSubnetAnnotation)
 
 	// Test an internal GCP LB.
-	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
+	gcpParamsInternal := operatorv1alpha1.ProviderLoadBalancerParameters{
+		Type: operatorv1alpha1.GCPLoadBalancerProvider,
+		GCP:  &operatorv1alpha1.GCPLoadBalancerParameters{Address: &loadBalancerAddress, Subnet: &subnet},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters = gcpParamsInternal
 	svc = DesiredEnvoyService(cntr)
-	checkServiceHasAnnotations(t, svc, gcpLBTypeAnnotation)
+	checkServiceHasLoadBalancerAddress(t, svc, loadBalancerAddress)
+	checkServiceHasAnnotations(t, svc, gcpLBTypeAnnotation, gcpLBTypeAnnotationLegacy, gcpLBSubnetAnnotation)
 
 	// Set network publishing type to ClusterIPService and verify the service type is as expected.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.ClusterIPServicePublishingType
