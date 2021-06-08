@@ -73,7 +73,7 @@ func desiredClusterRoleBinding(name, roleRef, svcAcctRef string, contour *operat
 			Kind:      "ServiceAccount",
 			APIGroup:  corev1.GroupName,
 			Name:      svcAcctRef,
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: contour.Namespace,
 		},
 	}
 	crb.RoleRef = rbacv1.RoleRef{

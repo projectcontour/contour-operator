@@ -37,13 +37,13 @@ const gatewayClassNamespacedParamRef = "Namespace"
 // Contour returns true if contour is valid.
 func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
 	// TODO [danehans]: Remove when https://github.com/projectcontour/contour-operator/issues/18 is fixed.
-	exist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
+	exist, err := objcontour.OtherContoursExistInNs(ctx, cli, contour)
 	if err != nil {
 		return fmt.Errorf("failed to verify if other contours exist in namespace %s: %w",
-			contour.Spec.Namespace.Name, err)
+			contour.Namespace, err)
 	}
 	if exist {
-		return fmt.Errorf("other contours exist in namespace %s", contour.Spec.Namespace.Name)
+		return fmt.Errorf("other contours exist in namespace %s", contour.Namespace)
 	}
 
 	if err := ContainerPorts(contour); err != nil {
@@ -306,9 +306,9 @@ func gatewayContour(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
-	if contour.Spec.Namespace.Name != gw.Namespace {
+	if contour.Namespace != gw.Namespace {
 		return nil, fmt.Errorf("invalid contour namespace %q; namespace must match gateway namespace %q",
-			contour.Spec.Namespace.Name, gw.Namespace)
+			contour.Namespace, gw.Namespace)
 	}
 	return contour, nil
 }

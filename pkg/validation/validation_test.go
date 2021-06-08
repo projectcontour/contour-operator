@@ -123,7 +123,6 @@ func TestContainerPorts(t *testing.T) {
 			Namespace: fmt.Sprintf("%s-ns", name),
 		},
 		Spec: operatorv1alpha1.ContourSpec{
-			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: operatorv1alpha1.LoadBalancerServicePublishingType,
@@ -443,7 +442,6 @@ func TestNodePorts(t *testing.T) {
 			Namespace: fmt.Sprintf("%s-ns", name),
 		},
 		Spec: operatorv1alpha1.ContourSpec{
-			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: operatorv1alpha1.NodePortServicePublishingType,
@@ -622,9 +620,6 @@ func TestGateway(t *testing.T) {
 					Name:      "valid-nil-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("valid-nil-host-gc"),
 				},
 			},
@@ -669,9 +664,6 @@ func TestGateway(t *testing.T) {
 					Name:      "valid-zero-value-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("valid-zero-value-host-gc"),
 				},
 			},
@@ -717,9 +709,6 @@ func TestGateway(t *testing.T) {
 					Name:      "valid-wildcard-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("valid-wildcard-host-gc"),
 				},
 			},
@@ -765,9 +754,6 @@ func TestGateway(t *testing.T) {
 					Name:      "valid-wildcard-subdomain-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("valid-wildcard-subdomain-host-gc"),
 				},
 			},
@@ -813,9 +799,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-subdomain-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-subdomain-host-gc"),
 				},
 			},
@@ -861,9 +844,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-ip-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-ip-host-gc"),
 				},
 			},
@@ -909,9 +889,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-wildcard-host-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-wildcard-host-gc"),
 				},
 			},
@@ -957,9 +934,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-listener-protocol-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-listener-protocol-gc"),
 				},
 			},
@@ -1004,9 +978,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-gatewayclass-reference-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-reference-gc"),
 				},
 			},
@@ -1051,9 +1022,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-gatewayclass-status-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-status-gc"),
 				},
 			},
@@ -1105,9 +1073,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-gatewayclass-no-parameters-ref-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-gatewayclass-no-parameters-ref-gc"),
 				},
 			},
@@ -1144,29 +1109,24 @@ func TestGateway(t *testing.T) {
 			},
 			expected: false,
 		},
-		"invalid contour spec ns": {
+		"invalid contour ns": {
 			contour: &operatorv1alpha1.Contour{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ns.Name,
-					Name:      "invalid-contour-spec-ns-contour",
-				},
-				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: "not-gw-ns",
-					},
+					Namespace: "not-gw-ns",
+					Name:      "invalid-contour-ns-contour",
 				},
 			},
 			gc: &gatewayv1alpha1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "invalid-contour-spec-ns-gc",
+					Name: "invalid-contour-ns-gc",
 				},
 				Spec: gatewayv1alpha1.GatewayClassSpec{
 					Controller: operatorv1alpha1.GatewayClassControllerRef,
 					ParametersRef: &gatewayv1alpha1.ParametersReference{
 						Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
 						Kind:      "Contour",
-						Name:      "invalid-contour-spec-ns-contour",
+						Name:      "invalid-contour-ns-contour",
 						Scope:     pointer.StringPtr("Namespace"),
 						Namespace: pointer.StringPtr(ns.Name),
 					},
@@ -1176,10 +1136,10 @@ func TestGateway(t *testing.T) {
 			gateway: &gatewayv1alpha1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
-					Name:      "invalid-contour-spec-ns-gateway",
+					Name:      "invalid-contour-ns-gateway",
 				},
 				Spec: gatewayv1alpha1.GatewaySpec{
-					GatewayClassName: "invalid-contour-spec-ns-gc",
+					GatewayClassName: "invalid-contour-ns-gc",
 					Listeners: []gatewayv1alpha1.Listener{
 						{
 							Port:     gatewayv1alpha1.PortNumber(int32(1)),
@@ -1198,9 +1158,6 @@ func TestGateway(t *testing.T) {
 					Name:      "valid-gateway-ip-address-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("valid-gateway-ip-address-gc"),
 				},
 			},
@@ -1251,9 +1208,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-gateway-ip-address-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-gateway-ip-address-gc"),
 				},
 			},
@@ -1304,9 +1258,6 @@ func TestGateway(t *testing.T) {
 					Name:      "invalid-gateway-address-type-contour",
 				},
 				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name: ns.Name,
-					},
 					GatewayClassRef: pointer.StringPtr("invalid-gateway-address-type-gc"),
 				},
 			},

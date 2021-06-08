@@ -25,7 +25,6 @@ import (
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
-	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
@@ -236,7 +235,6 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 		return retryable.NewMaybeRetryableAggregate(errs)
 	}
 
-	handleResult("namespace", objns.EnsureNamespace(ctx, cli, contour))
 	handleResult("rbac", objutil.EnsureRBAC(ctx, cli, contour))
 
 	if len(errs) > 0 {
@@ -317,7 +315,6 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour))
 	handleResult("configmap", objcm.Delete(ctx, cli, objcm.NewCfgForContour(contour)))
 	handleResult("rbac", objutil.EnsureRBACDeleted(ctx, cli, contour))
-	handleResult("namespace", objns.EnsureNamespaceDeleted(ctx, cli, contour))
 
 	if len(errs) == 0 {
 		if err := objcontour.EnsureFinalizerRemoved(ctx, cli, contour); err != nil {

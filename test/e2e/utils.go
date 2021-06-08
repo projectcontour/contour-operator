@@ -303,7 +303,7 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeo
 			return false, nil
 		}
 
-		envoyReplicas, err := envoyReplicas(ctx, cl, cntr.Spec.Namespace.Name)
+		envoyReplicas, err := envoyReplicas(ctx, cl, cntr.Namespace)
 		if err != nil || cntr.Status.AvailableEnvoys != envoyReplicas {
 			return false, nil
 		}
@@ -573,37 +573,6 @@ func deletePod(ctx context.Context, cl client.Client, ns, name string) error {
 		}
 	}
 
-	return nil
-}
-
-func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-
-	key := types.NamespacedName{
-		Name: ns.Name,
-	}
-
-	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, ns); err != nil {
-			if errors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}
-		// Consider the namespace deleted if status is terminating.
-		if ns.Status.Phase == corev1.NamespaceTerminating {
-			return true, nil
-		}
-		// The namespace is still "Active"
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
-	}
 	return nil
 }
 

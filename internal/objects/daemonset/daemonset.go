@@ -292,7 +292,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: contour.Namespace,
 			Name:      envoyDaemonSetName,
 			Labels:    labels,
 		},
@@ -365,7 +365,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 func CurrentDaemonSet(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
+		Namespace: contour.Namespace,
 		Name:      envoyDaemonSetName,
 	}
 	if err := cli.Get(ctx, key, ds); err != nil {

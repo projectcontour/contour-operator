@@ -69,12 +69,10 @@ func TestDesiredRoleBinding(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	cntr.Spec.Namespace.Name = "test-rb-ns"
+	cntr.Namespace = "test-rb-ns"
 	rbName := "test-rb"
 	svcAcct := "test-svc-acct-ref"
 	roleRef := "test-role-ref"
@@ -85,6 +83,6 @@ func TestDesiredRoleBinding(t *testing.T) {
 		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,
 	}
 	checkRoleBindingLabels(t, rb, ownerLabels)
-	checkRoleBindingSvcAcct(t, rb, svcAcct, cntr.Spec.Namespace.Name)
+	checkRoleBindingSvcAcct(t, rb, svcAcct, cntr.Namespace)
 	checkRoleBindingRole(t, rb, roleRef)
 }

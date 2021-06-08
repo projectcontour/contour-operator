@@ -29,8 +29,6 @@ import (
 type Config struct {
 	Name         string
 	Namespace    string
-	SpecNs       string
-	RemoveNs     bool
 	Replicas     int32
 	NetworkType  operatorv1alpha1.NetworkPublishingType
 	NodePorts    []operatorv1alpha1.NodePort
@@ -48,10 +46,6 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 		},
 		Spec: operatorv1alpha1.ContourSpec{
 			Replicas: cfg.Replicas,
-			Namespace: operatorv1alpha1.NamespaceSpec{
-				Name:             cfg.SpecNs,
-				RemoveOnDeletion: cfg.RemoveNs,
-			},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: cfg.NetworkType,
@@ -104,9 +98,9 @@ func OtherContoursExist(ctx context.Context, cli client.Client, contour *operato
 	return true, contours, nil
 }
 
-// OtherContoursExistInSpecNs lists Contour objects in the same spec.namespace.name as contour,
+// OtherContoursExistInNs lists Contour objects in the same namespace as contour,
 // returning true if any exist.
-func OtherContoursExistInSpecNs(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (bool, error) {
+func OtherContoursExistInNs(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (bool, error) {
 	exist, contours, err := OtherContoursExist(ctx, cli, contour)
 	if err != nil {
 		return false, err
@@ -117,7 +111,7 @@ func OtherContoursExistInSpecNs(ctx context.Context, cli client.Client, contour 
 				// Skip the contour from the list that matches the provided contour.
 				continue
 			}
-			if c.Spec.Namespace.Name == contour.Spec.Namespace.Name {
+			if c.Namespace == contour.Namespace {
 				return true, nil
 			}
 		}

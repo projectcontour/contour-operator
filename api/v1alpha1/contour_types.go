@@ -67,16 +67,6 @@ type ContourSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// Namespace defines the schema of a Contour namespace. See each field for
-	// additional details. Namespace name should be the same namespace as the
-	// Gateway when GatewayClassRef is set.
-	//
-	// TODO [danehans]: Ignore Namespace when GatewayClassRef is set.
-	// xref: https://github.com/projectcontour/contour-operator/issues/212
-	//
-	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
-	Namespace NamespaceSpec `json:"namespace,omitempty"`
-
 	// NetworkPublishing defines the schema for publishing Contour to a network.
 	//
 	// See each field for additional details.
@@ -179,29 +169,6 @@ type EnvoyNodePlacement struct {
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-}
-
-// NamespaceSpec defines the schema of a Contour namespace.
-type NamespaceSpec struct {
-	// Name is the name of the namespace to run Contour and dependent
-	// resources. If unset, defaults to "projectcontour".
-	//
-	// +kubebuilder:default=projectcontour
-	Name string `json:"name,omitempty"`
-
-	// RemoveOnDeletion will remove the namespace when the Contour is
-	// deleted. If set to True, deletion will not occur if any of the
-	// following conditions exist:
-	//
-	// 1. The Contour namespace is "default", "kube-system" or the
-	//    contour-operator's namespace.
-	//
-	// 2. Another Contour exists in the namespace.
-	//
-	// 3. The namespace does not contain the Contour owning label.
-	//
-	// +kubebuilder:default=false
-	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }
 
 // NetworkPublishing defines the schema for publishing Contour to a network.
@@ -572,13 +539,12 @@ const (
 type ContourStatus struct {
 	// AvailableContours is the number of observed available replicas
 	// according to the Contour deployment. The deployment and its pods
-	// will reside in the namespace specified by spec.namespace.name of
-	// the contour.
+	// will reside in the namespace of the Contour.
 	AvailableContours int32 `json:"availableContours"`
 
 	// AvailableEnvoys is the number of observed available pods from
 	// the Envoy daemonset. The daemonset and its pods will reside in the
-	// namespace specified by spec.namespace.name of the contour.
+	// namespace of the Contour.
 	AvailableEnvoys int32 `json:"availableEnvoys"`
 
 	// Conditions represent the observations of a contour's current state.

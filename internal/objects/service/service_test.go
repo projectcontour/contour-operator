@@ -138,8 +138,6 @@ func TestDesiredContourService(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
@@ -160,8 +158,6 @@ func TestDesiredEnvoyService(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
 		NodePorts:   objcontour.MakeNodePorts(map[string]int{"http": 30081, "https": 30444}),
 	}

@@ -91,7 +91,7 @@ func EnsureJobDeleted(ctx context.Context, cli client.Client, contour *operatorv
 func currentJob(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*batchv1.Job, error) {
 	current := &batchv1.Job{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
+		Namespace: contour.Namespace,
 		Name:      certgenJobName,
 	}
 	err := cli.Get(ctx, key, current)
@@ -154,7 +154,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certgenJobName,
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: contour.Namespace,
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{

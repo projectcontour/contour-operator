@@ -43,10 +43,9 @@ import (
 
 // Define utility constants for object names, testing timeouts/durations intervals, etc.
 const (
-	testContourName  = "test-contour"
-	testOperatorNs   = "test-contour-operator"
-	defaultNamespace = "projectcontour"
-	defaultReplicas  = int32(2)
+	testContourName = "test-contour"
+	testOperatorNs  = "test-contour-operator"
+	defaultReplicas = int32(2)
 
 	testGatewayClassName = "test-contour"
 
@@ -145,20 +144,6 @@ var _ = Describe("Run controller", func() {
 				return f.Spec.Replicas
 			}, timeout, interval).Should(Equal(defaultReplicas))
 
-			By("Expecting default namespace")
-			Eventually(func() string {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return f.Spec.Namespace.Name
-			}, timeout, interval).Should(Equal(defaultNamespace))
-
-			By("Expecting default remove namespace on deletion")
-			Eventually(func() bool {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return f.Spec.Namespace.RemoveOnDeletion
-			}, timeout, interval).Should(Equal(false))
-
 			By("Expecting default network publishing type")
 			Eventually(func() operatorv1alpha1.NetworkPublishingType {
 				f := &operatorv1alpha1.Contour{}
@@ -183,15 +168,11 @@ var _ = Describe("Run controller", func() {
 			// Update the contour
 			By("By updating a contour spec")
 			updatedReplicas := int32(1)
-			updatedNs := defaultNamespace + "-updated"
-			updatedRemoveNs := true
 			Eventually(func() error {
 				updated := &operatorv1alpha1.Contour{}
 				Expect(operator.client.Get(ctx, key, updated)).Should(Succeed())
 				updated.Spec.IngressClassName = &testIngressClass
 				updated.Spec.Replicas = updatedReplicas
-				updated.Spec.Namespace.Name = updatedNs
-				updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
 				updated.Spec.GatewayClassRef = &gc.Name
 
 				return operator.client.Update(ctx, updated)
@@ -207,20 +188,6 @@ var _ = Describe("Run controller", func() {
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.Replicas
 			}, timeout, interval).Should(Equal(updatedReplicas))
-
-			By("Expecting namespace to be updated")
-			Eventually(func() string {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return f.Spec.Namespace.Name
-			}, timeout, interval).Should(Equal(updatedNs))
-
-			By("Expecting remove namespace on deletion to be updated")
-			Eventually(func() bool {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return f.Spec.Namespace.RemoveOnDeletion
-			}, timeout, interval).Should(Equal(updatedRemoveNs))
 
 			By("Expecting ingressClassName to be set")
 			Eventually(func() string {
@@ -274,12 +241,6 @@ var _ = Describe("Run controller", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: key.Namespace,
 					Name:      key.Name,
-				},
-				Spec: operatorv1alpha1.ContourSpec{
-					Namespace: operatorv1alpha1.NamespaceSpec{
-						Name:             defaultNamespace + finalizerSuffix,
-						RemoveOnDeletion: true,
-					},
 				},
 			}
 			Expect(operator.client.Create(ctx, created)).Should(Succeed())

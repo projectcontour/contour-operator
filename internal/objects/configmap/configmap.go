@@ -174,7 +174,7 @@ func NewConfig() *Config {
 // NewCfgForContour returns a ConfigMap Config with default fields set for contour.
 func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
 	cfg := NewConfig()
-	cfg.Namespace = contour.Spec.Namespace.Name
+	cfg.Namespace = contour.Namespace
 	labels := objcontour.OwnerLabels(contour)
 	cfg.Labels = labels
 	return cfg

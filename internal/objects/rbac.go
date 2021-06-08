@@ -46,7 +46,7 @@ const (
 // EnsureRBAC ensures all the necessary RBAC resources exist for the
 // provided contour.
 func EnsureRBAC(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	ns := contour.Spec.Namespace.Name
+	ns := contour.Namespace
 	names := []string{ContourRbacName, EnvoyRbacName, CertGenRbacName}
 	certSvcAct := &corev1.ServiceAccount{}
 	for _, name := range names {
@@ -60,7 +60,7 @@ func EnsureRBAC(ctx context.Context, cli client.Client, contour *operatorv1alpha
 	}
 	// ClusterRole and ClusterRoleBinding resources are namespace-named to allow ownership
 	// from individual instances of Contour.
-	nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Spec.Namespace.Name)
+	nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Namespace)
 	cr, err := objcr.EnsureClusterRole(ctx, cli, nsName, contour)
 	if err != nil {
 		return fmt.Errorf("failed to ensure cluster role %s: %w", ContourRbacName, err)
@@ -82,12 +82,12 @@ func EnsureRBAC(ctx context.Context, cli client.Client, contour *operatorv1alpha
 // contour are deleted if Contour owner labels exist.
 func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
 	var errs []error
-	ns := contour.Spec.Namespace.Name
+	ns := contour.Namespace
 	objectsToDelete := []client.Object{}
-	contoursExist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
+	contoursExist, err := objcontour.OtherContoursExistInNs(ctx, cli, contour)
 	if err != nil {
 		return fmt.Errorf("failed to verify if contours contoursExist in namespace %s: %w",
-			contour.Spec.Namespace.Name, err)
+			contour.Namespace, err)
 	}
 	if !contoursExist {
 		cntrRoleBind, err := objrb.CurrentRoleBinding(ctx, cli, ns, ContourRbacName)
@@ -137,7 +137,7 @@ func EnsureRBACDeleted(ctx context.Context, cli client.Client, contour *operator
 	if !contoursExist {
 		// ClusterRole and ClusterRoleBinding resources are namespace-named to allow ownership
 		// from individual instances of Contour.
-		nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Spec.Namespace.Name)
+		nsName := fmt.Sprintf("%s-%s", ContourRbacName, contour.Namespace)
 		crb, err := objcrb.CurrentClusterRoleBinding(ctx, cli, nsName)
 		if err != nil {
 			if !errors.IsNotFound(err) {

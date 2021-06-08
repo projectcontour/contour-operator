@@ -26,7 +26,6 @@ import (
 	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
-	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
@@ -207,7 +206,6 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 		}
 	}
 
-	handleResult("namespace", objns.EnsureNamespace(ctx, cli, contour))
 	handleResult("rbac", objutil.EnsureRBAC(ctx, cli, contour))
 
 	if len(errs) > 0 {

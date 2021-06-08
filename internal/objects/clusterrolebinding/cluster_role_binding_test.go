@@ -69,8 +69,6 @@ func TestDesiredClusterRoleBinding(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        crbName,
 		Namespace:   fmt.Sprintf("%s-ns", crbName),
-		SpecNs:      "projectcontour",
-		RemoveNs:    true,
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
@@ -83,6 +81,6 @@ func TestDesiredClusterRoleBinding(t *testing.T) {
 		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,
 	}
 	checkClusterRoleBindingLabels(t, crb, ownerLabels)
-	checkClusterRoleBindingSvcAcct(t, crb, testSvcAcct, cntr.Spec.Namespace.Name)
+	checkClusterRoleBindingSvcAcct(t, crb, testSvcAcct, cntr.Namespace)
 	checkClusterRoleBindingRole(t, crb, testRoleRef)
 }

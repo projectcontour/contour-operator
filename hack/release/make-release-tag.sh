@@ -42,6 +42,11 @@ run::sed() {
     esac
 }
 
+# Update the version used by the e2e upgrade test.
+run::sed \
+  "-es|latestRelease = .*$|latestRelease = \"$NEWVERS\"|" \
+  "test/e2e/operator_test.go"
+
 # Update the Docker image tags for the operator in the deployment manifests.
 for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   # The version might be main or OLDVERS depending on whether we are

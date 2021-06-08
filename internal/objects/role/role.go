@@ -33,7 +33,7 @@ import (
 // and contour namespace/name for the owning contour labels.
 func EnsureRole(ctx context.Context, cli client.Client, name string, contour *operatorv1alpha1.Contour) (*rbacv1.Role, error) {
 	desired := desiredRole(name, contour)
-	current, err := CurrentRole(ctx, cli, contour.Spec.Namespace.Name, name)
+	current, err := CurrentRole(ctx, cli, contour.Namespace, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			updated, err := createRole(ctx, cli, desired)
@@ -59,7 +59,7 @@ func desiredRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.Role {
 			Kind: "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: contour.Namespace,
 			Name:      name,
 		},
 	}

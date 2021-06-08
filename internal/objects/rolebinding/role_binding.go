@@ -35,7 +35,7 @@ import (
 // The RoleBinding will use svcAct for the subject and role for the role reference.
 func EnsureRoleBinding(ctx context.Context, cli client.Client, name, svcAct, role string, contour *operatorv1alpha1.Contour) error {
 	desired := desiredRoleBinding(name, svcAct, role, contour)
-	current, err := CurrentRoleBinding(ctx, cli, contour.Spec.Namespace.Name, name)
+	current, err := CurrentRoleBinding(ctx, cli, contour.Namespace, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			if err := createRoleBinding(ctx, cli, desired); err != nil {
@@ -63,7 +63,7 @@ func desiredRoleBinding(name, svcAcctRef, roleRef string, contour *operatorv1alp
 			Kind: "RoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: contour.Namespace,
 			Name:      name,
 		},
 	}
@@ -75,7 +75,7 @@ func desiredRoleBinding(name, svcAcctRef, roleRef string, contour *operatorv1alp
 		Kind:      "ServiceAccount",
 		APIGroup:  corev1.GroupName,
 		Name:      svcAcctRef,
-		Namespace: contour.Spec.Namespace.Name,
+		Namespace: contour.Namespace,
 	}}
 	rb.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
