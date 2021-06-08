@@ -237,6 +237,7 @@ spec:
                                       only if scope is \"External\". \n Omit if desired
                                       IP is created in same resource group as AKS
                                       cluster."
+                                    maxLength: 90
                                     minLength: 1
                                     type: string
                                   subnet:

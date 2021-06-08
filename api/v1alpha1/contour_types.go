@@ -399,7 +399,7 @@ type AzureLoadBalancerParameters struct {
 	// Omit if desired IP is created in same resource group as AKS cluster.
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:valodation:MaxLength=90
+	// +kubebuilder:validation:MaxLength=90
 	// +optional
 	ResourceGroup *string `json:"resourceGroup,omitempty"`
 

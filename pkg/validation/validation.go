@@ -122,7 +122,7 @@ func NodePorts(contour *operatorv1alpha1.Contour) error {
 	return nil
 }
 
-// loadBalancer validates LoadBalancer "address" parameter of contour, returning an
+// LoadBalancerAddress validates LoadBalancer "address" parameter of contour, returning an
 // error if "address" does not meet the API specification.
 func LoadBalancerAddress(contour *operatorv1alpha1.Contour) error {
 	if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider &&
@@ -144,18 +144,22 @@ func LoadBalancerAddress(contour *operatorv1alpha1.Contour) error {
 	return nil
 }
 
+// LoadBalancerProvider validates LoadBalancer provider parameters of contour, returning
+// and error if parameters for different provider are specified the for the one specified
+// with "type" parameter.
 func LoadBalancerProvider(contour *operatorv1alpha1.Contour) error {
-	if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider {
+	switch contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type {
+	case operatorv1alpha1.AWSLoadBalancerProvider:
 		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil ||
 			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil {
 			return fmt.Errorf("aws provider chosen, other providers parameters should not be specified")
 		}
-	} else if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider {
+	case operatorv1alpha1.AzureLoadBalancerProvider:
 		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil ||
 			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil {
 			return fmt.Errorf("azure provider chosen, other providers parameters should not be specified")
 		}
-	} else if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider {
+	case operatorv1alpha1.GCPLoadBalancerProvider:
 		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil ||
 			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil {
 			return fmt.Errorf("gcp provider chosen, other providers parameters should not be specified")

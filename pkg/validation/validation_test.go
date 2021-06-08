@@ -230,8 +230,8 @@ func TestLoadBalancerIP(t *testing.T) {
 func TestLoadBalancerProvider(t *testing.T) {
 	testCases := []struct {
 		description        string
-		provider           string
-		additionalProvider string
+		provider           operatorv1alpha1.LoadBalancerProviderType
+		additionalProvider operatorv1alpha1.LoadBalancerProviderType
 		expected           bool
 	}{
 		{
@@ -303,25 +303,29 @@ func TestLoadBalancerProvider(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.provider == "AWS" {
+		switch tc.provider {
+		case "AWS":
 			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
-			if tc.additionalProvider == "Azure" {
+			switch tc.additionalProvider {
+			case "Azure":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet = &testString
-			} else if tc.additionalProvider == "GCP" {
+			case "GCP":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet = &testString
 			}
-		} else if tc.provider == "Azure" {
+		case "Azure":
 			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
-			if tc.additionalProvider == "AWS" {
+			switch tc.additionalProvider {
+			case "AWS":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs = strings.Split(testString, "")
-			} else if tc.additionalProvider == "GCP" {
+			case "GCP":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet = &testString
 			}
-		} else if tc.provider == "GCP" {
+		case "GCP":
 			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
-			if tc.additionalProvider == "AWS" {
+			switch tc.additionalProvider {
+			case "AWS":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs = strings.Split(testString, "")
-			} else if tc.additionalProvider == "Azure" {
+			case "Azure":
 				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet = &testString
 			}
 		}
