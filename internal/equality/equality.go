@@ -222,6 +222,11 @@ func LoadBalancerServiceChanged(current, expected *corev1.Service) (*corev1.Serv
 		changed = true
 	}
 
+	if !apiequality.Semantic.DeepEqual(current.Spec.LoadBalancerIP, expected.Spec.LoadBalancerIP) {
+		updated.Spec.LoadBalancerIP = expected.Spec.LoadBalancerIP
+		changed = true
+	}
+
 	if !changed {
 		return nil, false
 	}

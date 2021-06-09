@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -146,6 +147,189 @@ func TestContainerPorts(t *testing.T) {
 			cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = tc.ports
 		}
 		err := validation.ContainerPorts(cntr)
+		if err != nil && tc.expected {
+			t.Fatalf("%q: failed with error: %#v", tc.description, err)
+		}
+		if err == nil && !tc.expected {
+			t.Fatalf("%q: expected to fail but received no error", tc.description)
+		}
+	}
+}
+
+func TestLoadBalancerIP(t *testing.T) {
+	testCases := []struct {
+		description string
+		address     string
+		expected    bool
+	}{
+		{
+			description: "default load balancer type service without IP specified",
+			expected:    true,
+		},
+		{
+			description: "user-specified load balancer IPv4 address",
+			address:     "1.2.3.4",
+			expected:    true,
+		},
+		{
+			description: "user-specified load balancer IPv6 address",
+			address:     "2607:f0d0:1002:51::4",
+			expected:    true,
+		},
+		{
+			description: "invalid IPv4 address",
+			address:     "1.2..4",
+			expected:    false,
+		},
+		{
+			description: "invalid IPv6 address",
+			address:     "2607:f0d0:1002:51:::4",
+			expected:    false,
+		},
+	}
+
+	name := "test-validation"
+	cntr := &operatorv1alpha1.Contour{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: fmt.Sprintf("%s-ns", name),
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
+			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
+				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+					Type: operatorv1alpha1.LoadBalancerServicePublishingType,
+					LoadBalancer: operatorv1alpha1.LoadBalancerStrategy{
+						Scope: "External",
+						ProviderParameters: operatorv1alpha1.ProviderLoadBalancerParameters{
+							Type: "GCP",
+							GCP:  &operatorv1alpha1.GCPLoadBalancerParameters{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.address != "" {
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address = &tc.address
+		}
+
+		err := validation.LoadBalancerAddress(cntr)
+		if err != nil && tc.expected {
+			t.Fatalf("%q: failed with error: %#v", tc.description, err)
+		}
+		if err == nil && !tc.expected {
+			t.Fatalf("%q: expected to fail but received no error", tc.description)
+		}
+	}
+}
+
+func TestLoadBalancerProvider(t *testing.T) {
+	testCases := []struct {
+		description        string
+		provider           operatorv1alpha1.LoadBalancerProviderType
+		additionalProvider operatorv1alpha1.LoadBalancerProviderType
+		expected           bool
+	}{
+		{
+			description: "default load balancer parameters",
+			expected:    true,
+		},
+		{
+			description:        "aws provider with azure provider parameters specified",
+			provider:           "AWS",
+			additionalProvider: "Azure",
+			expected:           false,
+		},
+		{
+			description:        "aws provider with gcp provider parameters specified",
+			provider:           "AWS",
+			additionalProvider: "GCP",
+			expected:           false,
+		},
+		{
+			description:        "azure provider with aws provider parameters specified",
+			provider:           "Azure",
+			additionalProvider: "AWS",
+			expected:           false,
+		},
+		{
+			description:        "azure provider with gcp provider parameters specified",
+			provider:           "Azure",
+			additionalProvider: "GCP",
+			expected:           false,
+		},
+		{
+			description:        "gcp provider with aws provider parameters specified",
+			provider:           "GCP",
+			additionalProvider: "AWS",
+			expected:           false,
+		},
+		{
+			description:        "gcp provider with azure provider parameters specified",
+			provider:           "GCP",
+			additionalProvider: "Azure",
+			expected:           false,
+		},
+	}
+
+	name := "test-validation"
+	testString := "projectcontour"
+	cntr := &operatorv1alpha1.Contour{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: fmt.Sprintf("%s-ns", name),
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
+			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
+				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+					Type: operatorv1alpha1.LoadBalancerServicePublishingType,
+					LoadBalancer: operatorv1alpha1.LoadBalancerStrategy{
+						Scope: "External",
+						ProviderParameters: operatorv1alpha1.ProviderLoadBalancerParameters{
+							AWS:   &operatorv1alpha1.AWSLoadBalancerParameters{},
+							Azure: &operatorv1alpha1.AzureLoadBalancerParameters{},
+							GCP:   &operatorv1alpha1.GCPLoadBalancerParameters{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		switch tc.provider {
+		case "AWS":
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+			switch tc.additionalProvider {
+			case "Azure":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet = &testString
+			case "GCP":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet = &testString
+			}
+		case "Azure":
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AzureLoadBalancerProvider
+			switch tc.additionalProvider {
+			case "AWS":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs = strings.Split(testString, "")
+			case "GCP":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet = &testString
+			}
+		case "GCP":
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
+			switch tc.additionalProvider {
+			case "AWS":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs = strings.Split(testString, "")
+			case "Azure":
+				cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet = &testString
+			}
+		}
+		err := validation.LoadBalancerProvider(cntr)
 		if err != nil && tc.expected {
 			t.Fatalf("%q: failed with error: %#v", tc.description, err)
 		}

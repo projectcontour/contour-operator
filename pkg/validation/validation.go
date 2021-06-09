@@ -16,6 +16,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -51,6 +52,15 @@ func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.C
 
 	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
 		if err := NodePorts(contour); err != nil {
+			return err
+		}
+	}
+
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType {
+		if err := LoadBalancerAddress(contour); err != nil {
+			return err
+		}
+		if err := LoadBalancerProvider(contour); err != nil {
 			return err
 		}
 	}
@@ -106,6 +116,53 @@ func NodePorts(contour *operatorv1alpha1.Contour) error {
 	if ports[0].PortNumber != nil && ports[1].PortNumber != nil {
 		if ports[0].PortNumber == ports[1].PortNumber {
 			return fmt.Errorf("duplicate nodeport port numbers detected")
+		}
+	}
+
+	return nil
+}
+
+// LoadBalancerAddress validates LoadBalancer "address" parameter of contour, returning an
+// error if "address" does not meet the API specification.
+func LoadBalancerAddress(contour *operatorv1alpha1.Contour) error {
+	if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider &&
+		contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil &&
+		contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Address != nil {
+		validationIP := net.ParseIP(*contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Address)
+		if validationIP == nil {
+			return fmt.Errorf("wrong LoadBalancer address format, should be string with IPv4 or IPv6 format")
+		}
+	} else if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider &&
+		contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil &&
+		contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address != nil {
+		validationIP := net.ParseIP(*contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address)
+		if validationIP == nil {
+			return fmt.Errorf("wrong LoadBalancer address format, should be string with IPv4 or IPv6 format")
+		}
+	}
+
+	return nil
+}
+
+// LoadBalancerProvider validates LoadBalancer provider parameters of contour, returning
+// and error if parameters for different provider are specified the for the one specified
+// with "type" parameter.
+func LoadBalancerProvider(contour *operatorv1alpha1.Contour) error {
+	switch contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type {
+	case operatorv1alpha1.AWSLoadBalancerProvider:
+		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil ||
+			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil {
+			return fmt.Errorf("aws provider chosen, other providers parameters should not be specified")
+		}
+	case operatorv1alpha1.AzureLoadBalancerProvider:
+		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil ||
+			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil {
+			return fmt.Errorf("azure provider chosen, other providers parameters should not be specified")
+		}
+	case operatorv1alpha1.GCPLoadBalancerProvider:
+		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil ||
+			contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil {
+			return fmt.Errorf("gcp provider chosen, other providers parameters should not be specified")
 		}
 	}
 

@@ -374,6 +374,24 @@ type ProviderLoadBalancerParameters struct {
 	//
 	// +optional
 	AWS *AWSLoadBalancerParameters `json:"aws,omitempty"`
+
+	// Azure provides configuration settings that are specific to Azure
+	// load balancers.
+	//
+	// If empty, defaults will be applied. See specific azure fields for
+	// details about their defaults.
+	//
+	// +optional
+	Azure *AzureLoadBalancerParameters `json:"azure,omitempty"`
+
+	// GCP provides configuration settings that are specific to GCP
+	// load balancers.
+	//
+	// If empty, defaults will be applied. See specific gcp fields for
+	// details about their defaults.
+	//
+	// +optional
+	GCP *GCPLoadBalancerParameters `json:"gcp,omitempty"`
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the
@@ -410,6 +428,19 @@ type AWSLoadBalancerParameters struct {
 	//
 	// +kubebuilder:default=Classic
 	Type AWSLoadBalancerType `json:"type,omitempty"`
+
+	// AllocationIDs is a list of Allocation IDs of Elastic IP addresses that are
+	// to be assigned to the Network Load Balancer. Works only with type NLB.
+	// If you are using Amazon EKS 1.16 or later, you can assign Elastic IP addresses
+	// to Network Load Balancer with AllocationIDs. The number of Allocation IDs
+	// must match the number of subnets used for the load balancer.
+	//
+	// Example: "eipalloc-<xxxxxxxxxxxxxxxxx>"
+	//
+	// See: https://docs.aws.amazon.com/eks/latest/userguide/load-balancing.html
+	//
+	// +optional
+	AllocationIDs []string `json:"allocationIds,omitempty"`
 }
 
 // AWSLoadBalancerType is the type of AWS load balancer to manage.
@@ -420,6 +451,73 @@ const (
 	AWSClassicLoadBalancer AWSLoadBalancerType = "Classic"
 	AWSNetworkLoadBalancer AWSLoadBalancerType = "NLB"
 )
+
+type AzureLoadBalancerParameters struct {
+	// Address is the desired load balancer IP address. If scope is "Internal", address
+	// must reside in same virtual network as AKS and must not already be assigned
+	// to a resource. If address does not reside in same subnet as AKS, the subnet
+	// parameter is also required.
+	//
+	// Address must already exist (e.g. `az network public-ip create`).
+	//
+	// See:
+	// 	 https://docs.microsoft.com/en-us/azure/aks/static-ip#create-a-service-using-the-static-ip-address
+	// 	 https://docs.microsoft.com/en-us/azure/aks/internal-lb#specify-an-ip-address
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	Address *string `json:"address,omitempty"`
+
+	// ResourceGroup is the resource group name where the "address" resides. Relevant
+	// only if scope is "External".
+	//
+	// Omit if desired IP is created in same resource group as AKS cluster.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=90
+	// +optional
+	ResourceGroup *string `json:"resourceGroup,omitempty"`
+
+	// Subnet is the subnet name where the "address" resides. Relevant only
+	// if scope is "Internal" and desired IP does not reside in same subnet as AKS.
+	//
+	// Omit if desired IP is in same subnet as AKS cluster.
+	//
+	// See: https://docs.microsoft.com/en-us/azure/aks/internal-lb#specify-an-ip-address
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=80
+	// +optional
+	Subnet *string `json:"subnet,omitempty"`
+}
+
+type GCPLoadBalancerParameters struct {
+	// Address is the desired load balancer IP address. If scope is "Internal", the address
+	// must reside in same subnet as the GKE cluster or "subnet" has to be provided.
+	//
+	// See:
+	// 	 https://cloud.google.com/kubernetes-engine/docs/tutorials/configuring-domain-name-static-ip#use_a_service
+	// 	 https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing#lb_subnet
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	Address *string `json:"address,omitempty"`
+
+	// Subnet is the subnet name where the "address" resides. Relevant only
+	// if scope is "Internal" and desired IP does not reside in same subnet as GKE
+	// cluster.
+	//
+	// Omit if desired IP is in same subnet as GKE cluster.
+	//
+	// See: https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing#lb_subnet
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	Subnet *string `json:"subnet,omitempty"`
+}
 
 // NodePort is the schema to specify a network port for a NodePort Service.
 type NodePort struct {

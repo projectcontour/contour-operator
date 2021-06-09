@@ -550,12 +550,39 @@ func TestLoadBalancerServiceChanged(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			description: "if load balancer IP changed",
+			mutate: func(svc *corev1.Service) {
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+			},
+			expect: true,
+		},
 	}
 
 	for _, tc := range testCases {
+
 		cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 		cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer
 		cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.AWSLoadBalancerProvider
+		if tc.description == "if load balancer IP changed" {
+			loadBalancerIP := "1.2.3.4"
+			cntr = &operatorv1alpha1.Contour{
+				Spec: operatorv1alpha1.ContourSpec{
+					NetworkPublishing: operatorv1alpha1.NetworkPublishing{
+						Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+							Type: operatorv1alpha1.LoadBalancerServicePublishingType,
+							LoadBalancer: operatorv1alpha1.LoadBalancerStrategy{
+								ProviderParameters: operatorv1alpha1.ProviderLoadBalancerParameters{
+									GCP: &operatorv1alpha1.GCPLoadBalancerParameters{},
+								},
+							},
+						},
+					},
+				},
+			}
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type = operatorv1alpha1.GCPLoadBalancerProvider
+			cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address = &loadBalancerIP
+		}
 		cntr.Spec.NetworkPublishing.Envoy.ContainerPorts = []operatorv1alpha1.ContainerPort{
 			{
 				Name:       "http",

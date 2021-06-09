@@ -16,6 +16,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
@@ -53,19 +54,36 @@ const (
 	// balancer type. See the following for additional details:
 	// https://kubernetes.io/docs/concepts/services-networking/service/#aws-nlb-support
 	awsLBTypeAnnotation = "service.beta.kubernetes.io/aws-load-balancer-type"
-	// awsInternalLBAnnotation is the annotation used on a service to specify an AWS
-	// load balancer as being internal.
-	awsInternalLBAnnotation = "service.beta.kubernetes.io/aws-load-balancer-internal"
-	// azureInternalLBAnnotation is the annotation used on a service to specify an Azure
-	// load balancer as being internal.
-	azureInternalLBAnnotation = "service.beta.kubernetes.io/azure-load-balancer-internal"
-	// gcpLBTypeAnnotation is the annotation used on a service to specify a GCP load balancer
-	// type.
-	gcpLBTypeAnnotation = "cloud.google.com/load-balancer-type"
 	// awsLBProxyProtocolAnnotation is used to enable the PROXY protocol for an AWS Classic
 	// load balancer. For additional details, see:
 	// https://kubernetes.io/docs/concepts/services-networking/service/#proxy-protocol-support-on-aws
 	awsLBProxyProtocolAnnotation = "service.beta.kubernetes.io/aws-load-balancer-proxy-protocol"
+	// awsLBAllocationIDsAnnotation is a Service annotation that provides capability to
+	// assign Load Balancer IP based on Allocation IDs of AWS Elastic IP resources when
+	// load balancer scope is set to "External"
+	awsLBAllocationIDsAnnotation = "service.beta.kubernetes.io/aws-load-balancer-eip-allocations"
+	// awsInternalLBAnnotation is the annotation used on a service to specify an AWS
+	// load balancer as being internal.
+	awsInternalLBAnnotation = "service.beta.kubernetes.io/aws-load-balancer-internal"
+	// azureLBResourceGroupAnnotation is a Service annotation that provides capability
+	// to assign Load Balancer IP based on Public IP Azure resource that resides in
+	// different resource group as AKS cluster when load balancer scope is set to "External".
+	azureLBResourceGroupAnnotation = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+	// azureLBSubnetAnnotation is a Service annotation that provides capability to assign
+	// Load Balancer IP based on desired subnet when load balancer scope is set to "Internal".
+	azureLBSubnetAnnotation = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
+	// azureInternalLBAnnotation is the annotation used on a service to specify an Azure
+	// load balancer as being internal.
+	azureInternalLBAnnotation = "service.beta.kubernetes.io/azure-load-balancer-internal"
+	// gcpLBSubnetAnnotation is a Service annotation that provides capability to assign
+	// Load Balancer IP to specified subnet when load balancer scope is set to "Internal".
+	gcpLBSubnetAnnotation = "networking.gke.io/internal-load-balancer-subnet"
+	// gcpLBTypeAnnotationLegacy is the annotation used on a service to specify a GCP load balancer
+	// type for GKE version earlier then 1.17.
+	gcpLBTypeAnnotationLegacy = "cloud.google.com/load-balancer-type"
+	// gcpLBTypeAnnotation is the annotation used on a service to specify a GCP load balancer
+	// type for GKE version 1.17 and later.
+	gcpLBTypeAnnotation = "networking.gke.io/load-balancer-type"
 	// EnvoyServiceHTTPPort is the HTTP port number of the Envoy service.
 	EnvoyServiceHTTPPort = int32(80)
 	// EnvoyServiceHTTPSPort is the HTTPS port number of the Envoy service.
@@ -93,7 +111,8 @@ var (
 			azureInternalLBAnnotation: "true",
 		},
 		operatorv1alpha1.GCPLoadBalancerProvider: {
-			gcpLBTypeAnnotation: "Internal",
+			gcpLBTypeAnnotation:       "Internal",
+			gcpLBTypeAnnotationLegacy: "Internal",
 		},
 	}
 )
@@ -257,6 +276,34 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		}
 	}
 
+	// Add the AllocationIDs annotation if specified by AWS provider parameters.
+	if allocationIDsNeeded(&contour.Spec) {
+		svc.Annotations[awsLBAllocationIDsAnnotation] = strings.Join(contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs, ",")
+	}
+
+	// Add the ResourceGroup annotation if specified by Azure provider parameters.
+	if resourceGroupNeeded(&contour.Spec) {
+		svc.Annotations[azureLBResourceGroupAnnotation] = *contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.ResourceGroup
+	}
+
+	// Add the Subnet annotation if specified by provider parameters.
+	if subnetNeeded(&contour.Spec) {
+		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider {
+			svc.Annotations[azureLBSubnetAnnotation] = *contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet
+		} else if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider {
+			svc.Annotations[gcpLBSubnetAnnotation] = *contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet
+		}
+	}
+
+	// Add LoadBalancerIP parameter if specified by provider parameters.
+	if loadBalancerAddressNeeded(&contour.Spec) {
+		if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider {
+			svc.Spec.LoadBalancerIP = *contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Address
+		} else if contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider {
+			svc.Spec.LoadBalancerIP = *contour.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address
+		}
+	}
+
 	epType := contour.Spec.NetworkPublishing.Envoy.Type
 	if epType == operatorv1alpha1.LoadBalancerServicePublishingType ||
 		epType == operatorv1alpha1.NodePortServicePublishingType {
@@ -374,4 +421,51 @@ func updateEnvoyServiceIfNeeded(ctx context.Context, cli client.Client, contour 
 func isELB(params *operatorv1alpha1.ProviderLoadBalancerParameters) bool {
 	return params.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
 		(params.AWS == nil || params.AWS.Type == operatorv1alpha1.AWSClassicLoadBalancer)
+}
+
+// allocationIDsNeeded returns true if "service.beta.kubernetes.io/aws-load-balancer-eip-allocations"
+// annotation is needed based on the provided spec.
+func allocationIDsNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.Scope == "External" &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AWSLoadBalancerProvider &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS != nil &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1alpha1.AWSNetworkLoadBalancer &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.AWS.AllocationIDs != nil
+}
+
+// resourceGroupNeeded returns true if "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+// annotation is needed based on the provided spec.
+func resourceGroupNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.Scope == "External" &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.ResourceGroup != nil
+}
+
+// subnetNeeded returns true if "service.beta.kubernetes.io/azure-load-balancer-internal-subnet" or
+// "networking.gke.io/internal-load-balancer-subnet" annotation is needed based
+// on the provided spec.
+func subnetNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		spec.NetworkPublishing.Envoy.LoadBalancer.Scope == "Internal" &&
+		((spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider &&
+			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil &&
+			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Subnet != nil) ||
+			(spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider &&
+				spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil &&
+				spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Subnet != nil))
+}
+
+// loadBalancerAddressNeeded returns true if LoadBalancerIP parameter of service
+// is needed based on provided spec.
+func loadBalancerAddressNeeded(spec *operatorv1alpha1.ContourSpec) bool {
+	return spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType &&
+		((spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.AzureLoadBalancerProvider &&
+			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure != nil &&
+			spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Azure.Address != nil) ||
+			(spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type == operatorv1alpha1.GCPLoadBalancerProvider &&
+				spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP != nil &&
+				spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.GCP.Address != nil))
 }
