@@ -56,9 +56,7 @@ func (c *Contour) GatewayClassSet() bool {
 func (c *Contour) ContourNodeSelectorExists() bool {
 	if c.Spec.NodePlacement != nil &&
 		c.Spec.NodePlacement.Contour != nil &&
-		c.Spec.NodePlacement.Contour.NodeSelector != nil &&
-		(c.Spec.NodePlacement.Contour.NodeSelector.MatchLabels != nil ||
-			c.Spec.NodePlacement.Contour.NodeSelector.MatchExpressions != nil) {
+		c.Spec.NodePlacement.Contour.NodeSelector != nil {
 		return true
 	}
 
@@ -80,9 +78,7 @@ func (c *Contour) ContourTolerationsExist() bool {
 func (c *Contour) EnvoyNodeSelectorExists() bool {
 	if c.Spec.NodePlacement != nil &&
 		c.Spec.NodePlacement.Envoy != nil &&
-		c.Spec.NodePlacement.Envoy.NodeSelector != nil &&
-		(c.Spec.NodePlacement.Envoy.NodeSelector.MatchLabels != nil ||
-			c.Spec.NodePlacement.Envoy.NodeSelector.MatchExpressions != nil) {
+		c.Spec.NodePlacement.Envoy.NodeSelector != nil {
 		return true
 	}
 

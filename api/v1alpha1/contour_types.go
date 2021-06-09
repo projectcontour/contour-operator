@@ -138,7 +138,7 @@ type ContourNodePlacement struct {
 	// If unset, the Contour pod(s) will be scheduled to any available node.
 	//
 	// +optional
-	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Tolerations work with taints to ensure that Envoy pods are not scheduled
 	// onto inappropriate nodes. One or more taints are applied to a node; this
@@ -166,7 +166,7 @@ type EnvoyNodePlacement struct {
 	// If unset, the Envoy pod(s) will be scheduled to any available node.
 	//
 	// +optional
-	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Tolerations work with taints to ensure that Envoy pods are not scheduled
 	// onto inappropriate nodes. One or more taints are applied to a node; this
