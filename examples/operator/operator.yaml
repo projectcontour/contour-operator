@@ -409,6 +409,19 @@ spec:
                                   defaults will be applied. See specific aws fields
                                   for details about their defaults."
                                 properties:
+                                  allocationIds:
+                                    description: "AllocationIDs is a list of Allocation
+                                      IDs of Elastic IP addresses that are to be assigned
+                                      to the Network Load Balancer. Works only with
+                                      type NLB. If you are using Amazon EKS 1.16 or
+                                      later, you can assign Elastic IP addresses to
+                                      Network Load Balancer with AllocationIDs. The
+                                      number of Allocation IDs must match the number
+                                      of subnets used for the load balancer. \n Example:
+                                      \"eipalloc-<xxxxxxxxxxxxxxxxx>\" \n See: https://docs.aws.amazon.com/eks/latest/userguide/load-balancing.html"
+                                    items:
+                                      type: string
+                                    type: array
                                   type:
                                     default: Classic
                                     description: "Type is the type of AWS load balancer
@@ -425,6 +438,71 @@ spec:
                                     enum:
                                     - Classic
                                     - NLB
+                                    type: string
+                                type: object
+                              azure:
+                                description: "Azure provides configuration settings
+                                  that are specific to Azure load balancers. \n If
+                                  empty, defaults will be applied. See specific azure
+                                  fields for details about their defaults."
+                                properties:
+                                  address:
+                                    description: "Address is the desired load balancer
+                                      IP address. If scope is \"Internal\", address
+                                      must reside in same virtual network as AKS and
+                                      must not already be assigned to a resource.
+                                      If address does not reside in same subnet as
+                                      AKS, the subnet parameter is also required.
+                                      \n Address must already exist (e.g. `az network
+                                      public-ip create`). \n See: \t https://docs.microsoft.com/en-us/azure/aks/static-ip#create-a-service-using-the-static-ip-address
+                                      \t https://docs.microsoft.com/en-us/azure/aks/internal-lb#specify-an-ip-address"
+                                    maxLength: 253
+                                    minLength: 1
+                                    type: string
+                                  resourceGroup:
+                                    description: "ResourceGroup is the resource group
+                                      name where the \"address\" resides. Relevant
+                                      only if scope is \"External\". \n Omit if desired
+                                      IP is created in same resource group as AKS
+                                      cluster."
+                                    maxLength: 90
+                                    minLength: 1
+                                    type: string
+                                  subnet:
+                                    description: "Subnet is the subnet name where
+                                      the \"address\" resides. Relevant only if scope
+                                      is \"Internal\" and desired IP does not reside
+                                      in same subnet as AKS. \n Omit if desired IP
+                                      is in same subnet as AKS cluster. \n See: https://docs.microsoft.com/en-us/azure/aks/internal-lb#specify-an-ip-address"
+                                    maxLength: 80
+                                    minLength: 1
+                                    type: string
+                                type: object
+                              gcp:
+                                description: "GCP provides configuration settings
+                                  that are specific to GCP load balancers. \n If empty,
+                                  defaults will be applied. See specific gcp fields
+                                  for details about their defaults."
+                                properties:
+                                  address:
+                                    description: "Address is the desired load balancer
+                                      IP address. If scope is \"Internal\", the address
+                                      must reside in same subnet as the GKE cluster
+                                      or \"subnet\" has to be provided. \n See: \t
+                                      https://cloud.google.com/kubernetes-engine/docs/tutorials/configuring-domain-name-static-ip#use_a_service
+                                      \t https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing#lb_subnet"
+                                    maxLength: 253
+                                    minLength: 1
+                                    type: string
+                                  subnet:
+                                    description: "Subnet is the subnet name where
+                                      the \"address\" resides. Relevant only if scope
+                                      is \"Internal\" and desired IP does not reside
+                                      in same subnet as GKE cluster. \n Omit if desired
+                                      IP is in same subnet as GKE cluster. \n See:
+                                      https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing#lb_subnet"
+                                    maxLength: 63
+                                    minLength: 1
                                     type: string
                                 type: object
                               type:
@@ -530,6 +608,8 @@ spec:
                       Contour pods.
                     properties:
                       nodeSelector:
+                        additionalProperties:
+                          type: string
                         description: "NodeSelector is the simplest recommended form
                           of node selection constraint and specifies a map of key-value
                           pairs. For the Contour pod to be eligible to run on a node,
@@ -537,48 +617,6 @@ spec:
                           as labels (it can have additional labels as well). \n If
                           unset, the Contour pod(s) will be scheduled to any available
                           node."
-                        properties:
-                          matchExpressions:
-                            description: matchExpressions is a list of label selector
-                              requirements. The requirements are ANDed.
-                            items:
-                              description: A label selector requirement is a selector
-                                that contains values, a key, and an operator that
-                                relates the key and values.
-                              properties:
-                                key:
-                                  description: key is the label key that the selector
-                                    applies to.
-                                  type: string
-                                operator:
-                                  description: operator represents a key's relationship
-                                    to a set of values. Valid operators are In, NotIn,
-                                    Exists and DoesNotExist.
-                                  type: string
-                                values:
-                                  description: values is an array of string values.
-                                    If the operator is In or NotIn, the values array
-                                    must be non-empty. If the operator is Exists or
-                                    DoesNotExist, the values array must be empty.
-                                    This array is replaced during a strategic merge
-                                    patch.
-                                  items:
-                                    type: string
-                                  type: array
-                              required:
-                              - key
-                              - operator
-                              type: object
-                            type: array
-                          matchLabels:
-                            additionalProperties:
-                              type: string
-                            description: matchLabels is a map of {key,value} pairs.
-                              A single {key,value} in the matchLabels map is equivalent
-                              to an element of matchExpressions, whose key field is
-                              "key", the operator is "In", and the values array contains
-                              only "value". The requirements are ANDed.
-                            type: object
                         type: object
                       tolerations:
                         description: "Tolerations work with taints to ensure that
@@ -633,6 +671,8 @@ spec:
                       Envoy pods.
                     properties:
                       nodeSelector:
+                        additionalProperties:
+                          type: string
                         description: "NodeSelector is the simplest recommended form
                           of node selection constraint and specifies a map of key-value
                           pairs. For the Envoy pod to be eligible to run on a node,
@@ -640,48 +680,6 @@ spec:
                           as labels (it can have additional labels as well). \n If
                           unset, the Envoy pod(s) will be scheduled to any available
                           node."
-                        properties:
-                          matchExpressions:
-                            description: matchExpressions is a list of label selector
-                              requirements. The requirements are ANDed.
-                            items:
-                              description: A label selector requirement is a selector
-                                that contains values, a key, and an operator that
-                                relates the key and values.
-                              properties:
-                                key:
-                                  description: key is the label key that the selector
-                                    applies to.
-                                  type: string
-                                operator:
-                                  description: operator represents a key's relationship
-                                    to a set of values. Valid operators are In, NotIn,
-                                    Exists and DoesNotExist.
-                                  type: string
-                                values:
-                                  description: values is an array of string values.
-                                    If the operator is In or NotIn, the values array
-                                    must be non-empty. If the operator is Exists or
-                                    DoesNotExist, the values array must be empty.
-                                    This array is replaced during a strategic merge
-                                    patch.
-                                  items:
-                                    type: string
-                                  type: array
-                              required:
-                              - key
-                              - operator
-                              type: object
-                            type: array
-                          matchLabels:
-                            additionalProperties:
-                              type: string
-                            description: matchLabels is a map of {key,value} pairs.
-                              A single {key,value} in the matchLabels map is equivalent
-                              to an element of matchExpressions, whose key field is
-                              "key", the operator is "In", and the values array contains
-                              only "value". The requirements are ANDed.
-                            type: object
                         type: object
                       tolerations:
                         description: "Tolerations work with taints to ensure that
