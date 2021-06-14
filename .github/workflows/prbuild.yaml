@@ -119,3 +119,28 @@ jobs:
           version: v1.38
           only-new-issues: true
           args: --build-tags=e2e
+  codegen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          # * Module download cache
+          # * Build cache (Linux)
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ github.job }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.job }}-go-
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.4'
+      - name: add deps to path
+        run: |
+          ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+      - name: generate
+        run: |
+          make generate generate-contour-crds example manifests 
+          ./hack/actions/check-uncommitted-codegen.sh
