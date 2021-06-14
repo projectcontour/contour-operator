@@ -118,6 +118,24 @@ func checkContainerHasImage(t *testing.T, container *corev1.Container, image str
 	t.Errorf("container is missing image %q", image)
 }
 
+func checkDaemonSetHasNodeSelector(t *testing.T, ds *appsv1.DaemonSet, expected map[string]string) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(ds.Spec.Template.Spec.NodeSelector, expected) {
+		return
+	}
+	t.Errorf("deployment has unexpected node selector %q", expected)
+}
+
+func checkDaemonSetHasTolerations(t *testing.T, ds *appsv1.DaemonSet, expected []corev1.Toleration) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(ds.Spec.Template.Spec.Tolerations, expected) {
+		return
+	}
+	t.Errorf("deployment has unexpected tolerations %v", expected)
+}
+
 func TestDesiredDaemonSet(t *testing.T) {
 	name := "ds-test"
 	cfg := objcontour.Config{
@@ -144,4 +162,39 @@ func TestDesiredDaemonSet(t *testing.T) {
 	for _, port := range cntr.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		checkContainerHasPort(t, ds, port.PortNumber)
 	}
+	checkDaemonSetHasNodeSelector(t, ds, nil)
+	checkDaemonSetHasTolerations(t, ds, nil)
+}
+
+func TestNodePlacementDaemonSet(t *testing.T) {
+	name := "selector-test"
+	selectors := map[string]string{"node-role": "envoy"}
+	tolerations := []corev1.Toleration{
+		{
+			Operator: corev1.TolerationOpExists,
+			Key:      "node-role",
+			Value:    "envoy",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	cntr.Spec.NodePlacement = &operatorv1alpha1.NodePlacement{
+		Envoy: &operatorv1alpha1.EnvoyNodePlacement{
+			NodeSelector: selectors,
+			Tolerations:  tolerations,
+		},
+	}
+
+	testContourImage := config.DefaultContourImage
+	testEnvoyImage := config.DefaultEnvoyImage
+	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
+	checkDaemonSetHasNodeSelector(t, ds, selectors)
+	checkDaemonSetHasTolerations(t, ds, tolerations)
 }

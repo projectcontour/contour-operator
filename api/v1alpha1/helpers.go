@@ -51,3 +51,47 @@ func (c *Contour) IsFinalized() bool {
 func (c *Contour) GatewayClassSet() bool {
 	return c.Spec.GatewayClassRef != nil
 }
+
+// ContourNodeSelectorExists returns true if a nodeSelector is specified for Contour.
+func (c *Contour) ContourNodeSelectorExists() bool {
+	if c.Spec.NodePlacement != nil &&
+		c.Spec.NodePlacement.Contour != nil &&
+		c.Spec.NodePlacement.Contour.NodeSelector != nil {
+		return true
+	}
+
+	return false
+}
+
+// ContourTolerationsExist returns true if tolerations are set for Contour.
+func (c *Contour) ContourTolerationsExist() bool {
+	if c.Spec.NodePlacement != nil &&
+		c.Spec.NodePlacement.Contour != nil &&
+		len(c.Spec.NodePlacement.Contour.Tolerations) > 0 {
+		return true
+	}
+
+	return false
+}
+
+// EnvoyNodeSelectorExists returns true if a nodeSelector is specified for Envoy.
+func (c *Contour) EnvoyNodeSelectorExists() bool {
+	if c.Spec.NodePlacement != nil &&
+		c.Spec.NodePlacement.Envoy != nil &&
+		c.Spec.NodePlacement.Envoy.NodeSelector != nil {
+		return true
+	}
+
+	return false
+}
+
+// EnvoyTolerationsExist returns true if tolerations are set for Envoy.
+func (c *Contour) EnvoyTolerationsExist() bool {
+	if c.Spec.NodePlacement != nil &&
+		c.Spec.NodePlacement.Envoy != nil &&
+		len(c.Spec.NodePlacement.Envoy.Tolerations) > 0 {
+		return true
+	}
+
+	return false
+}

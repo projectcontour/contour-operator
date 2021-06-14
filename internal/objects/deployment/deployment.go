@@ -310,6 +310,15 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			},
 		},
 	}
+
+	if contour.ContourNodeSelectorExists() {
+		deploy.Spec.Template.Spec.NodeSelector = contour.Spec.NodePlacement.Contour.NodeSelector
+	}
+
+	if contour.ContourTolerationsExist() {
+		deploy.Spec.Template.Spec.Tolerations = contour.Spec.NodePlacement.Contour.Tolerations
+	}
+
 	return deploy
 }
 

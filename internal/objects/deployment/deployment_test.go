@@ -89,6 +89,24 @@ func checkContainerHasImage(t *testing.T, container *corev1.Container, image str
 	t.Errorf("container is missing image %q", image)
 }
 
+func checkDeploymentHasNodeSelector(t *testing.T, deploy *appsv1.Deployment, expected map[string]string) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(deploy.Spec.Template.Spec.NodeSelector, expected) {
+		return
+	}
+	t.Errorf("deployment has unexpected node selector %q", expected)
+}
+
+func checkDeploymentHasTolerations(t *testing.T, deploy *appsv1.Deployment, expected []corev1.Toleration) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(deploy.Spec.Template.Spec.Tolerations, expected) {
+		return
+	}
+	t.Errorf("deployment has unexpected tolerations %v", expected)
+}
+
 func TestDesiredDeployment(t *testing.T) {
 	name := "deploy-test"
 	cfg := objcontour.Config{
@@ -135,4 +153,39 @@ func TestDesiredDeployment(t *testing.T) {
 
 	arg := fmt.Sprintf("--ingress-class-name=%s", *cntr.Spec.IngressClassName)
 	checkContainerHasArg(t, container, arg)
+	checkDeploymentHasNodeSelector(t, deploy, nil)
+	checkDeploymentHasTolerations(t, deploy, nil)
+}
+
+func TestNodePlacementDeployment(t *testing.T) {
+	name := "selector-test"
+	selectors := map[string]string{"node-role": "contour"}
+	tolerations := []corev1.Toleration{
+		{
+			Operator: corev1.TolerationOpExists,
+			Key:      "node-role",
+			Value:    "contour",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	cntr.Spec.NodePlacement = &operatorv1alpha1.NodePlacement{
+		Contour: &operatorv1alpha1.ContourNodePlacement{
+			NodeSelector: selectors,
+			Tolerations:  tolerations,
+		},
+	}
+
+	testContourImage := config.DefaultContourImage
+	deploy := DesiredDeployment(cntr, testContourImage)
+
+	checkDeploymentHasNodeSelector(t, deploy, selectors)
+	checkDeploymentHasTolerations(t, deploy, tolerations)
 }

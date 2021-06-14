@@ -350,6 +350,14 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		},
 	}
 
+	if contour.EnvoyNodeSelectorExists() {
+		ds.Spec.Template.Spec.NodeSelector = contour.Spec.NodePlacement.Envoy.NodeSelector
+	}
+
+	if contour.EnvoyTolerationsExist() {
+		ds.Spec.Template.Spec.Tolerations = contour.Spec.NodePlacement.Envoy.Tolerations
+	}
+
 	return ds
 }
 
