@@ -85,7 +85,7 @@ func (c *Contour) EnvoyNodeSelectorExists() bool {
 	return false
 }
 
-// EnvoyTolerationsExist returns true if a nodeSelector is specified for Envoy.
+// EnvoyTolerationsExist returns true if tolerations are set for Envoy.
 func (c *Contour) EnvoyTolerationsExist() bool {
 	if c.Spec.NodePlacement != nil &&
 		c.Spec.NodePlacement.Envoy != nil &&
