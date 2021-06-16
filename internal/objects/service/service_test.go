@@ -133,6 +133,14 @@ func checkServiceHasLoadBalancerAddress(t *testing.T, svc *corev1.Service, addre
 	}
 }
 
+func checkServiceNs(t *testing.T, svc *corev1.Service, ns string) {
+	t.Helper()
+
+	if svc.Namespace != ns {
+		t.Errorf("service has unexpected namespace %v", svc.Namespace)
+	}
+}
+
 func TestDesiredContourService(t *testing.T) {
 	name := "svc-test"
 	cfg := objcontour.Config{
@@ -142,6 +150,7 @@ func TestDesiredContourService(t *testing.T) {
 	}
 	cntr := objcontour.New(cfg)
 	svc := DesiredContourService(cntr)
+	checkServiceNs(t, svc, cfg.Namespace)
 	xdsPort := objcfg.XDSPort
 	checkServiceHasPort(t, svc, xdsPort)
 	checkServiceHasTargetPort(t, svc, xdsPort)
@@ -163,6 +172,7 @@ func TestDesiredEnvoyService(t *testing.T) {
 	}
 	cntr := objcontour.New(cfg)
 	svc := DesiredEnvoyService(cntr)
+	checkServiceNs(t, svc, cfg.Namespace)
 	checkServiceHasType(t, svc, corev1.ServiceTypeNodePort)
 	checkServiceHasExternalTrafficPolicy(t, svc, corev1.ServiceExternalTrafficPolicyTypeLocal)
 	checkServiceHasPort(t, svc, EnvoyServiceHTTPPort)

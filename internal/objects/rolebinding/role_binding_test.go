@@ -64,20 +64,28 @@ func checkRoleBindingRole(t *testing.T, rb *rbacv1.RoleBinding, expected string)
 	t.Errorf("role binding has unexpected %q role reference", rb.Subjects[0].Name)
 }
 
+func checkRoleBindingNs(t *testing.T, rb *rbacv1.RoleBinding, ns string) {
+	t.Helper()
+
+	if rb.Namespace != ns {
+		t.Errorf("rolebinding has unexpected namespace %v", rb.Namespace)
+	}
+}
+
 func TestDesiredRoleBinding(t *testing.T) {
-	name := "job-test"
+	name := "role-binding-test"
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	cntr.Namespace = "test-rb-ns"
 	rbName := "test-rb"
 	svcAcct := "test-svc-acct-ref"
 	roleRef := "test-role-ref"
 	rb := desiredRoleBinding(rbName, svcAcct, roleRef, cntr)
 	checkRoleBindingName(t, rb, rbName)
+	checkRoleBindingNs(t, rb, cfg.Namespace)
 	ownerLabels := map[string]string{
 		operatorv1alpha1.OwningContourNameLabel: cntr.Name,
 		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,

@@ -19,9 +19,18 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	corev1 "k8s.io/api/core/v1"
 
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
+
+func checkConfigMapNs(t *testing.T, cm *corev1.ConfigMap, ns string) {
+	t.Helper()
+
+	if cm.Namespace != ns {
+		t.Errorf("configmap has unexpected namespace %v", cm.Namespace)
+	}
+}
 
 func TestDesiredContourConfigmap(t *testing.T) {
 	expected := `
@@ -134,9 +143,12 @@ accesslog-format: envoy
 	}
 	cntr := objcontour.New(cfg)
 	cmCfg := NewCfgForContour(cntr)
-	if cm, err := desired(cmCfg); err != nil {
+	cm, err := desired(cmCfg)
+	if err != nil {
 		t.Errorf("invalid contour configmap: %v", err)
-	} else if cm.Data["contour.yaml"] != expected {
+	}
+	checkConfigMapNs(t, cm, cfg.Namespace)
+	if cm.Data["contour.yaml"] != expected {
 		t.Errorf("unexpected contour.yaml; got:\n%s\nexpected:\n%s\n", cm.Data["contour.yaml"], expected)
 	}
 }
@@ -247,9 +259,12 @@ accesslog-format: envoy
 	gwCfg := NewCfgForGateway(&gatewayv1alpha1.Gateway{})
 	gwCfg.Contour.GatewayNamespace = "bar"
 	gwCfg.Contour.GatewayName = "foo"
-	if cm, err := desired(gwCfg); err != nil {
+	cm, err := desired(gwCfg)
+	if err != nil {
 		t.Errorf("invalid gateway configmap: %v", err)
-	} else if cm.Data["contour.yaml"] != expected {
+	}
+	checkConfigMapNs(t, cm, gwCfg.Namespace)
+	if cm.Data["contour.yaml"] != expected {
 		t.Errorf("unexpected contour.yaml; got:\n%s\nexpected:\n%s\n", cm.Data["contour.yaml"], expected)
 	}
 }

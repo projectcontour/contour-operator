@@ -44,6 +44,14 @@ func checkRoleLabels(t *testing.T, role *rbacv1.Role, expected map[string]string
 	t.Errorf("role has unexpected %q labels", role.Labels)
 }
 
+func checkRoleNs(t *testing.T, role *rbacv1.Role, ns string) {
+	t.Helper()
+
+	if role.Namespace != ns {
+		t.Errorf("role has unexpected namespace %v", role.Namespace)
+	}
+}
+
 func TestDesiredRole(t *testing.T) {
 	name := "role-test"
 	cfg := objcontour.Config{
@@ -54,6 +62,7 @@ func TestDesiredRole(t *testing.T) {
 	cntr := objcontour.New(cfg)
 	role := desiredRole(name, cntr)
 	checkRoleName(t, role, name)
+	checkRoleNs(t, role, cfg.Namespace)
 	ownerLabels := map[string]string{
 		operatorv1alpha1.OwningContourNameLabel: cntr.Name,
 		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,

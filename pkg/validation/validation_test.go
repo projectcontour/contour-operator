@@ -195,7 +195,6 @@ func TestLoadBalancerIP(t *testing.T) {
 			Namespace: fmt.Sprintf("%s-ns", name),
 		},
 		Spec: operatorv1alpha1.ContourSpec{
-			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: operatorv1alpha1.LoadBalancerServicePublishingType,
@@ -284,7 +283,6 @@ func TestLoadBalancerProvider(t *testing.T) {
 			Namespace: fmt.Sprintf("%s-ns", name),
 		},
 		Spec: operatorv1alpha1.ContourSpec{
-			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
 				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
 					Type: operatorv1alpha1.LoadBalancerServicePublishingType,

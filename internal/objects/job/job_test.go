@@ -57,6 +57,14 @@ func checkContainerHasImage(t *testing.T, container *corev1.Container, image str
 	t.Errorf("container is missing image %q", image)
 }
 
+func checkJobNs(t *testing.T, job *batchv1.Job, ns string) {
+	t.Helper()
+
+	if job.Namespace != ns {
+		t.Errorf("job has unexpected namespace %v", job.Namespace)
+	}
+}
+
 func TestDesiredJob(t *testing.T) {
 	name := "job-test"
 	cfg := objcontour.Config{
@@ -66,6 +74,7 @@ func TestDesiredJob(t *testing.T) {
 	}
 	cntr := objcontour.New(cfg)
 	job := DesiredJob(cntr, operatorconfig.DefaultContourImage)
+	checkJobNs(t, job, cfg.Namespace)
 	container := checkJobHasContainer(t, job, jobContainerName)
 	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
 	checkJobHasEnvVar(t, job, jobNsEnvVar)

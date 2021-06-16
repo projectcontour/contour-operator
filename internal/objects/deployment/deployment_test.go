@@ -107,6 +107,14 @@ func checkDeploymentHasTolerations(t *testing.T, deploy *appsv1.Deployment, expe
 	t.Errorf("deployment has unexpected tolerations %v", expected)
 }
 
+func checkDeploymentNs(t *testing.T, deploy *appsv1.Deployment, ns string) {
+	t.Helper()
+
+	if deploy.Namespace != ns {
+		t.Errorf("deployment has unexpected namespace %v", deploy.Namespace)
+	}
+}
+
 func TestDesiredDeployment(t *testing.T) {
 	name := "deploy-test"
 	cfg := objcontour.Config{
@@ -131,6 +139,7 @@ func TestDesiredDeployment(t *testing.T) {
 
 	testContourImage := config.DefaultContourImage
 	deploy := DesiredDeployment(cntr, testContourImage)
+	checkDeploymentNs(t, deploy, cfg.Namespace)
 
 	container := checkDeploymentHasContainer(t, deploy, contourContainerName, true)
 	checkContainerHasImage(t, container, testContourImage)
@@ -169,8 +178,6 @@ func TestNodePlacementDeployment(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
@@ -183,6 +190,7 @@ func TestNodePlacementDeployment(t *testing.T) {
 
 	testContourImage := config.DefaultContourImage
 	deploy := DesiredDeployment(cntr, testContourImage)
+	checkDeploymentNs(t, deploy, cfg.Namespace)
 
 	checkDeploymentHasNodeSelector(t, deploy, selectors)
 	checkDeploymentHasTolerations(t, deploy, tolerations)

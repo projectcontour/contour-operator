@@ -59,7 +59,6 @@ type Operator struct {
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours/status,verbs=get;update;patch
 // cert-gen needs create/update secrets.
 // +kubebuilder:rbac:groups="",resources=namespaces;secrets;serviceaccounts;services,verbs=get;list;watch;delete;create;update
-// +kubebuilder:rbac:groups="",resources=secrets;serviceaccounts;services,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update

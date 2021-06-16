@@ -136,6 +136,14 @@ func checkDaemonSetHasTolerations(t *testing.T, ds *appsv1.DaemonSet, expected [
 	t.Errorf("deployment has unexpected tolerations %v", expected)
 }
 
+func checkDaemonSetNs(t *testing.T, ds *appsv1.DaemonSet, ns string) {
+	t.Helper()
+
+	if ds.Namespace != ns {
+		t.Errorf("deployment has unexpected namespace %v", ds.Namespace)
+	}
+}
+
 func TestDesiredDaemonSet(t *testing.T) {
 	name := "ds-test"
 	cfg := objcontour.Config{
@@ -147,6 +155,7 @@ func TestDesiredDaemonSet(t *testing.T) {
 	testContourImage := config.DefaultContourImage
 	testEnvoyImage := config.DefaultEnvoyImage
 	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
+	checkDaemonSetNs(t, ds, cfg.Namespace)
 	container := checkDaemonSetHasContainer(t, ds, EnvoyContainerName, true)
 	checkContainerHasImage(t, container, testEnvoyImage)
 	container = checkDaemonSetHasContainer(t, ds, ShutdownContainerName, true)
@@ -178,8 +187,6 @@ func TestNodePlacementDaemonSet(t *testing.T) {
 	cfg := objcontour.Config{
 		Name:        name,
 		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    false,
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
