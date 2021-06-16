@@ -18,7 +18,8 @@ This section describes how to build Contour Operator from source.
 2. [Kustomize](https://kustomize.io/)
 3. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 4. [Make](https://www.gnu.org/software/make/)
-5. [kubebuilder](https://book.kubebuilder.io/quick-start.html#installation)
+5. [kubebuilder](https://book.kubebuilder.io/quick-start.html#installation). If using a 3.x version, reference the
+   envtest installation [instructions][9] to set up the etcd/api server used by the integration tests.
 
 ### Fetch the source
 
@@ -297,3 +298,4 @@ By making a contribution to this project, I certify that:
 [6]: https://projectcontour.io/resources/tagging/
 [7]: https://projectcontour.io/docs/main/deploy-options/
 [8]: https://github.com/projectcontour/contour-operator/blob/main/README.md
+[9]: https://book.kubebuilder.io/reference/envtest.html
