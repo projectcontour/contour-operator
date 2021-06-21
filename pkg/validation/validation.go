@@ -26,7 +26,9 @@ import (
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
@@ -63,6 +65,10 @@ func Contour(ctx context.Context, cli client.Client, contour *operatorv1alpha1.C
 		if err := LoadBalancerProvider(contour); err != nil {
 			return err
 		}
+	}
+
+	if err := IngressClass(ctx, cli, contour); err != nil {
+		return err
 	}
 
 	return nil
@@ -166,6 +172,19 @@ func LoadBalancerProvider(contour *operatorv1alpha1.Contour) error {
 		}
 	}
 
+	return nil
+}
+
+// IngressClass validates ingressClassName of the provided contour.
+func IngressClass(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+	if contour.Spec.IngressClassName != nil {
+		name := *contour.Spec.IngressClassName
+		ic := &networkingv1.IngressClass{}
+		key := types.NamespacedName{Name: name}
+		if err := cli.Get(ctx, key, ic); err != nil {
+			return fmt.Errorf("failed to get ingressclass %s: %w", name, err)
+		}
+	}
 	return nil
 }
 

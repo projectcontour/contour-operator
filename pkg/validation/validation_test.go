@@ -25,6 +25,7 @@ import (
 	"github.com/projectcontour/contour-operator/pkg/validation"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -473,6 +474,70 @@ func TestNodePorts(t *testing.T) {
 		if err == nil && !tc.expected {
 			t.Fatalf("%q: expected to fail but received no error", tc.description)
 		}
+	}
+}
+
+func TestIngressClass(t *testing.T) {
+	ctx := context.Background()
+
+	cntr := &operatorv1alpha1.Contour{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "ns",
+		},
+		Spec: operatorv1alpha1.ContourSpec{},
+	}
+
+	ic := &networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ic",
+		},
+		Spec: networkingv1.IngressClassSpec{},
+	}
+
+	testCases := map[string]struct {
+		class    string
+		exists   bool
+		expected bool
+	}{
+		"undefined ingress class name": {
+			expected: true,
+		},
+		"ingress class name exists": {
+			class:    "test-ic",
+			expected: true,
+		},
+		"ingress class name doesn't exist": {
+			class:    "not-exist",
+			expected: false,
+		},
+	}
+
+	// Build and create and instance of the client
+	builder := fake.NewClientBuilder()
+	scheme := operator.GetOperatorScheme()
+	builder.WithScheme(scheme)
+	cl := builder.Build()
+
+	// Created the referenced ingress class.
+	if err := cl.Create(ctx, ic); err != nil {
+		t.Fatalf("failed to create ingressclass: %#v", err)
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			mutated := cntr.DeepCopy()
+			if len(tc.class) > 0 {
+				mutated.Spec.IngressClassName = pointer.StringPtr(tc.class)
+			}
+			err := validation.IngressClass(ctx, cl, mutated)
+			if err != nil && tc.expected {
+				t.Fatalf("failed with error: %#v", err)
+			}
+			if err == nil && !tc.expected {
+				t.Fatalf("expected to fail but received no error")
+			}
+		})
 	}
 }
 
