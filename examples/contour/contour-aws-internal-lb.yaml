@@ -1,0 +1,12 @@
+apiVersion: operator.projectcontour.io/v1alpha1
+kind: Contour
+metadata:
+  name: contour-sample
+spec:
+  networkPublishing:
+    envoy:
+      type: LoadBalancerService
+      loadBalancer:
+        providerParameters:
+          type: AWS
+        scope: Internal
