@@ -108,6 +108,13 @@ func EnsureDaemonSetDeleted(ctx context.Context, cli client.Client, contour *ope
 	return nil
 }
 
+func min(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // DesiredDaemonSet returns the desired DaemonSet for the provided contour using
 // contourImage as the shutdown-manager/envoy-initconfig container images and
 // envoyImage as Envoy's container image.
@@ -122,6 +129,9 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 	}
 
+	// used to see if we need to run as root
+	minPort := int32(1025)
+
 	var ports []corev1.ContainerPort
 	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
 		p := corev1.ContainerPort{
@@ -129,7 +139,15 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			ContainerPort: port.PortNumber,
 			Protocol:      corev1.ProtocolTCP,
 		}
+		minPort = min(minPort, port.PortNumber)
 		ports = append(ports, p)
+	}
+
+	// run as 1001 if not using any low ports
+	securityContext := &corev1.PodSecurityContext{}
+	if minPort > 1024 {
+		user := int64(1001)
+		securityContext.RunAsUser = &user
 	}
 
 	containers := []corev1.Container{
@@ -341,7 +359,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					DeprecatedServiceAccount:      EnvoyContainerName,
 					AutomountServiceAccountToken:  pointer.BoolPtr(false),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(300)),
-					SecurityContext:               &corev1.PodSecurityContext{},
+					SecurityContext:               securityContext,
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
