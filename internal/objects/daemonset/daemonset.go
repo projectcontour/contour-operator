@@ -146,8 +146,9 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 	// run as 1001 if not using any low ports
 	securityContext := &corev1.PodSecurityContext{}
 	if minPort > 1024 {
-		user := int64(1001)
+		user := int64(101)
 		securityContext.RunAsUser = &user
+		securityContext.RunAsGroup = &user
 	}
 
 	containers := []corev1.Container{
