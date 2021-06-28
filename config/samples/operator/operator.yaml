@@ -6427,7 +6427,7 @@ status:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: contour-operator-contour-operator
+  name: contour-operator
   namespace: contour-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -6472,7 +6472,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: contour-operator-contour-operator
+  name: contour-operator
 rules:
 - apiGroups:
   - ""
@@ -6705,20 +6705,7 @@ roleRef:
   name: contour-operator-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: contour-operator-contour-operator
-  namespace: contour-operator
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: contour-operator-contour-operator-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: contour-operator-contour-operator
-subjects:
-- kind: ServiceAccount
-  name: contour-operator-contour-operator
+  name: contour-operator
   namespace: contour-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -6731,7 +6718,20 @@ roleRef:
   name: contour-operator-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: contour-operator-contour-operator
+  name: contour-operator
+  namespace: contour-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: contour-operator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: contour-operator
+subjects:
+- kind: ServiceAccount
+  name: contour-operator
   namespace: contour-operator
 ---
 apiVersion: v1
@@ -6748,7 +6748,7 @@ data:
       resourceName: 0d879e31.projectcontour.io
 kind: ConfigMap
 metadata:
-  name: contour-operator-manager-config
+  name: manager-config
   namespace: contour-operator
 ---
 apiVersion: v1
@@ -6756,7 +6756,7 @@ kind: Service
 metadata:
   labels:
     control-plane: contour-operator
-  name: contour-operator-contour-operator-metrics-service
+  name: contour-operator-metrics-service
   namespace: contour-operator
 spec:
   ports:
@@ -6771,7 +6771,7 @@ kind: Deployment
 metadata:
   labels:
     control-plane: contour-operator
-  name: contour-operator-contour-operator
+  name: contour-operator
   namespace: contour-operator
 spec:
   replicas: 1
@@ -6813,5 +6813,5 @@ spec:
           allowPrivilegeEscalation: false
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: contour-operator-contour-operator
+      serviceAccountName: contour-operator
       terminationGracePeriodSeconds: 10

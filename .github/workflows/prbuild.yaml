@@ -142,5 +142,5 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
       - name: generate
         run: |
-          make generate generate-contour-crds example manifests 
+          make generate generate-contour-crds example manifests
           ./hack/actions/check-uncommitted-codegen.sh
