@@ -16,7 +16,7 @@ package config
 const (
 	DefaultContourImage           = "docker.io/projectcontour/contour:main"
 	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.18.3"
-	DefaultMetricsAddr            = ":8080"
+	DefaultMetricsBindAddr        = ":8080"
 	DefaultEnableLeaderElection   = false
 	DefaultEnableLeaderElectionID = "0d879e31.projectcontour.io"
 )
@@ -49,7 +49,7 @@ func New() *Config {
 	return &Config{
 		ContourImage:       DefaultContourImage,
 		EnvoyImage:         DefaultEnvoyImage,
-		MetricsBindAddress: DefaultMetricsAddr,
+		MetricsBindAddress: DefaultMetricsBindAddr,
 		LeaderElection:     DefaultEnableLeaderElection,
 		LeaderElectionID:   DefaultEnableLeaderElectionID,
 	}

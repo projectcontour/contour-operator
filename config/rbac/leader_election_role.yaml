@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: contour-operator-leader-election
+  name: leader-election-role
 rules:
 - apiGroups:
   - ""
@@ -17,16 +17,21 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - ""
+  - coordination.k8s.io
   resources:
-  - configmaps/status
+  - leases
   verbs:
   - get
+  - list
+  - watch
+  - create
   - update
   - patch
+  - delete
 - apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
+  - patch

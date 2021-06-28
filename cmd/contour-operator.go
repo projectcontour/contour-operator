@@ -35,9 +35,9 @@ func main() {
 		"The container image used for the managed Contour.")
 	flag.StringVar(&opCfg.EnvoyImage, "envoy-image", operatorconfig.DefaultEnvoyImage,
 		"The container image used for the managed Envoy.")
-	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-addr", operatorconfig.DefaultMetricsAddr, "The "+
+	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-bind-address", operatorconfig.DefaultMetricsBindAddr, "The "+
 		"address the metric endpoint binds to. It can be set to \"0\" to disable serving metrics.")
-	flag.BoolVar(&opCfg.LeaderElection, "enable-leader-election", operatorconfig.DefaultEnableLeaderElection,
+	flag.BoolVar(&opCfg.LeaderElection, "leader-elect", operatorconfig.DefaultEnableLeaderElection,
 		"Enable leader election for the operator. Enabling this will ensure there is only one active operator.")
 	flag.Parse()
 

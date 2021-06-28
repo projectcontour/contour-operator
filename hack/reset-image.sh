@@ -2,7 +2,7 @@
 
 readonly HERE=$(cd "$(dirname "$0")" && pwd)
 readonly REPO=$(cd "${HERE}/.." && pwd)
-readonly EXAMPLE_FILE="examples/operator/operator.yaml"
+readonly EXAMPLE_FILE="config/samples/operator/operator.yaml"
 readonly MANAGER_FILE="config/manager/manager.yaml"
 readonly PULL_POLICY="Always"
 readonly PROGNAME=$(basename "$0")

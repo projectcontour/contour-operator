@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: contour-operator
+  name: system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,16 +22,24 @@ spec:
       labels:
         control-plane: contour-operator
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
       - command:
         - /contour-operator
         args:
-        - --enable-leader-election
+        - --leader-elect
         image: docker.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator
+        securityContext:
+          allowPrivilegeEscalation: false
         resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
           requests:
             cpu: 100m
-            memory: 70Mi
+            memory: 20Mi
+      serviceAccountName: contour-operator
       terminationGracePeriodSeconds: 10

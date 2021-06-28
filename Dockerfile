@@ -3,7 +3,7 @@ ARG BUILDPLATFORM=linux/amd64
 # Build the manager binary
 FROM --platform=$BUILDPLATFORM golang:1.16.5 as builder
 
-WORKDIR /
+WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -25,9 +25,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on go build 
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM --platform=$BUILDPLATFORM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /contour-operator .
-USER nonroot:nonroot
+COPY --from=builder /workspace/contour-operator .
+USER 65532:65532
 
 ENTRYPOINT ["/contour-operator"]

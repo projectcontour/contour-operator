@@ -14,7 +14,7 @@ operator pattern.
 
 Install the Contour Operator & Contour CRDs:
 ```
-$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/operator/operator.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/config/samples/operator/operator.yaml
 ```
 
 Verify the deployment is available:
@@ -26,7 +26,7 @@ contour-operator   1/1     1            1           1m
 
 Install an instance of the `Contour` custom resource:
 ```
-$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour-operator/main/config/samples/contour/contour.yaml
 ```
 
 Verify the `Contour` custom resource is available:

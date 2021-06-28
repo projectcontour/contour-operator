@@ -44,7 +44,7 @@ fi
 # Update the image pull policy so the operator's image is served by
 # the kind cluster. Set the pull policy with kustomize when
 # https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
-for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+for file in config/manager/manager.yaml config/samples/operator/operator.yaml ; do
   echo "setting \"imagePullPolicy: IfNotPresent\" for $file"
   run::sed \
     "-es|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|" \
@@ -52,7 +52,7 @@ for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
 done
 
 # Update the operator's image.
-for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+for file in config/manager/manager.yaml config/samples/operator/operator.yaml ; do
   echo "setting \"image: ${IMAGE}:${VERSION}\" for $file"
   run::sed \
     "-es|image: ${IMAGE}:.*$|image: ${IMAGE}:${VERSION}|" \
