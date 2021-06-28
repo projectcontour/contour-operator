@@ -232,7 +232,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.5.0
+    controller-gen.kubebuilder.io/version: v0.6.1
   creationTimestamp: null
   name: contours.operator.projectcontour.io
 spec:
@@ -6424,10 +6424,16 @@ status:
   conditions: []
   storedVersions: []
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: contour-operator-contour-operator
+  namespace: contour-operator
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: contour-operator-leader-election
+  name: contour-operator-leader-election-role
   namespace: contour-operator
 rules:
 - apiGroups:
@@ -6443,25 +6449,30 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - ""
+  - coordination.k8s.io
   resources:
-  - configmaps/status
+  - leases
   verbs:
   - get
+  - list
+  - watch
+  - create
   - update
   - patch
+  - delete
 - apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: contour-operator
+  name: contour-operator-contour-operator
 rules:
 - apiGroups:
   - ""
@@ -6658,7 +6669,17 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: contour-operator-auth-proxy
+  name: contour-operator-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: contour-operator-proxy-role
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -6674,53 +6695,60 @@ rules:
   - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: contour-operator-metrics-reader
-rules:
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: contour-operator-leader-election
+  name: contour-operator-leader-election-rolebinding
   namespace: contour-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: contour-operator-leader-election
+  name: contour-operator-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: contour-operator-contour-operator
   namespace: contour-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: contour-operator
+  name: contour-operator-contour-operator-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: contour-operator
+  name: contour-operator-contour-operator
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: contour-operator-contour-operator
   namespace: contour-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: contour-operator-auth-proxy
+  name: contour-operator-proxy-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: contour-operator-auth-proxy
+  name: contour-operator-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: contour-operator-contour-operator
+  namespace: contour-operator
+---
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: 0d879e31.projectcontour.io
+kind: ConfigMap
+metadata:
+  name: contour-operator-manager-config
   namespace: contour-operator
 ---
 apiVersion: v1
@@ -6728,7 +6756,7 @@ kind: Service
 metadata:
   labels:
     control-plane: contour-operator
-  name: contour-operator-metrics
+  name: contour-operator-contour-operator-metrics-service
   namespace: contour-operator
 spec:
   ports:
@@ -6743,7 +6771,7 @@ kind: Deployment
 metadata:
   labels:
     control-plane: contour-operator
-  name: contour-operator
+  name: contour-operator-contour-operator
   namespace: contour-operator
 spec:
   replicas: 1
@@ -6767,15 +6795,23 @@ spec:
         - containerPort: 8443
           name: https
       - args:
-        - --metrics-addr=127.0.0.1:8080
-        - --enable-leader-election
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
         command:
         - /contour-operator
         image: docker.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator
         resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
           requests:
             cpu: 100m
-            memory: 70Mi
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: contour-operator-contour-operator
       terminationGracePeriodSeconds: 10
