@@ -304,7 +304,6 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 					ServiceAccountName:            objutil.ContourRbacName,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
-					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
 				},
 			},
@@ -317,6 +316,12 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 
 	if contour.ContourTolerationsExist() {
 		deploy.Spec.Template.Spec.Tolerations = contour.Spec.NodePlacement.Contour.Tolerations
+	}
+
+	if contour.ContourSecurityContextExists() {
+		deploy.Spec.Template.Spec.SecurityContext = contour.Spec.ContourSecurityContext
+	} else {
+		deploy.Spec.Template.Spec.SecurityContext = objutil.NewUnprivilegedPodSecurity()
 	}
 
 	return deploy

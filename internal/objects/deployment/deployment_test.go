@@ -19,12 +19,14 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/config"
+	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/pointer"
 )
 
 func checkDeploymentHasEnvVar(t *testing.T, deploy *appsv1.Deployment, name string) {
@@ -107,6 +109,16 @@ func checkDeploymentHasTolerations(t *testing.T, deploy *appsv1.Deployment, expe
 	t.Errorf("deployment has unexpected tolerations %v", expected)
 }
 
+func checkDeploymentHasSecurityContext(t *testing.T, deploy *appsv1.Deployment, expected *corev1.PodSecurityContext) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(deploy.Spec.Template.Spec.SecurityContext, expected) {
+		return
+	}
+
+	t.Errorf("deployment has unexpected security context %v", expected)
+}
+
 func TestDesiredDeployment(t *testing.T) {
 	name := "deploy-test"
 	cfg := objcontour.Config{
@@ -155,6 +167,7 @@ func TestDesiredDeployment(t *testing.T) {
 	checkContainerHasArg(t, container, arg)
 	checkDeploymentHasNodeSelector(t, deploy, nil)
 	checkDeploymentHasTolerations(t, deploy, nil)
+	checkDeploymentHasSecurityContext(t, deploy, objutil.NewUnprivilegedPodSecurity())
 }
 
 func TestNodePlacementDeployment(t *testing.T) {
@@ -188,4 +201,24 @@ func TestNodePlacementDeployment(t *testing.T) {
 
 	checkDeploymentHasNodeSelector(t, deploy, selectors)
 	checkDeploymentHasTolerations(t, deploy, tolerations)
+}
+
+func TestSecurityContextDeployment(t *testing.T) {
+	name := "security-context-test"
+	sc := &corev1.PodSecurityContext{
+		RunAsUser: pointer.Int64(int64(0)),
+	}
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	cntr.Spec.ContourSecurityContext = sc
+
+	testContourImage := config.DefaultContourImage
+	ds := DesiredDeployment(cntr, testContourImage)
+	checkDeploymentHasSecurityContext(t, ds, sc)
 }

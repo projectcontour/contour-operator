@@ -361,7 +361,6 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					DeprecatedServiceAccount:      EnvoyContainerName,
 					AutomountServiceAccountToken:  pointer.BoolPtr(false),
 					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(300)),
-					SecurityContext:               &corev1.PodSecurityContext{},
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
@@ -376,6 +375,12 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 
 	if contour.EnvoyTolerationsExist() {
 		ds.Spec.Template.Spec.Tolerations = contour.Spec.NodePlacement.Envoy.Tolerations
+	}
+
+	if contour.EnvoySecurityContextExists() {
+		ds.Spec.Template.Spec.SecurityContext = contour.Spec.EnvoySecurityContext
+	} else {
+		ds.Spec.Template.Spec.SecurityContext = objutil.NewUnprivilegedPodSecurity()
 	}
 
 	return ds

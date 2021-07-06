@@ -19,11 +19,13 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/config"
+	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/pointer"
 )
 
 func checkDaemonSetHasEnvVar(t *testing.T, ds *appsv1.DaemonSet, container, name string) {
@@ -136,6 +138,16 @@ func checkDaemonSetHasTolerations(t *testing.T, ds *appsv1.DaemonSet, expected [
 	t.Errorf("deployment has unexpected tolerations %v", expected)
 }
 
+func checkDaemonSetHasSecurityContext(t *testing.T, ds *appsv1.DaemonSet, expected *corev1.PodSecurityContext) {
+	t.Helper()
+
+	if apiequality.Semantic.DeepEqual(ds.Spec.Template.Spec.SecurityContext, expected) {
+		return
+	}
+
+	t.Errorf("deployment has unexpected security context %v", expected)
+}
+
 func TestDesiredDaemonSet(t *testing.T) {
 	name := "ds-test"
 	cfg := objcontour.Config{
@@ -164,6 +176,7 @@ func TestDesiredDaemonSet(t *testing.T) {
 	}
 	checkDaemonSetHasNodeSelector(t, ds, nil)
 	checkDaemonSetHasTolerations(t, ds, nil)
+	checkDaemonSetHasSecurityContext(t, ds, objutil.NewUnprivilegedPodSecurity())
 }
 
 func TestNodePlacementDaemonSet(t *testing.T) {
@@ -197,4 +210,25 @@ func TestNodePlacementDaemonSet(t *testing.T) {
 	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
 	checkDaemonSetHasNodeSelector(t, ds, selectors)
 	checkDaemonSetHasTolerations(t, ds, tolerations)
+}
+
+func TestSecurityContextDaemonSet(t *testing.T) {
+	name := "security-context-test"
+	sc := &corev1.PodSecurityContext{
+		RunAsUser: pointer.Int64(int64(0)),
+	}
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	cntr.Spec.EnvoySecurityContext = sc
+
+	testContourImage := config.DefaultContourImage
+	testEnvoyImage := config.DefaultEnvoyImage
+	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
+	checkDaemonSetHasSecurityContext(t, ds, sc)
 }

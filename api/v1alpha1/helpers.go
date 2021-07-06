@@ -102,3 +102,11 @@ func (c *Contour) EnvoyTolerationsExist() bool {
 
 	return false
 }
+
+func (c *Contour) ContourSecurityContextExists() bool {
+	return c.Spec.ContourSecurityContext != nil
+}
+
+func (c *Contour) EnvoySecurityContextExists() bool {
+	return c.Spec.EnvoySecurityContext != nil
+}
