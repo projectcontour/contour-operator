@@ -126,6 +126,16 @@ type ContourSpec struct {
 	//
 	// +optional
 	EnableExternalNameService *bool `json:"enableExternalNameService,omitempty"`
+
+	// ContourSecurityContext defines a PodSecurityContext for Contour pods.
+	//
+	// +optional
+	ContourSecurityContext *corev1.PodSecurityContext `json:"contourSecurityContext,omitempty"`
+
+	//EnvoySecurityContext defines a PodSecurityContext for Envoy pods.
+	//
+	// +optional
+	EnvoySecurityContext *corev1.PodSecurityContext `json:"envoySecurityContext,omitempty"`
 }
 
 // NodePlacement describes node scheduling configuration of Contour and Envoy pods.
