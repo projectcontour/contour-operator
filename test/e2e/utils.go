@@ -76,6 +76,7 @@ func NewK8sClient() (client.Client, error) {
 
 func newContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*operatorv1alpha1.Contour, error) {
 	cntr := objcontour.New(cfg)
+	cntr.Spec.ContourSecurityContext = &corev1.PodSecurityContext{}
 	if err := cl.Create(ctx, cntr); err != nil {
 		return nil, fmt.Errorf("failed to create contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
