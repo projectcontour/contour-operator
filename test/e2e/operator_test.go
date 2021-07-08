@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const timeout = 3 * time.Minute
@@ -58,24 +57,6 @@ var (
 	expectedContourConditions = []metav1.Condition{
 		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
 		// TODO [danehans]: Update when additional status conditions are added to Contour.
-	}
-	// expectedGatewayClassConditions are the expected status conditions of a GatewayClass.
-	expectedGatewayClassConditions = []metav1.Condition{
-		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionTrue},
-	}
-	// expectedNonOwnedGatewayClassConditions are the expected status conditions of a GatewayClass
-	// not owned by the operator.
-	expectedNonOwnedGatewayClassConditions = []metav1.Condition{
-		{Type: string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted), Status: metav1.ConditionFalse},
-	}
-	// expectedGatewayConditions are the expected status conditions of a Gateway.
-	expectedGatewayConditions = []metav1.Condition{
-		{Type: string(gatewayv1alpha1.GatewayConditionReady), Status: metav1.ConditionTrue},
-	}
-	// expectedNonOwnedGatewayConditions are the expected status conditions of a Gateway
-	// not owned by the operator.
-	expectedNonOwnedGatewayConditions = []metav1.Condition{
-		{Type: string(gatewayv1alpha1.GatewayConditionScheduled), Status: metav1.ConditionFalse},
 	}
 	// testAppName is the name of the application used for e2e testing.
 	testAppName = "kuard"
@@ -597,11 +578,6 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created gatewayclass %s", gcName)
 
-	// The gatewayclass should now report admitted.
-	if err := waitForGatewayClassStatusConditions(ctx, kclient, timeout, gcName, expectedGatewayClassConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
-	}
-
 	// Create the gateway namespace if it doesn't exist.
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
@@ -616,11 +592,6 @@ func TestGateway(t *testing.T) {
 		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
-
-	// The gateway should report admitted.
-	if err := waitForGatewayStatusConditions(ctx, kclient, timeout, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
-	}
 
 	// The contour should now report available.
 	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {
@@ -725,11 +696,6 @@ func TestGatewayClusterIP(t *testing.T) {
 	}
 	t.Logf("created gatewayclass %s", gcName)
 
-	// The gatewayclass should now report admitted.
-	if err := waitForGatewayClassStatusConditions(ctx, kclient, timeout, gcName, expectedGatewayClassConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
-	}
-
 	// Create the gateway namespace if it doesn't exist.
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
@@ -744,11 +710,6 @@ func TestGatewayClusterIP(t *testing.T) {
 		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
-
-	// The gateway should report admitted.
-	if err := waitForGatewayStatusConditions(ctx, kclient, timeout, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
-	}
 
 	// The contour should now report available.
 	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {
@@ -843,11 +804,6 @@ func TestGatewayOwnership(t *testing.T) {
 	}
 	t.Logf("created gatewayclass %s", nonOwnedClass)
 
-	// The gatewayclass should not report admitted.
-	if err := waitForGatewayClassStatusConditions(ctx, kclient, timeout, nonOwnedClass, expectedNonOwnedGatewayClassConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", nonOwnedClass, err)
-	}
-
 	// Create the namespace used by the non-owned gateway
 	if err := newNs(ctx, kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to create namespace %s: %v", cfg.SpecNs, err)
@@ -859,11 +815,6 @@ func TestGatewayOwnership(t *testing.T) {
 		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, nonOwnedGateway, err)
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, nonOwnedGateway)
-
-	// The gateway should not report scheduled.
-	if err := waitForGatewayStatusConditions(ctx, kclient, timeout, nonOwnedGateway, cfg.SpecNs, expectedNonOwnedGatewayConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, nonOwnedGateway, err)
-	}
 
 	// Create the Contour and Gateway API resources that should be managed by the operator.
 	cntr, err := newContour(ctx, kclient, cfg)
@@ -877,11 +828,6 @@ func TestGatewayOwnership(t *testing.T) {
 	}
 	t.Logf("created gatewayclass %s", gcName)
 
-	// The gatewayclass should now report admitted.
-	if err := waitForGatewayClassStatusConditions(ctx, kclient, timeout, gcName, expectedGatewayClassConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gatewayclass %s: %v", gcName, err)
-	}
-
 	// Create the gateway. The gateway must be projectcontour/contour until the following issue is fixed:
 	// https://github.com/projectcontour/contour-operator/issues/241
 	gwName := "contour"
@@ -889,11 +835,6 @@ func TestGatewayOwnership(t *testing.T) {
 		t.Fatalf("failed to create gateway %s/%s: %v", cfg.SpecNs, gwName, err)
 	}
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
-
-	// The gateway should report admitted.
-	if err := waitForGatewayStatusConditions(ctx, kclient, timeout, gwName, cfg.SpecNs, expectedGatewayConditions...); err != nil {
-		t.Fatalf("failed to observe expected status conditions for gateway %s/%s: %v", cfg.SpecNs, gwName, err)
-	}
 
 	// The contour should now report available.
 	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {

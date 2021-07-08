@@ -152,6 +152,7 @@ func TestDesiredGatewayConfigmap(t *testing.T) {
 #
 # Specify the service-apis Gateway Contour should watch.
 gateway:
+  controllerName: some-controller-name
   name: foo
   namespace: bar
 #
@@ -246,7 +247,7 @@ accesslog-format: envoy
 #   right side of the x-forwarded-for HTTP header to trust.
 #   num-trusted-hops: 0
 `
-	gwCfg := NewCfgForGateway(&gatewayv1alpha1.Gateway{})
+	gwCfg := NewCfgForGateway(&gatewayv1alpha1.Gateway{}, "some-controller-name")
 	gwCfg.Contour.GatewayNamespace = "bar"
 	gwCfg.Contour.GatewayName = "foo"
 	if cm, err := desired(gwCfg); err != nil {

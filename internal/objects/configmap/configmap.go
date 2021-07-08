@@ -46,8 +46,9 @@ var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
 #
-# Specify the service-apis Gateway Contour should watch.{{if and .GatewayName .GatewayNamespace}}
+# Specify the service-apis Gateway Contour should watch.{{if and .GatewayName .GatewayNamespace .GatewayControllerName }}
 gateway:
+  controllerName: {{.GatewayControllerName}}
   name: {{.GatewayName}}
   namespace: {{.GatewayNamespace}}{{else}}
 # gateway:
@@ -164,6 +165,9 @@ type contourConfig struct {
 	GatewayNamespace string
 	// GatewayName is the Gateway name Contour should watch.
 	GatewayName string
+	// GatewayControllerName is the name of the controller that should
+	// reconcile GatewayClasses and associated Gateways.
+	GatewayControllerName string
 }
 
 // NewConfig returns a Config with default fields set.
@@ -181,13 +185,14 @@ func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
 }
 
 // NewCfgForGateway returns a ConfigMap Config with default fields set for gw.
-func NewCfgForGateway(gw *gatewayv1alpha1.Gateway) *Config {
+func NewCfgForGateway(gw *gatewayv1alpha1.Gateway, controllerName string) *Config {
 	cfg := NewConfig()
 	cfg.Namespace = gw.Namespace
 	labels := objgw.OwnerLabels(gw)
 	cfg.Labels = labels
 	cfg.Contour.GatewayNamespace = gw.Namespace
 	cfg.Contour.GatewayName = gw.Name
+	cfg.Contour.GatewayControllerName = controllerName
 	return cfg
 }
 

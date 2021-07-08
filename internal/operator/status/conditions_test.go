@@ -42,9 +42,6 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 		description      string
 		deployConditions []appsv1.DeploymentCondition
 		dsAvailable      int32
-		gcSet            bool
-		gcExists         bool
-		gcAdmitted       bool
 		expect           metav1.Condition
 	}{
 		{
@@ -102,33 +99,6 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 				Status: metav1.ConditionTrue,
 			},
 		},
-		{
-			description: "gatewayclass set",
-			gcSet:       true,
-			expect: metav1.Condition{
-				Type:   operatorv1alpha1.ContourAvailableConditionType,
-				Status: metav1.ConditionFalse,
-			},
-		},
-		{
-			description: "gatewayclass exists but not admitted",
-			gcSet:       true,
-			gcExists:    true,
-			expect: metav1.Condition{
-				Type:   operatorv1alpha1.ContourAvailableConditionType,
-				Status: metav1.ConditionFalse,
-			},
-		},
-		{
-			description: "gatewayclass exists and is admitted",
-			gcSet:       true,
-			gcExists:    true,
-			gcAdmitted:  true,
-			expect: metav1.Condition{
-				Type:   operatorv1alpha1.ContourAvailableConditionType,
-				Status: metav1.ConditionTrue,
-			},
-		},
 	}
 
 	for i, tc := range testCases {
@@ -150,7 +120,7 @@ func TestComputeContourAvailableCondition(t *testing.T) {
 			},
 		}
 
-		actual := computeContourAvailableCondition(deploy, ds, tc.gcSet, tc.gcExists, tc.gcAdmitted)
+		actual := computeContourAvailableCondition(deploy, ds)
 		if !apiequality.Semantic.DeepEqual(actual.Type, tc.expect.Type) ||
 			!apiequality.Semantic.DeepEqual(actual.Status, tc.expect.Status) {
 			t.Fatalf("%q: expected %#v, got %#v", tc.description, tc.expect, actual)
