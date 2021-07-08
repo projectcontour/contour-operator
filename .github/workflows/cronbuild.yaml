@@ -156,4 +156,4 @@ jobs:
         with:
           job-status: ${{ job.status }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: github-actions-test
+          channel: contour-ci-notifications
