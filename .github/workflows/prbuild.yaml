@@ -36,7 +36,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
   test-example-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -75,7 +75,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
   test-e2e-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -114,7 +114,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
   codespell:
     name: Codespell
     runs-on: ubuntu-latest
@@ -133,7 +133,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -149,7 +149,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
   codegen:
     runs-on: ubuntu-latest
     steps:
@@ -180,5 +180,5 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#contour-ci-notifications'
-        if: ${{ failure() && github.head_ref == 'main' }}
+        if: ${{ failure() && github.head_ref == 'refs/heads/main' }}
 
