@@ -2,6 +2,9 @@ name: Build and Test
 
 # Trigger the workflow on push or pull request
 on:
+   # Run every hour
+  schedule:
+    - cron: '0 * * * *'
   push:
   pull_request:
 
@@ -141,3 +144,16 @@ jobs:
         run: |
           make generate generate-contour-crds example manifests 
           ./hack/actions/check-uncommitted-codegen.sh
+
+  failure-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: exit 1
+      - name: Slack Failure
+        if: ${{ failure() }}
+        uses: kpritam/slack-job-status-action@v1
+        with:
+          job-status: ${{ job.status }}
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: github-actions-test
