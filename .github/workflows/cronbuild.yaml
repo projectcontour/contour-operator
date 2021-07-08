@@ -147,7 +147,13 @@ jobs:
 
   slack:
     name: Slack
-    needs: codegen # set needs only last job except this job
+    needs:
+      - test-linux
+      - test-example-linux
+      - test-e2e-linux
+      - codespell
+      - lint
+      - codegen
     runs-on: ubuntu-latest
     if: always() # set always
     steps:
