@@ -145,15 +145,20 @@ jobs:
           make generate generate-contour-crds example manifests 
           ./hack/actions/check-uncommitted-codegen.sh
 
-  failure-notification:
+  slack:
+    name: Slack
+    needs: publish # set needs only last job except this job
     runs-on: ubuntu-latest
+    if: always() # set always
     steps:
-      - uses: actions/checkout@v2
-      - run: exit 1
-      - name: Slack Failure
-        if: ${{ failure() }}
-        uses: kpritam/slack-job-status-action@v1
+      # run this action to get workflow conclusion
+      # You can get conclusion via env (env.WORKFLOW_CONCLUSION)
+      - uses: technote-space/workflow-conclusion-action@v2
+      - uses: 8398a7/action-slack@v3
         with:
-          job-status: ${{ job.status }}
-          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: contour-ci-notifications
+          # status: ${{ env.WORKFLOW_CONCLUSION }} # neutral, success, skipped, cancelled, timed_out, action_required, failure
+          status: failure
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.WORKFLOW_CONCLUSION == 'failure' # notify only if failure
