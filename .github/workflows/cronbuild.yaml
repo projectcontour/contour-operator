@@ -147,7 +147,7 @@ jobs:
 
   slack:
     name: Slack
-    needs: publish # set needs only last job except this job
+    needs: codegen # set needs only last job except this job
     runs-on: ubuntu-latest
     if: always() # set always
     steps:
