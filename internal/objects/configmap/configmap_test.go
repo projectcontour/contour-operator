@@ -30,7 +30,7 @@ func TestDesiredContourConfigmap(t *testing.T) {
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
 #
-# Specify the service-apis Gateway Contour should watch.
+# Specify the Gateway API configuration.
 # gateway:
 #   name: contour
 #   namespace: projectcontour
@@ -150,7 +150,7 @@ func TestDesiredGatewayConfigmap(t *testing.T) {
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
 #
-# Specify the service-apis Gateway Contour should watch.
+# Specify the Gateway API configuration.
 gateway:
   controllerName: some-controller-name
   name: foo
