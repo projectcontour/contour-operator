@@ -46,7 +46,7 @@ var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
 #
-# Specify the service-apis Gateway Contour should watch.{{if and .GatewayName .GatewayNamespace .GatewayControllerName }}
+# Specify the Gateway API configuration.{{if and .GatewayName .GatewayNamespace .GatewayControllerName }}
 gateway:
   controllerName: {{.GatewayControllerName}}
   name: {{.GatewayName}}
