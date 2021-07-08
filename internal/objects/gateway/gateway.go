@@ -78,6 +78,10 @@ func ContourForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alph
 		return nil, nil
 	}
 
+	if gc.Spec.ParametersRef == nil {
+		return nil, fmt.Errorf("failed to get contour for gateway %s/%s and gatewayclass %s, no gatewayclass parameters reference", gw.Namespace, gw.Name, gc.Name)
+	}
+
 	cntr, err := objcontour.CurrentContour(ctx, cli, *gc.Spec.ParametersRef.Namespace, gc.Spec.ParametersRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contour for gateway %s/%s", gw.Namespace, gw.Name)

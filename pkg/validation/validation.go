@@ -22,12 +22,10 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
-	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -220,24 +218,6 @@ func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
 // Gateway returns an error if gw is an invalid Gateway. Otherwise, the referenced Contour is returned.
 func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*operatorv1alpha1.Contour, error) {
 	var errs []error
-
-	gc, err := objgc.Get(ctx, cli, gw.Spec.GatewayClassName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get gatewayclass for gateway %s/%s: %w", gw.Namespace,
-			gw.Name, err)
-	}
-
-	admitted := false
-	for _, c := range gc.Status.Conditions {
-		if c.Type == string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted) &&
-			c.Status == metav1.ConditionTrue {
-			admitted = true
-		}
-	}
-	if !admitted {
-		return nil, fmt.Errorf("invalid gatewayclass %s; status must be %s=%s", gc.Name,
-			gatewayv1alpha1.GatewayClassConditionStatusAdmitted, metav1.ConditionTrue)
-	}
 
 	if err := gatewayListeners(gw); err != nil {
 		errs = append(errs, fmt.Errorf("failed to validate listeners for gateway %s/%s: %w", gw.Namespace,

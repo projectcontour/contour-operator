@@ -314,35 +314,6 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeo
 	})
 }
 
-func waitForGatewayClassStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name string, conditions ...metav1.Condition) error {
-	nsName := types.NamespacedName{Name: name}
-	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		gc := &gatewayv1alpha1.GatewayClass{}
-		if err := cl.Get(ctx, nsName, gc); err != nil {
-			return false, nil
-		}
-		expected := conditionMap(conditions...)
-		current := conditionMap(gc.Status.Conditions...)
-		return conditionsMatchExpected(expected, current), nil
-	})
-}
-
-func waitForGatewayStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string, conditions ...metav1.Condition) error {
-	nsName := types.NamespacedName{
-		Name:      name,
-		Namespace: ns,
-	}
-	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		gw := &gatewayv1alpha1.Gateway{}
-		if err := cl.Get(ctx, nsName, gw); err != nil {
-			return false, nil
-		}
-		expected := conditionMap(conditions...)
-		current := conditionMap(gw.Status.Conditions...)
-		return conditionsMatchExpected(expected, current), nil
-	})
-}
-
 func waitForDeploymentStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string, conditions ...appsv1.DeploymentCondition) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
