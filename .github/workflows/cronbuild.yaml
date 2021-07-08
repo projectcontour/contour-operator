@@ -32,11 +32,11 @@ jobs:
         run: |
           CODECOV_NAME=coverage.out bash <(curl -s https://codecov.io/bash)
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
   test-example-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -71,11 +71,11 @@ jobs:
         run: |
           make local-cluster load-image example test-example
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
   test-e2e-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -110,11 +110,11 @@ jobs:
         run: |
           make local-cluster load-image test-e2e
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
   codespell:
     name: Codespell
     runs-on: ubuntu-latest
@@ -129,11 +129,11 @@ jobs:
           check_filenames: true
           check_hidden: true
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -145,11 +145,11 @@ jobs:
           only-new-issues: true
           args: --build-tags=e2e
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
   codegen:
     runs-on: ubuntu-latest
     steps:
@@ -176,9 +176,9 @@ jobs:
           make generate generate-contour-crds example manifests 
           ./hack/actions/check-uncommitted-codegen.sh
       - uses: act10ns/slack@v1
-          with:
-            status: ${{ job.status }}
-            steps: ${{ toJson(steps) }}
-            channel: '#contour-ci-notifications'
-          if: failure()
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: failure()
 
