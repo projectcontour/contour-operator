@@ -8,21 +8,11 @@ NEW_VERSION ?= $(OLD_VERSION)
 
 # Used as a go test argument for running e2e tests.
 TEST ?= .*
+TEST_K8S_VERSION ?= 1.19.2
 
 # Image URL to use all building/pushing image targets
 IMAGE ?= docker.io/projectcontour/contour-operator
-
-# Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
-CRD_OPTIONS ?= "crd:crdVersions=v1"
-
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
-CONTROLLER_GEN := go run sigs.k8s.io/controller-tools/cmd/controller-gen
+TAG_LATEST ?= false
 
 # Platforms to build the multi-arch image for.
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
@@ -57,8 +47,6 @@ DOCKER_BUILD_LABELS = \
 	--label "org.opencontainers.image.title=contour-operator" \
 	--label "org.opencontainers.image.description=Deploy and manage Contour using an operator."
 
-TAG_LATEST ?= false
-
 ifeq ($(TAG_LATEST), true)
 	IMAGE_TAGS = \
 		--tag $(IMAGE):$(VERSION) \
@@ -68,104 +56,101 @@ else
 		--tag $(IMAGE):$(VERSION)
 endif
 
-all: manager
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
 
-# Run tests & validate against linters
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
+
+CONTROLLER_GEN := go run sigs.k8s.io/controller-tools/cmd/controller-gen
+KUSTOMIZE := go run sigs.k8s.io/kustomize/kustomize/v3
+SETUP_ENVTEST := go run sigs.k8s.io/controller-runtime/tools/setup-envtest
+
+CODESPELL_SKIP := $(shell cat .codespell.skip | tr \\n ',')
+
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+# This is a requirement for 'setup-envtest.sh' in the test target.
+# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
+all: build
+
+##@ General
+
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Development
+
+# Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
+.PHONY: generate-contour-crds
+generate-contour-crds: ## Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
+	@./hack/generate-contour-crds.sh $(NEW_VERSION)
+
+manifests: generate-contour-crds ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=contour-operator webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+generate: ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+fmt: ## Run go fmt against code.
+	go fmt ./...
+	go fmt ./test/e2e/
+
+vet: ## Run go vet against code.
+	go vet ./...
+
+##@ Test
+
 .PHONY: check
-check: test lint-golint lint-codespell
+check: test lint-golint lint-codespell ## Run tests and validate against linters
 
-# Run tests
-test: generate fmt vet manifests
-	go test \
-	  -mod=readonly \
-	  -covermode=atomic \
-	  -coverprofile coverage.out \
-	  ./...
+test: manifests generate fmt vet ## Run tests.
+	$(SETUP_ENVTEST) use -p path $(TEST_K8S_VERSION); KUBEBUILDER_ASSETS=${HOME}/.local/share/kubebuilder-envtest/k8s/$(TEST_K8S_VERSION)-$(shell go env GOHOSTOS)-$(shell go env GOHOSTARCH) go test ./... -coverprofile cover.out
 
-lint-golint:
+lint-golint: ## Run golangci-lint against code.
 	@echo Running Go linter ...
 	@./hack/golangci-lint.sh run --build-tags=e2e
 
 .PHONY: lint-codespell
-lint-codespell: CODESPELL_SKIP := $(shell cat .codespell.skip | tr \\n ',')
-lint-codespell:
+lint-codespell: ## Run codespell against code.
 	@echo Running Codespell ...
 	@./hack/codespell.sh --skip $(CODESPELL_SKIP) --ignore-words .codespell.ignorewords --check-filenames --check-hidden -q2
 
-# Build manager binary
-manager: generate fmt vet
+.PHONY: test-e2e
+test-e2e: deploy ## Run e2e tests.
+	go test -mod=readonly -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e
+
+##@ Build
+
+build: generate fmt vet ## Build manager binary.
 	go build -mod=readonly -o bin/contour-operator cmd/contour-operator.go
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests install
+run: manifests generate fmt vet install ## Run a controller from your host.
 	go run ./cmd/contour-operator.go
 
-# Install CRDs into a cluster
-install: manifests
-	kustomize build config/crd | kubectl apply -f -
+docker-build: test ## Build the contour-operator container image.
+	docker build \
+		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
+		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
+		--build-arg "BUILD_SHA=$(BUILD_SHA)" \
+		$(DOCKER_BUILD_LABELS) \
+		$(shell pwd) \
+		--tag $(IMAGE):$(VERSION)
 
-# Uninstall CRDs from a cluster
-uninstall: manifests
-	kustomize build config/crd | kubectl delete -f -
+docker-push: docker-build ## Push the contour-operator container image to the Docker registry.
+	docker push ${IMAGE}:$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	docker push $(IMAGE):latest
+endif
 
-deploy: ## Deploy the operator to a Kubernetes cluster. This assumes a kubeconfig in ~/.kube/config
-deploy: manifests
-	cd config/manager
-	kustomize build config/default | kubectl apply -f -
-
-load-image: ## Load the operator image to a kind cluster
-load-image: container
-	./hack/load-image.sh $(IMAGE) $(VERSION)
-
-# Remove the operator deployment. This assumes a kubeconfig in ~/.kube/config
-undeploy:
-	cd config/manager
-	kustomize build config/default | kubectl delete -f -
-
-example: ## Generate the example operator manifest.
-example:
-	cd config/manager
-	kustomize build config/default > examples/operator/operator.yaml
-
-test-example: ## Test the example Contour.
-.PHONY: test-example
-test-example:
-	./hack/test-example.sh
-
-verify-image: ## Verifies operator image references and pull policy.
-.PHONY: verify-image
-verify-image:
-	./hack/verify-image.sh $(NEW_VERSION)
-
-reset-image: ## Resets operator image references and pull policy.
-.PHONY: reset-image
-reset-image:
-	./hack/reset-image.sh $(IMAGE) $(OLD_VERSION)
-
-# Generate Contour's rendered CRD manifest (i.e. HTTPProxy).
-# Remove when https://github.com/projectcontour/contour-operator/issues/42 is fixed.
-.PHONY: generate-contour-crds
-generate-contour-crds:
-	@./hack/generate-contour-crds.sh $(NEW_VERSION)
-
-manifests: ## Generate manifests e.g. CRD, RBAC etc.
-manifests: generate-contour-crds
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=contour-operator webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-
-# Run go fmt against code
-fmt:
-	go fmt ./...
-	go fmt ./test/e2e/
-
-# Run go vet against code
-vet:
-	go vet ./...
-
-# Generate code
-generate:
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-multiarch-build-push: ## Build and push a multi-arch contour-operator container image to the Docker registry
+multiarch-build-push: ## Build and push a multi-arch contour-operator container image to the Docker registry.
 	docker buildx build \
 		--platform $(IMAGE_PLATFORMS) \
 		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
@@ -176,33 +161,46 @@ multiarch-build-push: ## Build and push a multi-arch contour-operator container 
 		--push \
 		.
 
-container: ## Build the contour-operator container image
-container: test
-	docker build \
-		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
-		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
-		--build-arg "BUILD_SHA=$(BUILD_SHA)" \
-		$(DOCKER_BUILD_LABELS) \
-		$(shell pwd) \
-		--tag $(IMAGE):$(VERSION)
+##@ Deployment
 
-push: ## Push the contour-operator container image to the Docker registry
-push: container
-	docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
+install: manifests ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-local-cluster: # Create a local kind cluster
+uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | kubectl delete -f -
+
+deploy: manifests ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMAGE}
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/default | kubectl delete -f -
+
+##@ Kind cluster
+
+local-cluster: ## Create a local kind cluster
 	./hack/kind-dev-cluster.sh
 
-release: ## Prepares a tagged release of the operator.
-.PHONY: release
-release:
-	./hack/release/make-release-tag.sh $(OLD_VERSION) $(NEW_VERSION)
+load-image: docker-build ## Load the operator image to a Kind cluster
+	./hack/load-image.sh $(IMAGE) $(VERSION)
 
-test-e2e: ## Runs e2e tests.
-.PHONY: test-e2e
-test-e2e: deploy
-	go test -mod=readonly -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e
+example: ## Generate example operator manifest.
+	$(KUSTOMIZE) build config/default > config/samples/operator/operator.yaml
+
+.PHONY: test-example
+test-example: ## Test example operator.
+	./hack/test-example.sh
+
+##@ Release
+
+.PHONY: verify-image
+verify-image: ## Verifies operator image references and pull policy.
+	./hack/verify-image.sh $(NEW_VERSION)
+
+.PHONY: reset-image
+reset-image: ## Resets operator image references and pull policy
+	./hack/reset-image.sh $(IMAGE) $(OLD_VERSION)
+
+.PHONY: release
+release: ## Prepares a tagged release of the operator.
+	./hack/release/make-release-tag.sh $(OLD_VERSION) $(NEW_VERSION)

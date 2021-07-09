@@ -1,7 +1,15 @@
 domain: projectcontour.io
+layout:
+- go.kubebuilder.io/v3
+projectName: contour-operator
 repo: github.com/projectcontour/contour-operator
 resources:
-- group: operator
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: projectcontour.io
+  group: operator
   kind: Contour
+  path: github.com/projectcontour/contour-operator/api/v1alpha1
   version: v1alpha1
-version: "2"
+version: "3"

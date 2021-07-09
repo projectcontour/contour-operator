@@ -10,8 +10,8 @@ readonly OLDVERS="$1"
 readonly NEWVERS="$2"
 readonly CONTOUR_IMG="docker.io/projectcontour/contour:$NEWVERS"
 readonly OPERATOR_IMG="docker.io/projectcontour/contour-operator:$NEWVERS"
-readonly OPERATOR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/operator/operator.yaml"
-readonly CONTOUR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/contour/contour.yaml"
+readonly OPERATOR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/config/samples/operator/operator.yaml"
+readonly CONTOUR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/config/samples/contour/contour.yaml"
 readonly TEST_EXAMPLE="https://projectcontour.io/docs/$NEWVERS/deploy-options/#test-with-ingress"
 readonly CONDUCT_EXAMPLE="https://github.com/projectcontour/contour/blob/$NEWVERS/CODE_OF_CONDUCT.md"
 
@@ -43,7 +43,7 @@ run::sed() {
 }
 
 # Update the Docker image tags for the operator in the deployment manifests.
-for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+for file in config/manager/manager.yaml config/samples/operator/operator.yaml ; do
   # The version might be main or OLDVERS depending on whether we are
   # tagging from the release branch or from main.
   run::sed \
@@ -62,7 +62,7 @@ run::sed \
 
 # Update the operator's image pull policy. Set the pull policy with kustomize when
 # https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
-for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
+for file in config/manager/manager.yaml config/samples/operator/operator.yaml ; do
   echo "setting \"imagePullPolicy: IfNotPresent\" for $file"
   run::sed \
     "-es|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|" \
@@ -71,10 +71,10 @@ done
 
 # Update the docs with the release version.
 run::sed \
-  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
-  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/examples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
-  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/examples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
-  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/examples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/config/samples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/config/samples/operator/operator.yaml|$OPERATOR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/main/config/samples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
+  "-es|https://raw.githubusercontent.com/projectcontour/contour-operator/$OLDVERS/config/samples/contour/contour.yaml|$CONTOUR_EXAMPLE|" \
   "-es|https://projectcontour.io/docs/main/deploy-options/#test-with-ingress|$TEST_EXAMPLE|" \
   "-es|https://projectcontour.io/docs/$OLDVERS/deploy-options/#test-with-ingress|$TEST_EXAMPLE|" \
   "-es|https://github.com/projectcontour/contour/blob/main/CODE_OF_CONDUCT.md|$CONDUCT_EXAMPLE|" \
@@ -85,11 +85,11 @@ run::sed \
 # YAML updates. The "git commit" will fail if there are no changes, so
 # make sure that there are changes to commit before we do it.
 cfg_changed=$(git status -s config/manager 2>&1 | grep -E -q '^\s+[MADRCU]')
-example_changed=$(git status -s examples/operator 2>&1 | grep -E -q '^\s+[MADRCU]')
+example_changed=$(git status -s config/samples/operator 2>&1 | grep -E -q '^\s+[MADRCU]')
 if $cfg_changed  || $example_changed ; then
   git commit -s -m "Update Contour Docker image to $NEWVERS." \
     config/manager/manager.yaml \
-    examples/operator/operator.yaml \
+    config/samples/operator/operator.yaml \
     internal/operator/config/config.go \
     README.md
 fi

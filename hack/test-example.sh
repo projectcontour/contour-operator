@@ -39,19 +39,19 @@ waitForHttpResponse() {
 }
 
 # Test Contour
-kubectl::apply -f examples/operator/operator.yaml
-kubectl::apply -f examples/contour/contour-nodeport.yaml
+kubectl::apply -f config/samples/operator/operator.yaml
+kubectl::apply -f config/samples/contour/contour-nodeport.yaml
 kubectl::apply -f https://projectcontour.io/examples/kuard.yaml
 waitForHttpResponse http://local.projectcontour.io 1 100
 kubectl::delete -f https://projectcontour.io/examples/kuard.yaml
-kubectl::delete -f examples/contour/contour-nodeport.yaml
+kubectl::delete -f config/samples/contour/contour-nodeport.yaml
 # Test Gateway
-kubectl::apply -f examples/gateway/gateway-nodeport.yaml
-kubectl::apply -f examples/gateway/kuard/kuard.yaml
+kubectl::apply -f config/samples/gateway/gateway-nodeport.yaml
+kubectl::apply -f config/samples/gateway/kuard/kuard.yaml
 waitForHttpResponse http://local.projectcontour.io 1 100
-kubectl::delete -f examples/gateway/kuard/kuard.yaml
-kubectl::delete -f examples/gateway/gateway-nodeport.yaml
-kubectl::delete -f examples/operator/operator.yaml
+kubectl::delete -f config/samples/gateway/kuard/kuard.yaml
+kubectl::delete -f config/samples/gateway/gateway-nodeport.yaml
+kubectl::delete -f config/samples/operator/operator.yaml
 
 if ${RESP} == false ; then
   echo "examples test passed"

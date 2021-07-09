@@ -3,7 +3,7 @@ kind: Service
 metadata:
   labels:
     control-plane: contour-operator
-  name: contour-operator-metrics
+  name: contour-operator-metrics-service
   namespace: system
 spec:
   ports:
