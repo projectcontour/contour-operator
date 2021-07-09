@@ -21,9 +21,8 @@ jobs:
           go-version: '1.16.5'
       - name: deps
         run: |
-          ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
+          sudo ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
-          echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test
         run: |
           make test
@@ -62,9 +61,8 @@ jobs:
           go-version: '1.16.5'
       - name: deps
         run: |
-          ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
+          sudo ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
-          echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-example
         env:
           NODEIMAGE: ${{ matrix.node_image }}
@@ -101,7 +99,7 @@ jobs:
           go-version: '1.16.5'
       - name: deps
         run: |
-          ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
+          sudo ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
       - name: test-e2e
@@ -169,7 +167,7 @@ jobs:
           go-version: '1.16.5'
       - name: add deps to path
         run: |
-          ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
+          sudo ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
       - name: generate
         run: |
