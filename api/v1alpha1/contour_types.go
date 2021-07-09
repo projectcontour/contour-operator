@@ -132,7 +132,7 @@ type ContourSpec struct {
 	// +optional
 	ContourSecurityContext *corev1.PodSecurityContext `json:"contourSecurityContext,omitempty"`
 
-	//EnvoySecurityContext defines a PodSecurityContext for Envoy pods.
+	// EnvoySecurityContext defines a PodSecurityContext for Envoy pods.
 	//
 	// +optional
 	EnvoySecurityContext *corev1.PodSecurityContext `json:"envoySecurityContext,omitempty"`

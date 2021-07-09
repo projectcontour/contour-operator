@@ -103,10 +103,14 @@ func (c *Contour) EnvoyTolerationsExist() bool {
 	return false
 }
 
+// ContourSecurityContextExists returns true if there is a
+// PodSecurityContext for Contour.
 func (c *Contour) ContourSecurityContextExists() bool {
 	return c.Spec.ContourSecurityContext != nil
 }
 
+// EnvoySecurityContextExists() returns true if there is a
+// PodSecurityContext for Envoy.
 func (c *Contour) EnvoySecurityContextExists() bool {
 	return c.Spec.EnvoySecurityContext != nil
 }
