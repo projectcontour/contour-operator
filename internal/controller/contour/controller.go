@@ -27,8 +27,8 @@ import (
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
-	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
+	"github.com/projectcontour/contour-operator/internal/status"
 	"github.com/projectcontour/contour-operator/pkg/validation"
 
 	"github.com/go-logr/logr"

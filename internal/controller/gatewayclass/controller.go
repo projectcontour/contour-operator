@@ -19,8 +19,8 @@ import (
 
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
-	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
+	"github.com/projectcontour/contour-operator/internal/status"
 	"github.com/projectcontour/contour-operator/pkg/validation"
 
 	"github.com/go-logr/logr"
