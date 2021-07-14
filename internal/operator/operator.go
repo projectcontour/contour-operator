@@ -18,10 +18,10 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
-	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
-	gwcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gateway"
-	gccontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gatewayclass"
+	operatorconfig "github.com/projectcontour/contour-operator/internal/config"
+	contourcontroller "github.com/projectcontour/contour-operator/internal/controller/contour"
+	gwcontroller "github.com/projectcontour/contour-operator/internal/controller/gateway"
+	gccontroller "github.com/projectcontour/contour-operator/internal/controller/gatewayclass"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/go-logr/logr"

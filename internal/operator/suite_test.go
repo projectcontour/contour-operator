@@ -20,7 +20,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
+	operatorconfig "github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/pkg/slice"
 
 	. "github.com/onsi/ginkgo"
