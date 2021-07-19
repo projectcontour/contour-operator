@@ -2,7 +2,7 @@ name: Build and Test
 
 # Trigger the workflow on push or pull request
 on:
-   # Run every hour
+  # Run every hour
   schedule:
     - cron: '0 * * * *'
   push:
@@ -10,6 +10,7 @@ on:
 
 env:
   GOPROXY: https://proxy.golang.org/
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 jobs:
   test-linux:
     runs-on: ubuntu-latest
@@ -30,6 +31,12 @@ jobs:
         if: ${{ success() }}
         run: |
           CODECOV_NAME=coverage.out bash <(curl -s https://codecov.io/bash)
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
   test-example-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -63,6 +70,12 @@ jobs:
           NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image example test-example
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
   test-e2e-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -96,6 +109,12 @@ jobs:
           NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image test-e2e
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
   codespell:
     name: Codespell
     runs-on: ubuntu-latest
@@ -109,6 +128,12 @@ jobs:
           ignore_words_file: './.codespell.ignorewords'
           check_filenames: true
           check_hidden: true
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -119,6 +144,12 @@ jobs:
           version: v1.38
           only-new-issues: true
           args: --build-tags=e2e
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
   codegen:
     runs-on: ubuntu-latest
     steps:
@@ -142,5 +173,12 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
       - name: generate
         run: |
-          make generate generate-contour-crds example manifests 
+          make generate generate-contour-crds example manifests
           ./hack/actions/check-uncommitted-codegen.sh
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#contour-ci-notifications'
+        if: ${{ failure() && github.ref == 'refs/heads/main' }}
+
