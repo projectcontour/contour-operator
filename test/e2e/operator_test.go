@@ -615,7 +615,7 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80), "/"); err != nil {
 		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
@@ -678,7 +678,6 @@ func TestMultipleContoursGateway(t *testing.T) {
 		name   string
 		gcName string
 		gwName string
-		host   string
 		cfg    objcontour.Config
 	}{
 		{name: "test-mult-gw-1"},
@@ -687,7 +686,6 @@ func TestMultipleContoursGateway(t *testing.T) {
 	for _, test := range tests {
 		test.gcName = test.name + "-gc"
 		test.gwName = test.name + "-gw"
-		test.host = fmt.Sprintf("local.%s.projectcontour.io", test.name)
 		test.cfg = objcontour.Config{
 			Name:         test.name,
 			Namespace:    operatorNs,
@@ -747,7 +745,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 		}
 		t.Logf("created service %s/%s", test.cfg.SpecNs, appName)
 
-		if err := newHTTPRouteToSvc(ctx, kclient, appName, test.cfg.SpecNs, appName, "app", appName, test.host, int32(80)); err != nil {
+		if err := newHTTPRouteToSvc(ctx, kclient, appName, test.cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80), test.name); err != nil {
 			t.Fatalf("failed to create httproute %s/%s: %v", test.cfg.SpecNs, appName, err)
 		}
 		t.Logf("created httproute %s/%s", test.cfg.SpecNs, appName)
@@ -755,7 +753,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 
 	for _, test := range tests {
 		// Check routability to route in each Gateway.
-		testURL := "http://" + test.host
+		testURL := "http://local.projectcontour.io/" + test.name
 		if isKind {
 			if err := waitForHTTPResponse(testURL, timeout); err != nil {
 				t.Fatalf("failed to receive http response for %q: %v", testURL, err)
@@ -770,7 +768,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 			t.Logf("using worker node ip %s", ip)
 
 			// Curl the ingress from the client pod.
-			testURL = fmt.Sprintf("http://%s:30080/", ip)
+			testURL = fmt.Sprintf("http://%s:30080/%s", ip, test.name)
 			cliName := "test-client"
 			if err := podWaitForHTTPResponse(ctx, kclient, test.cfg.SpecNs, cliName, testURL, timeout); err != nil {
 				t.Fatalf("failed to receive http response for %q: %v", testURL, err)
@@ -860,7 +858,7 @@ func TestGatewayClusterIP(t *testing.T) {
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80), "/"); err != nil {
 		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
