@@ -253,10 +253,10 @@ func newIngress(ctx context.Context, cl client.Client, name, ns, backendName str
 	return nil
 }
 
-func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32, prefix string) error {
+func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
 	rootPrefix := &gatewayv1alpha1.HTTPPathMatch{
 		Type:  pathMatchTypePtr(gatewayv1alpha1.PathMatchPrefix),
-		Value: pointer.StringPtr(prefix),
+		Value: pointer.StringPtr("/"),
 	}
 	fwdPort := gatewayv1alpha1.PortNumber(svcPort)
 	svcFwd := gatewayv1alpha1.HTTPRouteForwardTo{
