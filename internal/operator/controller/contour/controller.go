@@ -120,31 +120,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	contour := &operatorv1alpha1.Contour{}
 	if err := r.client.Get(ctx, req.NamespacedName, contour); err != nil {
 		if errors.IsNotFound(err) {
-			// Sync gatewayclass status if this contour is referenced by any gatewayclasses.
-			gc, exists, err := objgc.ParameterRefExists(ctx, r.client, req.Name, req.Namespace)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to verify the existence of gatewayclasses for contour %s/%s: %w",
-					req.Namespace, req.Name, err)
-			}
-			if exists {
-				var errs []error
-				owned := objgc.IsController(gc)
-				valid := false
-				if owned {
-					if err := validation.GatewayClass(gc); err != nil {
-						errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-					} else {
-						valid = true
-					}
-				}
-				if err := status.SyncGatewayClass(ctx, r.client, gc, owned, valid); err != nil {
-					errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", req.Namespace,
-						req.Name, err))
-				}
-				if len(errs) != 0 {
-					return ctrl.Result{}, retryable.NewMaybeRetryableAggregate(errs)
-				}
-			}
 			// This means the contour was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related
 			// resource that got deleted async).

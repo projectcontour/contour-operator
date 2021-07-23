@@ -119,18 +119,10 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	desired := gc.ObjectMeta.DeletionTimestamp.IsZero()
 	if desired {
 		owned := objgc.IsController(gc)
-		valid := false
 		if owned {
 			if err := validation.GatewayClass(gc); err != nil {
 				errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-			} else {
-				valid = true
 			}
-		}
-		if err := status.SyncGatewayClass(ctx, r.client, gc, owned, valid); err != nil {
-			errs = append(errs, fmt.Errorf("failed to sync status for gatewayclass %s: %w", gc.Name, err))
-		} else {
-			r.log.Info("synced status for gatewayclass", "name", gc.Name)
 		}
 		// Sync status for contours that reference this gatewayclass.
 		cntrs, err := objcontour.GatewayClassRefsExist(ctx, r.client, gc.Name)

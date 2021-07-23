@@ -28,7 +28,6 @@ import (
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
-	"github.com/projectcontour/contour-operator/internal/operator/status"
 	retryable "github.com/projectcontour/contour-operator/internal/retryableerror"
 	"github.com/projectcontour/contour-operator/pkg/validation"
 
@@ -166,9 +165,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						cntr.Namespace, cntr.Name, err))
 				}
 			}
-			if err := status.SyncGateway(ctx, r.client, gw); err != nil {
-				errs = append(errs, fmt.Errorf("failed to sync status for gateway %s/%s: %w", gw.Namespace, gw.Name, err))
-			}
 		default:
 			// Before doing anything with the gateway, ensure it has a finalizer
 			// so it can cleaned-up later.
@@ -215,7 +211,7 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 	}
 
 	// configmap error/logging messages are different, hence not using handleResult
-	if err := objcm.Ensure(ctx, cli, objcm.NewCfgForGateway(gw)); err != nil {
+	if err := objcm.Ensure(ctx, cli, objcm.NewCfgForGateway(gw, operatorv1alpha1.GatewayClassControllerRef)); err != nil {
 		errs = append(errs, fmt.Errorf("failed to ensure configmap for gateway %s/%s: %w", gw.Namespace, gw.Name, err))
 	} else {
 		r.log.Info("ensured configmap for gateway", "namespace", gw.Namespace, "name", gw.Name)
@@ -264,7 +260,7 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 	handleResult("daemonset", objds.EnsureDaemonSetDeleted(ctx, cli, contour))
 	handleResult("deployment", objdeploy.EnsureDeploymentDeleted(ctx, cli, contour))
 	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour))
-	handleResult("configmap", objcm.Delete(ctx, cli, objcm.NewCfgForGateway(gw)))
+	handleResult("configmap", objcm.Delete(ctx, cli, objcm.NewCfgForGateway(gw, operatorv1alpha1.GatewayClassControllerRef)))
 	handleResult("rbac", objutil.EnsureRBACDeleted(ctx, cli, contour))
 
 	if len(errs) > 0 {
