@@ -19,10 +19,10 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-	"github.com/projectcontour/contour-operator/internal/operator/config"
 	labels "github.com/projectcontour/contour-operator/pkg/labels"
 
 	batchv1 "k8s.io/api/batch/v1"

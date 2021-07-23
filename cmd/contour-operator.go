@@ -17,8 +17,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/operator"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -27,21 +27,21 @@ import (
 )
 
 var (
-	opCfg operatorconfig.Config
+	opCfg config.Config
 )
 
 func main() {
-	flag.StringVar(&opCfg.ContourImage, "contour-image", operatorconfig.DefaultContourImage,
+	flag.StringVar(&opCfg.ContourImage, "contour-image", config.DefaultContourImage,
 		"The container image used for the managed Contour.")
-	flag.StringVar(&opCfg.EnvoyImage, "envoy-image", operatorconfig.DefaultEnvoyImage,
+	flag.StringVar(&opCfg.EnvoyImage, "envoy-image", config.DefaultEnvoyImage,
 		"The container image used for the managed Envoy.")
-	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-addr", operatorconfig.DefaultMetricsAddr, "The "+
+	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-addr", config.DefaultMetricsAddr, "The "+
 		"address the metric endpoint binds to. It can be set to \"0\" to disable serving metrics.")
-	flag.BoolVar(&opCfg.LeaderElection, "enable-leader-election", operatorconfig.DefaultEnableLeaderElection,
+	flag.BoolVar(&opCfg.LeaderElection, "enable-leader-election", config.DefaultEnableLeaderElection,
 		"Enable leader election for the operator. Enabling this will ensure there is only one active operator.")
 	flag.Parse()
 
-	opCfg.LeaderElectionID = operatorconfig.DefaultEnableLeaderElectionID
+	opCfg.LeaderElectionID = config.DefaultEnableLeaderElectionID
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog := ctrl.Log.WithName("setup")
