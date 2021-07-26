@@ -77,9 +77,11 @@ check: test lint-golint lint-codespell
 # Run tests
 test: generate fmt vet manifests
 	go test \
+	  -race \
 	  -mod=readonly \
 	  -covermode=atomic \
 	  -coverprofile coverage.out \
+	  -coverpkg=./cmd/...,./internal/...,./pkg/... \
 	  ./...
 
 lint-golint:
