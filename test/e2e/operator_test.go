@@ -121,7 +121,7 @@ func TestDefaultContour(t *testing.T) {
 		t.Logf("updated service %s/%s loadbalancer IP and nodeports", cfg.SpecNs, svcName)
 	}
 
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -208,7 +208,7 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
@@ -359,7 +359,7 @@ func TestContourClusterIPService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
@@ -442,7 +442,7 @@ func TestContourSpec(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -463,7 +463,7 @@ func TestContourSpec(t *testing.T) {
 	if _, err := updateContour(ctx, kclient, cfg); err != nil {
 		t.Fatalf("failed to update contour %s/%s: %v", operatorNs, testName, err)
 	}
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -532,7 +532,7 @@ func TestMultipleContours(t *testing.T) {
 		}
 		t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-		if err := waitForContourStatusConditions(ctx, kclient, timeout, testName, operatorNs, expectedContourConditions...); err != nil {
+		if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -594,7 +594,7 @@ func TestGateway(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
@@ -725,7 +725,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 		}
 		t.Logf("created gateway %s/%s", test.cfg.SpecNs, test.gwName)
 
-		if err := waitForContourStatusConditions(ctx, kclient, timeout, test.name, operatorNs, expectedContourConditions...); err != nil {
+		if err := waitForContourStatusConditions(ctx, kclient, test.name, operatorNs, expectedContourConditions...); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, test.name, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, test.name)
@@ -840,7 +840,7 @@ func TestGatewayClusterIP(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -965,7 +965,7 @@ func TestGatewayOwnership(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, contourName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -1055,7 +1055,7 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
@@ -1118,7 +1118,7 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("observed image %s for deployment %s/contour", wantContourImage, cfg.SpecNs)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, timeout, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+	if err := waitForContourStatusConditions(ctx, kclient, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
