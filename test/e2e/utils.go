@@ -288,12 +288,12 @@ func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, 
 	return nil
 }
 
-func waitForContourStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string, conditions ...metav1.Condition) error {
+func waitForContourStatusConditions(ctx context.Context, cl client.Client, name, ns string, conditions ...metav1.Condition) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
 	}
-	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+	return wait.PollImmediate(1*time.Second, time.Minute*5, func() (bool, error) {
 		cntr := &operatorv1alpha1.Contour{}
 		if err := cl.Get(ctx, nsName, cntr); err != nil {
 			return false, nil
