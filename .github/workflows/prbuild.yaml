@@ -39,6 +39,7 @@ jobs:
         if: ${{ failure() && github.ref == 'refs/heads/main' }}
   test-example-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         # use stable kubernetes_version values since they're included
