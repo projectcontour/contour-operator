@@ -403,9 +403,12 @@ func podConditionsMatchExpected(expected, actual map[corev1.PodConditionType]cor
 func waitForHTTPResponse(url string, timeout time.Duration) error {
 	var resp http.Response
 	method := "GET"
+	client := http.DefaultClient
+	client.Timeout = 5 * time.Second
+
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		req, _ := http.NewRequest(method, url, nil)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return false, nil
 		}
