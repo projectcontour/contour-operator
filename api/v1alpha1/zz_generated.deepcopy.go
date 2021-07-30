@@ -186,6 +186,11 @@ func (in *ContourSpec) DeepCopyInto(out *ContourSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.GatewayControllerName != nil {
+		in, out := &in.GatewayControllerName, &out.GatewayControllerName
+		*out = new(string)
+		**out = **in
+	}
 	if in.IngressClassName != nil {
 		in, out := &in.IngressClassName, &out.IngressClassName
 		*out = new(string)
