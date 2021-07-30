@@ -292,7 +292,11 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour))
 	handleResult("configmap", objcm.Delete(ctx, cli, objcm.NewCfgForContour(contour)))
 	handleResult("rbac", objutil.EnsureRBACDeleted(ctx, cli, contour))
-	handleResult("namespace", objns.EnsureNamespaceDeleted(ctx, cli, contour))
+	if deleteExpected, err := objns.EnsureNamespaceDeleted(ctx, cli, contour); deleteExpected {
+		handleResult("namespace", err)
+	} else {
+		r.log.Info("bypassing namespace deletion", "namespace", contour.Namespace, "name", contour.Name)
+	}
 
 	if len(errs) == 0 {
 		if err := objcontour.EnsureFinalizerRemoved(ctx, cli, contour); err != nil {

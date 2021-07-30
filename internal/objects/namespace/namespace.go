@@ -56,38 +56,39 @@ func EnsureNamespace(ctx context.Context, cli client.Client, contour *operatorv1
 //   - Another contour exists in the same namespace.
 //   - The namespace of contour matches a name in namespaceCoreList.
 //   - The namespace does not contain the Contour owner labels.
-func EnsureNamespaceDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+// Returns a boolean indicating if the delete was expected to occur and an error.
+func EnsureNamespaceDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (bool, error) {
 	name := contour.Spec.Namespace.Name
 	if !contour.Spec.Namespace.RemoveOnDeletion {
-		return nil
+		return false, nil
 	}
 	for _, ns := range namespaceCoreList {
 		if name == ns {
-			return nil
+			return false, nil
 		}
 	}
 	ns, err := currentSpecNsName(ctx, cli, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil
+			return true, nil
 		}
-		return err
+		return true, err
 	}
 	if labels.Exist(ns, objcontour.OwnerLabels(contour)) {
 		contoursExist, err := objcontour.OtherContoursExistInSpecNs(ctx, cli, contour)
 		if err != nil {
-			return fmt.Errorf("failed to verify if contours exist in namespace %s: %w", name, err)
+			return true, fmt.Errorf("failed to verify if contours exist in namespace %s: %w", name, err)
 		}
 		if !contoursExist {
 			if err := cli.Delete(ctx, ns); err != nil {
 				if errors.IsNotFound(err) {
-					return nil
+					return true, nil
 				}
-				return fmt.Errorf("failed to delete namespace %s: %w", ns.Name, err)
+				return true, fmt.Errorf("failed to delete namespace %s: %w", ns.Name, err)
 			}
 		}
 	}
-	return nil
+	return true, nil
 }
 
 // DesiredNamespace returns the desired Namespace resource for the provided contour.

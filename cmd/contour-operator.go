@@ -65,7 +65,7 @@ func main() {
 	}
 
 	setupLog.Info("starting contour operator")
-	if err := op.Start(ctrl.SetupSignalHandler(), &opCfg); err != nil {
+	if err := op.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "failed to start contour operator")
 		os.Exit(1)
 	}
