@@ -102,7 +102,9 @@ func testEnsureDefaultFields(t *testing.T, k8sClient client.Client) {
 	}
 	key := client.ObjectKeyFromObject(basicContour)
 	require.NoError(t, k8sClient.Create(context.Background(), basicContour))
-	defer k8sClient.Delete(context.Background(), basicContour)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), basicContour))
+	}()
 
 	updatedContour := &operatorv1alpha1.Contour{}
 	require.Eventually(t, func() bool {
@@ -274,7 +276,9 @@ func testReplicas(t *testing.T, k8sClient client.Client) {
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), replicas))
-	defer k8sClient.Delete(context.Background(), replicas)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), replicas))
+	}()
 
 	deployment := &apps_v1.Deployment{}
 	require.Eventually(t, func() bool {
@@ -299,7 +303,9 @@ func testIngressClassName(t *testing.T, k8sClient client.Client) {
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), ingress))
-	defer k8sClient.Delete(context.Background(), ingress)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), ingress))
+	}()
 
 	deployment := &apps_v1.Deployment{}
 	require.Eventually(t, func() bool {
@@ -324,7 +330,9 @@ func testGatewayClass(t *testing.T, k8sClient client.Client) {
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), gatewayContour))
-	defer k8sClient.Delete(context.Background(), gatewayContour)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), gatewayContour))
+	}()
 
 	gatewayClass := &gatewayv1alpha1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -342,7 +350,9 @@ func testGatewayClass(t *testing.T, k8sClient client.Client) {
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), gatewayClass))
-	defer k8sClient.Delete(context.Background(), gatewayClass)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), gatewayClass))
+	}()
 
 	gateway := &gatewayv1alpha1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
@@ -360,7 +370,9 @@ func testGatewayClass(t *testing.T, k8sClient client.Client) {
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), gateway))
-	defer k8sClient.Delete(context.Background(), gateway)
+	defer func() {
+		require.NoError(t, k8sClient.Delete(context.Background(), gateway))
+	}()
 
 	configMap := &corev1.ConfigMap{}
 	require.Eventually(t, func() bool {
