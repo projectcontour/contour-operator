@@ -50,8 +50,8 @@ spec:
                 type: string
               gatewayControllerName:
                 description: GatewayControllerName is used to determine which GatewayClass
-                  Contour reconciles. If unset, Contour will not reconcile Gateway
-                  API resources.
+                  Contour reconciles. The string takes the form of "projectcontour.io/<namespace>/contour".
+                  If unset, Contour will not reconcile Gateway API resources.
                 maxLength: 253
                 type: string
               ingressClassName:

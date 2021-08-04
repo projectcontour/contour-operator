@@ -92,8 +92,9 @@ type ContourSpec struct {
 	GatewayClassRef *string `json:"gatewayClassRef,omitempty"`
 
 	// GatewayControllerName is used to determine which GatewayClass
-	// Contour reconciles. If unset, Contour will not reconcile Gateway
-	// API resources.
+	// Contour reconciles. The string takes the form of
+	// "projectcontour.io/<namespace>/contour". If unset, Contour will not
+	// reconcile Gateway API resources.
 	//
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
