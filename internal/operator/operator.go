@@ -20,9 +20,7 @@ import (
 	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/config"
-	contourcontroller "github.com/projectcontour/contour-operator/internal/controller/contour"
-	gwcontroller "github.com/projectcontour/contour-operator/internal/controller/gateway"
-	gccontroller "github.com/projectcontour/contour-operator/internal/controller/gatewayclass"
+	"github.com/projectcontour/contour-operator/internal/controller"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -95,7 +93,7 @@ func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
 	}
 
 	// Create and register the contour controller with the operator manager.
-	if _, err := contourcontroller.New(mgr, contourcontroller.Config{
+	if _, err := controller.New(mgr, controller.Config{
 		ContourImage: opCfg.ContourImage,
 		EnvoyImage:   opCfg.EnvoyImage,
 	}); err != nil {
@@ -118,10 +116,6 @@ func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
 // Start creates Gateway API controllers (if configured) and starts the operator
 // synchronously until a message is received from ctx.
 func (o *Operator) Start(ctx context.Context) error {
-	if err := o.createGatewayControllers(); err != nil {
-		return fmt.Errorf("failed to create gateway controllers: %w", err)
-	}
-
 	errChan := make(chan error)
 	go func() {
 		errChan <- o.manager.Start(ctx)
@@ -134,27 +128,6 @@ func (o *Operator) Start(ctx context.Context) error {
 	case err := <-errChan:
 		return err
 	}
-}
-
-// createGatewayControllers creates Gateway and GatewayClass controllers.
-func (o *Operator) createGatewayControllers() error {
-	if !o.gatewayCRDsExist() {
-		o.log.Info("Gateway CRDs not found; starting operator without gateway controllers")
-	} else {
-		// Create and register the gatewayclass controller with the operator manager.
-		if _, err := gccontroller.New(o.manager); err != nil {
-			return fmt.Errorf("failed to create gatewayclass controller: %w", err)
-		}
-		// Create and register the gateway controller with the operator manager.
-		cfg := gwcontroller.Config{
-			ContourImage: o.config.ContourImage,
-			EnvoyImage:   o.config.EnvoyImage,
-		}
-		if _, err := gwcontroller.New(o.manager, cfg); err != nil {
-			return fmt.Errorf("failed to create gateway controller: %w", err)
-		}
-	}
-	return nil
 }
 
 // gatewayCRDsExist returns nil if Gateway CRDs exist.

@@ -286,7 +286,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 									LocalObjectReference: corev1.LocalObjectReference{
 										// [TODO] danehans: Update to contour.Name when
 										// projectcontour/contour/issues/2122 is fixed.
-										Name: objcm.ContourCfgMapName,
+										Name: objcm.ContourConfigMapName,
 									},
 									Items: []corev1.KeyToPath{
 										{
