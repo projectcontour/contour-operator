@@ -68,11 +68,7 @@ type ContourSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// Namespace defines the schema of a Contour namespace. See each field for
-	// additional details. Namespace name should be the same namespace as the
-	// Gateway when GatewayClassRef is set.
-	//
-	// TODO [danehans]: Ignore Namespace when GatewayClassRef is set.
-	// xref: https://github.com/projectcontour/contour-operator/issues/212
+	// additional details.
 	//
 	// +kubebuilder:default={name: "projectcontour", removeOnDeletion: false}
 	Namespace NamespaceSpec `json:"namespace,omitempty"`
@@ -86,6 +82,7 @@ type ContourSpec struct {
 
 	// GatewayClassRef is a reference to a GatewayClass name used for
 	// managing a Contour.
+	// DEPRECATED: The contour operator no longer reconciles GatewayClasses.
 	//
 	// +kubebuilder:validation:MaxLength=253
 	// +optional

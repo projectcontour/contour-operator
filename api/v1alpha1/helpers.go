@@ -16,24 +16,30 @@ package v1alpha1
 const (
 	// GatewayClassControllerRef identifies contour operator as the managing controller
 	// of a GatewayClass.
+	// DEPRECATED: The contour operator no longer reconciles GatewayClasses.
 	GatewayClassControllerRef = "projectcontour.io/contour-operator"
 
 	// GatewayClassParamsRefGroup identifies contour operator as the group name of a
 	// GatewayClass.
+	// DEPRECATED: The contour operator no longer reconciles GatewayClasses.
 	GatewayClassParamsRefGroup = "operator.projectcontour.io"
 
 	// GatewayClassParamsRefKind identifies Contour as the kind name of a GatewayClass.
+	// DEPRECATED: The contour operator no longer reconciles GatewayClasses.
 	GatewayClassParamsRefKind = "Contour"
 
 	// GatewayFinalizer is the name of the finalizer used for a Gateway.
+	// DEPRECATED: The contour operator no longer reconciles Gateways.
 	GatewayFinalizer = "gateway.networking.x-k8s.io/finalizer"
 
 	// OwningGatewayNameLabel is the owner reference label used for a Gateway
 	// managed by the operator. The value should be the name of the Gateway.
+	// DEPRECATED: The contour operator no longer reconciles Gateways.
 	OwningGatewayNameLabel = "contour.operator.projectcontour.io/owning-gateway-name"
 
 	// OwningGatewayNsLabel is the owner reference label used for a Gateway
 	// managed by the operator. The value should be the namespace of the Gateway.
+	// DEPRECATED: The contour operator no longer reconciles Gateways.
 	OwningGatewayNsLabel = "contour.operator.projectcontour.io/owning-gateway-namespace"
 )
 
@@ -48,6 +54,7 @@ func (c *Contour) IsFinalized() bool {
 }
 
 // GatewayClassSet returns true if gatewayClassRef is set for Contour.
+// DEPRECATED: The GatewayClassRef field is deprecated.
 func (c *Contour) GatewayClassSet() bool {
 	return c.Spec.GatewayClassRef != nil
 }
