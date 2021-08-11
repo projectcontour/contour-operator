@@ -17,18 +17,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/config"
+	"github.com/projectcontour/contour-operator/internal/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/controller/contour"
 	gwcontroller "github.com/projectcontour/contour-operator/internal/controller/gateway"
 	gccontroller "github.com/projectcontour/contour-operator/internal/controller/gatewayclass"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
+	controller_runtime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -53,6 +52,7 @@ type Operator struct {
 	client  Client
 	manager manager.Manager
 	log     logr.Logger
+	config  *config.Config
 }
 
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours,verbs=get;list;watch;update
@@ -79,7 +79,7 @@ type Operator struct {
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 
 // New creates a new operator from cliCfg and opCfg.
-func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
+func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
 	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha1.GatewayClass{},
 		&gatewayv1alpha1.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
 	mgrOpts := manager.Options{
@@ -89,7 +89,7 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 		MetricsBindAddress:    opCfg.MetricsBindAddress,
 		ClientDisableCacheFor: nonCached,
 	}
-	mgr, err := ctrl.NewManager(cliCfg, mgrOpts)
+	mgr, err := controller_runtime.NewManager(cliCfg, mgrOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager: %w", err)
 	}
@@ -110,14 +110,15 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 	return &Operator{
 		manager: mgr,
 		client:  Client{mgr.GetClient(), restMapper},
-		log:     ctrl.Log.WithName(operatorName),
+		log:     controller_runtime.Log.WithName(operatorName),
+		config:  opCfg,
 	}, nil
 }
 
 // Start creates Gateway API controllers (if configured) and starts the operator
 // synchronously until a message is received from ctx.
-func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) error {
-	if err := o.createGatewayControllers(opCfg); err != nil {
+func (o *Operator) Start(ctx context.Context) error {
+	if err := o.createGatewayControllers(); err != nil {
 		return fmt.Errorf("failed to create gateway controllers: %w", err)
 	}
 
@@ -136,7 +137,7 @@ func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) erro
 }
 
 // createGatewayControllers creates Gateway and GatewayClass controllers.
-func (o *Operator) createGatewayControllers(opCfg *operatorconfig.Config) error {
+func (o *Operator) createGatewayControllers() error {
 	if !o.gatewayCRDsExist() {
 		o.log.Info("Gateway CRDs not found; starting operator without gateway controllers")
 	} else {
@@ -146,8 +147,8 @@ func (o *Operator) createGatewayControllers(opCfg *operatorconfig.Config) error 
 		}
 		// Create and register the gateway controller with the operator manager.
 		cfg := gwcontroller.Config{
-			ContourImage: opCfg.ContourImage,
-			EnvoyImage:   opCfg.EnvoyImage,
+			ContourImage: o.config.ContourImage,
+			EnvoyImage:   o.config.EnvoyImage,
 		}
 		if _, err := gwcontroller.New(o.manager, cfg); err != nil {
 			return fmt.Errorf("failed to create gateway controller: %w", err)
