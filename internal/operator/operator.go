@@ -130,17 +130,6 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 }
 
-// gatewayCRDsExist returns nil if Gateway CRDs exist.
-func (o *Operator) gatewayCRDsExist() bool {
-	for _, gvr := range GatewayAPIResources() {
-		_, err := o.client.KindFor(gvr)
-		if meta.IsNoMatchError(err) {
-			return false
-		}
-	}
-	return true
-}
-
 // GatewayAPIResources for Operator.
 // The list omits TCP and UDP routes since they're unsupported by operator.
 func GatewayAPIResources() []schema.GroupVersionResource {
