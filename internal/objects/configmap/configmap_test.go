@@ -14,13 +14,13 @@
 package configmap
 
 import (
-	"fmt"
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestDesiredContourConfigmap(t *testing.T) {
@@ -32,8 +32,7 @@ func TestDesiredContourConfigmap(t *testing.T) {
 #
 # Specify the Gateway API configuration.
 # gateway:
-#   name: contour
-#   namespace: projectcontour
+#   controllerName: projectcontour.io/projectcontour/contour
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -126,24 +125,27 @@ accesslog-format: envoy
 #   right side of the x-forwarded-for HTTP header to trust.
 #   num-trusted-hops: 0
 `
-	name := "test-contour-configmap"
-	cfg := objcontour.Config{
-		Name:        name,
-		Namespace:   fmt.Sprintf("%s-ns", name),
-		SpecNs:      "projectcontour",
-		RemoveNs:    true,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+
+	c := &operatorv1alpha1.Contour{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{
+				Name: "some-ns",
+			},
+		},
 	}
-	cntr := objcontour.New(cfg)
-	cmCfg := NewCfgForContour(cntr)
-	if cm, err := desired(cmCfg); err != nil {
-		t.Errorf("invalid contour configmap: %v", err)
-	} else if cm.Data["contour.yaml"] != expected {
-		t.Errorf("unexpected contour.yaml; got:\n%s\nexpected:\n%s\n", cm.Data["contour.yaml"], expected)
-	}
+	cm, err := desired(configForContour(c))
+	require.NoError(t, err)
+	require.Equal(t, "contour", cm.Name)
+	require.Equal(t, "some-ns", cm.Namespace)
+	require.Contains(t, cm.Data, "contour.yaml")
+	assert.Equal(t, expected, cm.Data["contour.yaml"])
 }
 
-func TestDesiredGatewayConfigmap(t *testing.T) {
+func TestDesiredGatewayControllerConfigmap(t *testing.T) {
 	expected := `
 #
 # server:
@@ -153,8 +155,6 @@ func TestDesiredGatewayConfigmap(t *testing.T) {
 # Specify the Gateway API configuration.
 gateway:
   controllerName: some-controller-name
-  name: foo
-  namespace: bar
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -247,12 +247,20 @@ accesslog-format: envoy
 #   right side of the x-forwarded-for HTTP header to trust.
 #   num-trusted-hops: 0
 `
-	gwCfg := NewCfgForGateway(&gatewayv1alpha1.Gateway{}, "some-controller-name")
-	gwCfg.Contour.GatewayNamespace = "bar"
-	gwCfg.Contour.GatewayName = "foo"
-	if cm, err := desired(gwCfg); err != nil {
-		t.Errorf("invalid gateway configmap: %v", err)
-	} else if cm.Data["contour.yaml"] != expected {
-		t.Errorf("unexpected contour.yaml; got:\n%s\nexpected:\n%s\n", cm.Data["contour.yaml"], expected)
+	c := &operatorv1alpha1.Contour{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: operatorv1alpha1.ContourSpec{
+			Namespace: operatorv1alpha1.NamespaceSpec{
+				Name: "some-ns",
+			},
+			GatewayControllerName: pointer.String("some-controller-name"),
+		},
 	}
+	cm, err := desired(configForContour(c))
+	require.NoError(t, err)
+	require.Contains(t, cm.Data, "contour.yaml")
+	assert.Equal(t, expected, cm.Data["contour.yaml"])
 }

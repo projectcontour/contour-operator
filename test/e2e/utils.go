@@ -634,30 +634,6 @@ func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 	return nil
 }
 
-// newOperatorGatewayClass creates a GatewayClass object using the provided name for the object's
-// name and contourNs/contourName for the referenced Contour.
-func newOperatorGatewayClass(ctx context.Context, cl client.Client, name, contourNs, contourName string) error {
-	gc := &gatewayv1alpha1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller: operatorv1alpha1.GatewayClassControllerRef,
-			ParametersRef: &gatewayv1alpha1.ParametersReference{
-				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
-				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
-				Name:      contourName,
-				Scope:     pointer.StringPtr("Namespace"),
-				Namespace: pointer.StringPtr(contourNs),
-			},
-		},
-	}
-	if err := cl.Create(ctx, gc); err != nil {
-		return fmt.Errorf("failed to create gatewayclass %s: %v", name, err)
-	}
-	return nil
-}
-
 // newGatewayClass creates a GatewayClass object using the provided name as
 // the name of the GatewayClass and controller string.
 func newGatewayClass(ctx context.Context, cl client.Client, name string) error {

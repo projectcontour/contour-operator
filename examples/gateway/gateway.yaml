@@ -9,20 +9,14 @@ metadata:
   name: contour-gateway-sample
   namespace: contour-operator
 spec:
-  gatewayClassRef: sample-gatewayclass
+  gatewayControllerName: projectcontour.io/sample-controller
 ---
 kind: GatewayClass
 apiVersion: networking.x-k8s.io/v1alpha1
 metadata:
   name: sample-gatewayclass
 spec:
-  controller: projectcontour.io/contour-operator
-  parametersRef:
-    group: operator.projectcontour.io
-    kind: Contour
-    scope: Namespace
-    name: contour-gateway-sample
-    namespace: contour-operator
+  controller: projectcontour.io/sample-controller
 ---
 kind: Gateway
 apiVersion: networking.x-k8s.io/v1alpha1

@@ -27,14 +27,14 @@ import (
 
 // Config is the configuration of a Contour.
 type Config struct {
-	Name         string
-	Namespace    string
-	SpecNs       string
-	RemoveNs     bool
-	Replicas     int32
-	NetworkType  operatorv1alpha1.NetworkPublishingType
-	NodePorts    []operatorv1alpha1.NodePort
-	GatewayClass *string
+	Name                  string
+	Namespace             string
+	SpecNs                string
+	RemoveNs              bool
+	Replicas              int32
+	NetworkType           operatorv1alpha1.NetworkPublishingType
+	NodePorts             []operatorv1alpha1.NodePort
+	GatewayControllerName *string
 }
 
 // New makes a Contour object using the provided ns/name for the object's
@@ -72,8 +72,8 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 	if cfg.NetworkType == operatorv1alpha1.NodePortServicePublishingType && len(cfg.NodePorts) > 0 {
 		cntr.Spec.NetworkPublishing.Envoy.NodePorts = cfg.NodePorts
 	}
-	if cfg.GatewayClass != nil {
-		cntr.Spec.GatewayClassRef = cfg.GatewayClass
+	if cfg.GatewayControllerName != nil {
+		cntr.Spec.GatewayControllerName = cfg.GatewayControllerName
 	}
 	return cntr
 }
@@ -134,26 +134,6 @@ func OwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
 			operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 		},
 	}
-}
-
-// GatewayClassRefsExist returns a list of Contours that reference a GatewayClass
-// named name.
-func GatewayClassRefsExist(ctx context.Context, cli client.Client, name string) ([]operatorv1alpha1.Contour, error) {
-	var found []operatorv1alpha1.Contour
-	contours := &operatorv1alpha1.ContourList{}
-	if err := cli.List(ctx, contours); err != nil {
-		return found, err
-	}
-	if len(contours.Items) > 0 {
-		for i, c := range contours.Items {
-			if c.Spec.GatewayClassRef != nil {
-				if *c.Spec.GatewayClassRef == name {
-					found = append(found, contours.Items[i])
-				}
-			}
-		}
-	}
-	return found, nil
 }
 
 // OwnerLabels returns owner labels for the provided contour.

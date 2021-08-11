@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package contour
+package controller
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
-	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
@@ -135,9 +134,16 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := validation.Contour(ctx, r.client, contour); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
 		}
-		switch {
-		case contour.GatewayClassSet():
-			if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
+		if !contour.IsFinalized() {
+			// Before doing anything with the contour, ensure it has a finalizer
+			// so it can cleaned-up later.
+			if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
+				return ctrl.Result{}, err
+			}
+			r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
+		} else {
+			r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
+			if err := r.ensureContour(ctx, contour); err != nil {
 				switch e := err.(type) {
 				case retryable.Error:
 					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
@@ -146,45 +152,19 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					return ctrl.Result{}, err
 				}
 			}
-		default:
-			if !contour.IsFinalized() {
-				// Before doing anything with the contour, ensure it has a finalizer
-				// so it can cleaned-up later.
-				if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
-					return ctrl.Result{}, err
-				}
-				r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
-			} else {
-				r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
-				if err := r.ensureContour(ctx, contour); err != nil {
-					switch e := err.(type) {
-					case retryable.Error:
-						r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-						return ctrl.Result{RequeueAfter: e.After()}, nil
-					default:
-						return ctrl.Result{}, err
-					}
-				}
-				r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
-			}
+			r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	} else {
-		switch {
-		case contour.GatewayClassSet():
-			// Do nothing since the contour is a dependent resource of the associated gatewayclass.
-			return ctrl.Result{}, nil
-		default:
-			if err := r.ensureContourDeleted(ctx, contour); err != nil {
-				switch e := err.(type) {
-				case retryable.Error:
-					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-					return ctrl.Result{RequeueAfter: e.After()}, nil
-				default:
-					return ctrl.Result{}, err
-				}
+		if err := r.ensureContourDeleted(ctx, contour); err != nil {
+			switch e := err.(type) {
+			case retryable.Error:
+				r.log.Error(e, "got retryable error; requeueing", "after", e.After())
+				return ctrl.Result{RequeueAfter: e.After()}, nil
+			default:
+				return ctrl.Result{}, err
 			}
-			r.log.Info("deleted contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
+		r.log.Info("deleted contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	return ctrl.Result{}, nil
 }
@@ -221,7 +201,7 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	contourImage := r.config.ContourImage
 	envoyImage := r.config.EnvoyImage
 
-	handleResult("configmap", objcm.Ensure(ctx, cli, objcm.NewCfgForContour(contour)))
+	handleResult("configmap", objcm.EnsureConfigMap(ctx, cli, contour))
 	handleResult("job", objjob.EnsureJob(ctx, cli, contour, contourImage))
 	handleResult("deployment", objdeploy.EnsureDeployment(ctx, cli, contour, contourImage))
 	handleResult("daemonset", objds.EnsureDaemonSet(ctx, cli, contour, contourImage, envoyImage))
@@ -235,41 +215,8 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	return syncContourStatus()
 }
 
-// ensureContourForGatewayClass ensures all necessary resources exist for the given contour
-// when the contour is being managed by a GatewayClass.
-func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	if !contour.GatewayClassSet() {
-		return fmt.Errorf("gatewayclass not set for contour %s/%s", contour.Namespace, contour.Name)
-	}
-
-	var errs []error
-	cli := r.client
-	gcRef := *contour.Spec.GatewayClassRef
-	gc, err := objgc.Get(ctx, cli, gcRef)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to verify the existence of gatewayclass %s: %w", gcRef, err))
-	} else {
-		owned := objgc.IsController(gc)
-		if owned {
-			if err := validation.GatewayClass(gc); err != nil {
-				errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-			}
-		}
-	}
-	if err := status.SyncContour(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
-	}
-	return retryable.NewMaybeRetryableAggregate(errs)
-}
-
 // ensureContourDeleted ensures contour and all child resources have been deleted.
 func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	if contour.GatewayClassSet() {
-		return nil
-	}
-
 	var errs []error
 	cli := r.client
 
@@ -290,7 +237,7 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	handleResult("daemonset", objds.EnsureDaemonSetDeleted(ctx, cli, contour))
 	handleResult("deployment", objdeploy.EnsureDeploymentDeleted(ctx, cli, contour))
 	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour))
-	handleResult("configmap", objcm.Delete(ctx, cli, objcm.NewCfgForContour(contour)))
+	handleResult("configmap", objcm.EnsureConfigMapDeleted(ctx, cli, contour))
 	handleResult("rbac", objutil.EnsureRBACDeleted(ctx, cli, contour))
 	if deleteExpected, err := objns.EnsureNamespaceDeleted(ctx, cli, contour); deleteExpected {
 		handleResult("namespace", err)

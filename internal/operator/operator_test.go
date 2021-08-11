@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -84,7 +83,7 @@ func TestOperator(t *testing.T) {
 		"namespace remove on delete works":                        testNamespaceRemoveOnDelete,
 		"replicas controls number of contour deployment replicas": testReplicas,
 		"ingress class name":                                      testIngressClassName,
-		"gatewayclass":                                            testGatewayClass,
+		"gateway controller name":                                 testGatewayControllerName,
 	}
 	for name, subtest := range subtests {
 		t.Run(name, func(t *testing.T) {
@@ -316,7 +315,7 @@ func testIngressClassName(t *testing.T, k8sClient client.Client) {
 	require.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, "--ingress-class-name=some-class")
 }
 
-func testGatewayClass(t *testing.T, k8sClient client.Client) {
+func testGatewayControllerName(t *testing.T, k8sClient client.Client) {
 	gatewayContour := &operatorv1alpha1.Contour{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gateway",
@@ -326,52 +325,12 @@ func testGatewayClass(t *testing.T, k8sClient client.Client) {
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name: operatorNSName,
 			},
-			GatewayClassRef: pointer.String("somegatewayclass"),
+			GatewayControllerName: pointer.String("somecontrollername"),
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), gatewayContour))
 	defer func() {
 		require.NoError(t, k8sClient.Delete(context.Background(), gatewayContour))
-	}()
-
-	gatewayClass := &gatewayv1alpha1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "somegatewayclass",
-		},
-		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller: "projectcontour.io/contour-operator",
-			ParametersRef: &gatewayv1alpha1.ParametersReference{
-				Group:     "operator.projectcontour.io",
-				Kind:      "Contour",
-				Name:      "gateway",
-				Scope:     pointer.StringPtr("Namespace"),
-				Namespace: pointer.StringPtr(operatorNSName),
-			},
-		},
-	}
-	require.NoError(t, k8sClient.Create(context.Background(), gatewayClass))
-	defer func() {
-		require.NoError(t, k8sClient.Delete(context.Background(), gatewayClass))
-	}()
-
-	gateway := &gatewayv1alpha1.Gateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "somegateway",
-			Namespace: operatorNSName,
-		},
-		Spec: gatewayv1alpha1.GatewaySpec{
-			GatewayClassName: "somegatewayclass",
-			Listeners: []gatewayv1alpha1.Listener{
-				{
-					Port:     8080,
-					Protocol: gatewayv1alpha1.HTTPProtocolType,
-				},
-			},
-		},
-	}
-	require.NoError(t, k8sClient.Create(context.Background(), gateway))
-	defer func() {
-		require.NoError(t, k8sClient.Delete(context.Background(), gateway))
 	}()
 
 	configMap := &corev1.ConfigMap{}
@@ -384,12 +343,9 @@ func testGatewayClass(t *testing.T, k8sClient client.Client) {
 	contourConfig := struct {
 		GatewayConfig *struct {
 			ControllerName string `yaml:"controllerName,omitempty"`
-			Name           string `yaml:"name,omitempty"`
-			Namespace      string `yaml:"namespace,omitempty"`
 		} `yaml:"gateway,omitempty"`
 	}{}
 	require.NoError(t, yaml.Unmarshal([]byte(configMap.Data["contour.yaml"]), &contourConfig))
-	assert.Equal(t, "projectcontour.io/contour-operator", contourConfig.GatewayConfig.ControllerName)
-	assert.Equal(t, "somegateway", contourConfig.GatewayConfig.Name)
-	assert.Equal(t, operatorNSName, contourConfig.GatewayConfig.Namespace)
+	require.NotNil(t, contourConfig.GatewayConfig)
+	assert.Equal(t, "somecontrollername", contourConfig.GatewayConfig.ControllerName)
 }

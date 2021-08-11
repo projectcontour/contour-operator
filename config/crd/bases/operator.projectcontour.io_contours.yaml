@@ -44,8 +44,9 @@ spec:
             description: Spec defines the desired state of Contour.
             properties:
               gatewayClassRef:
-                description: GatewayClassRef is a reference to a GatewayClass name
-                  used for managing a Contour.
+                description: 'GatewayClassRef is a reference to a GatewayClass name
+                  used for managing a Contour. DEPRECATED: The contour operator no
+                  longer reconciles GatewayClasses.'
                 maxLength: 253
                 type: string
               gatewayControllerName:
@@ -68,11 +69,8 @@ spec:
                 default:
                   name: projectcontour
                   removeOnDeletion: false
-                description: "Namespace defines the schema of a Contour namespace.
-                  See each field for additional details. Namespace name should be
-                  the same namespace as the Gateway when GatewayClassRef is set. \n
-                  TODO [danehans]: Ignore Namespace when GatewayClassRef is set. xref:
-                  https://github.com/projectcontour/contour-operator/issues/212"
+                description: Namespace defines the schema of a Contour namespace.
+                  See each field for additional details.
                 properties:
                   name:
                     default: projectcontour
