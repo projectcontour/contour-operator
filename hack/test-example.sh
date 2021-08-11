@@ -27,7 +27,7 @@ waitForHttpResponse() {
     while [ $attempts -le $retries ]
     do
       echo "Sending http request to $url (attempt #$attempts)"
-      resp=$(curl -w %"{http_code}" -s -o /dev/null "$url")
+      resp=$(curl --max-time 5 -w %"{http_code}" -s -o /dev/null "$url")
       if [ "$resp" = "200" ] ; then
         echo "Received http response from $url"
         RESP=true
@@ -47,6 +47,14 @@ waitForHttpResponse http://local.projectcontour.io 1 100
 kubectl::delete -f https://projectcontour.io/examples/kuard.yaml
 kubectl::delete -f examples/contour/contour-nodeport.yaml
 
+if [ "${RESP}" == "false" ]; then
+  echo "basic ingress test failed"
+  exit 1
+fi
+
+# Reset.
+RESP=false
+
 # Test Gateway
 kubectl::apply -f examples/gateway/gateway-nodeport.yaml
 kubectl::apply -f examples/gateway/kuard/kuard.yaml
@@ -61,10 +69,10 @@ kubectl::delete gatewayclasses --all-namespaces --all
 kubectl::delete -f examples/gateway/gateway-nodeport.yaml
 kubectl::delete -f examples/operator/operator.yaml
 
-if ${RESP} == false ; then
-  echo "examples test passed"
-  exit 0
-else
-  echo "examples test failed"
+if [ "${RESP}" == "false" ]; then
+  echo "gateway test failed"
   exit 1
 fi
+
+echo "all tests passed"
+exit 0
