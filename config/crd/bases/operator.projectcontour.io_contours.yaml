@@ -48,6 +48,12 @@ spec:
                   used for managing a Contour.
                 maxLength: 253
                 type: string
+              gatewayControllerName:
+                description: GatewayControllerName is used to determine which GatewayClass
+                  Contour reconciles. The string takes the form of "projectcontour.io/<namespace>/contour".
+                  If unset, Contour will not reconcile Gateway API resources.
+                maxLength: 253
+                type: string
               ingressClassName:
                 description: "IngressClassName is the name of the IngressClass used
                   by Contour. If unset, Contour will process all ingress objects without

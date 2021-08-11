@@ -91,6 +91,15 @@ type ContourSpec struct {
 	// +optional
 	GatewayClassRef *string `json:"gatewayClassRef,omitempty"`
 
+	// GatewayControllerName is used to determine which GatewayClass
+	// Contour reconciles. The string takes the form of
+	// "projectcontour.io/<namespace>/contour". If unset, Contour will not
+	// reconcile Gateway API resources.
+	//
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	GatewayControllerName *string `json:"gatewayControllerName,omitempty"`
+
 	// IngressClassName is the name of the IngressClass used by Contour. If unset,
 	// Contour will process all ingress objects without an ingress class annotation
 	// or ingress objects with an annotation matching ingress-class=contour. When
