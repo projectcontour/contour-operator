@@ -38,8 +38,7 @@ const (
 	ContourConfigMapName = "contour"
 )
 
-var contourConfigMapTemplate = template.Must(template.New("contour.yaml").Parse(`
-#
+var contourConfigMapTemplate = template.Must(template.New("contour.yaml").Parse(`#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
