@@ -24,8 +24,7 @@ import (
 )
 
 func TestDesiredContourConfigmap(t *testing.T) {
-	expected := `
-#
+	expected := `#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
@@ -146,8 +145,7 @@ accesslog-format: envoy
 }
 
 func TestDesiredGatewayControllerConfigmap(t *testing.T) {
-	expected := `
-#
+	expected := `#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
 #   xds-server-type: contour
