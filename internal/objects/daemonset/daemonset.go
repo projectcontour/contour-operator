@@ -61,6 +61,10 @@ const (
 	envoyCfgVolName = "envoy-config"
 	// envoyCfgVolMntDir is the directory name of the Envoy configuration volume.
 	envoyCfgVolMntDir = "config"
+	// envoyAdminVolName is the name of the Envoy admin volume.
+	envoyAdminVolName = "envoy-admin"
+	// envoyAdminVolMntDir is the directory name of the Envoy admin volume.
+	envoyAdminVolMntDir = "admin"
 	// envoyCfgFileName is the name of the Envoy configuration file.
 	envoyCfgFileName = "envoy.json"
 	// xdsResourceVersion is the version of the Envoy xdS resource types.
@@ -167,6 +171,12 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			},
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 			TerminationMessagePath:   "/dev/termination-log",
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      envoyAdminVolName,
+					MountPath: filepath.Join("/", envoyAdminVolMntDir),
+				},
+			},
 		},
 		{
 			Name:            EnvoyContainerName,
@@ -227,6 +237,10 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					Name:      envoyCfgVolName,
 					MountPath: filepath.Join("/", envoyCfgVolMntDir),
 					ReadOnly:  true,
+				},
+				{
+					Name:      envoyAdminVolName,
+					MountPath: filepath.Join("/", envoyAdminVolMntDir),
 				},
 			},
 			Lifecycle: &corev1.Lifecycle{
@@ -332,6 +346,12 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 						},
 						{
 							Name: envoyCfgVolName,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: envoyAdminVolName,
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},

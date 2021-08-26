@@ -15,7 +15,7 @@ package config
 
 const (
 	DefaultContourImage           = "docker.io/projectcontour/contour:v1.18.0"
-	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.19.0"
+	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.19.1"
 	DefaultMetricsAddr            = ":8080"
 	DefaultEnableLeaderElection   = false
 	DefaultEnableLeaderElectionID = "0d879e31.projectcontour.io"
