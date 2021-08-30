@@ -6,7 +6,7 @@ linters:
     - bodyclose
     - gofmt
     - goimports
-    - golint
+    - revive
     - gosec
     - misspell
     - unconvert

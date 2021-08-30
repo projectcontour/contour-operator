@@ -1,7 +1,7 @@
 ARG BUILDPLATFORM=linux/amd64
 
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.16.5 as builder
+FROM --platform=$BUILDPLATFORM golang:1.17.0 as builder
 
 WORKDIR /
 # Copy the Go Modules manifests
