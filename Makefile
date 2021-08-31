@@ -10,7 +10,8 @@ NEW_VERSION ?= $(OLD_VERSION)
 TEST ?= .*
 
 # Image URL to use all building/pushing image targets
-IMAGE ?= docker.io/projectcontour/contour-operator
+REGISTRY ?= docker.io/projectcontour
+IMAGE := ${REGISTRY}/contour-operator
 
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+
 CRD_OPTIONS ?= "crd:crdVersions=v1"
