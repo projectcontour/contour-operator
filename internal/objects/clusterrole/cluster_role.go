@@ -104,12 +104,12 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	gateway := rbacv1.PolicyRule{
 		Verbs:     verbGLWU,
 		APIGroups: groupGateway,
-		Resources: []string{"gatewayclasses", "gateways", "backendpolicies", "httproutes", "tlsroutes"},
+		Resources: []string{"gatewayclasses", "gateways", "httproutes", "tlsroutes"},
 	}
 	gatewayStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
 		APIGroups: groupGateway,
-		Resources: []string{"gatewayclasses/status", "gateways/status", "backendpolicies/status", "httproutes/status",
+		Resources: []string{"gatewayclasses/status", "gateways/status", "httproutes/status",
 			"tlsroutes/status"},
 	}
 	unsupported := rbacv1.PolicyRule{

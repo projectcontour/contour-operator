@@ -148,10 +148,6 @@ func GatewayAPIResources() []schema.GroupVersionResource {
 	}, {
 		Group:    gatewayv1alpha1.GroupVersion.Group,
 		Version:  gatewayv1alpha1.GroupVersion.Version,
-		Resource: "backendpolicies",
-	}, {
-		Group:    gatewayv1alpha1.GroupVersion.Group,
-		Version:  gatewayv1alpha1.GroupVersion.Version,
 		Resource: "tlsroutes",
 	}}
 }
