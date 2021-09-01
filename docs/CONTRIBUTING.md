@@ -162,13 +162,13 @@ Build and push a Contour Operator container image that includes your changes
 (replacing <MY_DOCKER_USERNAME> with your own Docker Hub username):
 
 ```
-IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make push
+REGISTRY=docker.io/<MY_DOCKER_USERNAME> make push
 ```
 
 Run the e2e tests for the project using your image:
 
 ```
-IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make test-e2e
+REGISTRY=docker.io/<MY_DOCKER_USERNAME> make test-e2e
 ```
 
 If you're running a local kind cluster with `make local-cluster`, you can load
@@ -213,7 +213,7 @@ Verify your changes by deploying the image you built to your kind cluster. The f
 installs the Contour and Contour Operator CRDs and deploys the operator to your kind cluster:
 
 ```
-IMAGE=docker.io/<MY_DOCKER_USERNAME>/contour-operator make deploy
+REGISTRY=docker.io/<MY_DOCKER_USERNAME> make deploy
 ```
 
 Follow the steps in the [README][8] to run an instance of the `Contour` custom resource and example application.
