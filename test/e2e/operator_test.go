@@ -894,7 +894,7 @@ func TestOperatorUpgrade(t *testing.T) {
 		t.Fatalf("failed to get image for deployment %s/%s", operatorNs, operatorName)
 	}
 	// Ensure the current image is not the "latest" release.
-	latest := "docker.io/projectcontour/contour-operator:latest"
+	latest := "ghcr.io/projectcontour/contour-operator:latest"
 	if current == latest {
 		t.Fatalf("unexpected image %s for deployment %s/%s", current, operatorNs, operatorName)
 	}

@@ -10,7 +10,7 @@ NEW_VERSION ?= $(OLD_VERSION)
 TEST ?= .*
 
 # Image URL to use all building/pushing image targets
-REGISTRY ?= docker.io/projectcontour
+REGISTRY ?= ghcr.io/projectcontour
 IMAGE := ${REGISTRY}/contour-operator
 
 # Need v1 to support defaults in CRDs, unfortunately limiting us to k8s 1.16+

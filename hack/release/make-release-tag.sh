@@ -8,8 +8,8 @@
 readonly PROGNAME=$(basename "$0")
 readonly OLDVERS="$1"
 readonly NEWVERS="$2"
-readonly CONTOUR_IMG="docker.io/projectcontour/contour:$NEWVERS"
-readonly OPERATOR_IMG="docker.io/projectcontour/contour-operator:$NEWVERS"
+readonly CONTOUR_IMG="ghcr.io/projectcontour/contour:$NEWVERS"
+readonly OPERATOR_IMG="ghcr.io/projectcontour/contour-operator:$NEWVERS"
 readonly OPERATOR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/operator/operator.yaml"
 readonly CONTOUR_EXAMPLE="https://raw.githubusercontent.com/projectcontour/contour-operator/$NEWVERS/examples/contour/contour.yaml"
 readonly TEST_EXAMPLE="https://projectcontour.io/docs/$NEWVERS/deploy-options/#test-with-ingress"
@@ -47,8 +47,8 @@ for file in config/manager/manager.yaml examples/operator/operator.yaml ; do
   # The version might be main or OLDVERS depending on whether we are
   # tagging from the release branch or from main.
   run::sed \
-    "-es|docker.io/projectcontour/contour-operator:main|$OPERATOR_IMG|" \
-    "-es|docker.io/projectcontour/contour-operator:$OLDVERS|$OPERATOR_IMG|" \
+    "-es|ghcr.io/projectcontour/contour-operator:main|$OPERATOR_IMG|" \
+    "-es|ghcr.io/projectcontour/contour-operator:$OLDVERS|$OPERATOR_IMG|" \
     "$file"
 done
 
@@ -56,8 +56,8 @@ done
 # The version might be main or OLDVERS depending on whether we are
 # tagging from the release branch or from main.
 run::sed \
-  "-es|docker.io/projectcontour/contour:main|$CONTOUR_IMG|" \
-  "-es|docker.io/projectcontour/contour:$OLDVERS|$CONTOUR_IMG|" \
+  "-es|ghcr.io/projectcontour/contour:main|$CONTOUR_IMG|" \
+  "-es|ghcr.io/projectcontour/contour:$OLDVERS|$CONTOUR_IMG|" \
   "internal/config/config.go"
 
 # Update the operator's image pull policy. Set the pull policy with kustomize when

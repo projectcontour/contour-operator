@@ -6783,7 +6783,7 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        image: docker.io/projectcontour/contour-operator:main
+        image: ghcr.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator
         resources:
