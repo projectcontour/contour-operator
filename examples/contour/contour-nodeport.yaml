@@ -2,6 +2,7 @@ apiVersion: operator.projectcontour.io/v1alpha1
 kind: Contour
 metadata:
   name: contour-sample
+  namespace: contour-operator
 spec:
   networkPublishing:
     envoy:

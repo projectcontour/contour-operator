@@ -27,10 +27,8 @@ import (
 	"github.com/projectcontour/contour-operator/internal/config"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -48,17 +46,6 @@ var (
 	operatorNs = "contour-operator"
 	// specNs is the spec.namespace.name of a Contour.
 	specNs = "projectcontour"
-	// expectedDeploymentConditions are the expected status conditions of a
-	// deployment.
-	expectedDeploymentConditions = []appsv1.DeploymentCondition{
-		{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
-	}
-	// expectedContourConditions are the expected status conditions of a
-	// contour.
-	expectedContourConditions = []metav1.Condition{
-		{Type: operatorv1alpha1.ContourAvailableConditionType, Status: metav1.ConditionTrue},
-		// TODO [danehans]: Update when additional status conditions are added to Contour.
-	}
 	// testAppName is the name of the application used for e2e testing.
 	testAppName = "kuard"
 	// testAppImage is the image used by the e2e test application.
@@ -71,7 +58,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	cl, err := newClient()
+	cl, err := NewK8sClient()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -93,7 +80,7 @@ func TestMain(m *testing.M) {
 
 func TestOperatorDeploymentAvailable(t *testing.T) {
 	t.Helper()
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, operatorName, operatorNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, operatorName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected conditions for deployment %s/%s: %v", operatorNs, operatorName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", operatorNs, operatorName)
@@ -122,29 +109,29 @@ func TestDefaultContour(t *testing.T) {
 		t.Logf("updated service %s/%s loadbalancer IP and nodeports", cfg.SpecNs, svcName)
 	}
 
-	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, testName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+	if err := NewIngress(kclient, appName, cfg.SpecNs, appName, 80); err != nil {
 		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
@@ -153,7 +140,7 @@ func TestDefaultContour(t *testing.T) {
 	testURL := "http://local.projectcontour.io/"
 
 	if isKind {
-		if err := waitForHTTPResponse(testURL, timeout); err != nil {
+		if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
@@ -209,29 +196,29 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, cntr.Name, cntr.Namespace); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+	if err := NewIngress(kclient, appName, cfg.SpecNs, appName, 80); err != nil {
 		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
@@ -241,7 +228,7 @@ func TestContourNodePortService(t *testing.T) {
 
 	var ip string
 	if isKind {
-		if err := waitForHTTPResponse(testURL, timeout); err != nil {
+		if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
@@ -278,7 +265,7 @@ func TestContourNodePortService(t *testing.T) {
 	t.Logf("updated contour %s/%s", cfg.Namespace, cfg.Name)
 
 	// Update the kuard service port.
-	svc := &corev1.Service{}
+	svc := &core_v1.Service{}
 	key = types.NamespacedName{
 		Namespace: cfg.SpecNs,
 		Name:      appName,
@@ -311,7 +298,7 @@ func TestContourNodePortService(t *testing.T) {
 	testURL = "http://local.projectcontour.io:81/"
 
 	if isKind {
-		if err := waitForHTTPResponse(testURL, timeout); err != nil {
+		if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
@@ -360,29 +347,29 @@ func TestContourClusterIPService(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, cntr.Name, cntr.Namespace, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, cntr.Name, cntr.Namespace); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cntr.Namespace, cntr.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+	if err := NewIngress(kclient, appName, cfg.SpecNs, appName, 80); err != nil {
 		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
@@ -443,19 +430,19 @@ func TestContourSpec(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, testName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
@@ -464,17 +451,17 @@ func TestContourSpec(t *testing.T) {
 	if _, err := updateContour(ctx, kclient, cfg); err != nil {
 		t.Fatalf("failed to update contour %s/%s: %v", operatorNs, testName, err)
 	}
-	if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, testName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+	if err := NewIngress(kclient, appName, cfg.SpecNs, appName, 80); err != nil {
 		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
@@ -483,7 +470,7 @@ func TestContourSpec(t *testing.T) {
 	testURL := "http://local.projectcontour.io/"
 
 	if isKind {
-		if err := waitForHTTPResponse(testURL, timeout); err != nil {
+		if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
@@ -533,7 +520,7 @@ func TestMultipleContours(t *testing.T) {
 		}
 		t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-		if err := waitForContourStatusConditions(ctx, kclient, testName, operatorNs, expectedContourConditions...); err != nil {
+		if err := WaitForContourAvailable(kclient, testName, operatorNs); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -575,7 +562,7 @@ func TestGateway(t *testing.T) {
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, contourName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
@@ -600,22 +587,22 @@ func TestGateway(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// Create a sample workload for e2e testing.
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+	if err := NewHTTPRoute(kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
 		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
@@ -624,7 +611,7 @@ func TestGateway(t *testing.T) {
 	testURL := "http://local.projectcontour.io/"
 
 	if isKind {
-		if err := waitForHTTPResponse(testURL, timeout); err != nil {
+		if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 			t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 		}
 		t.Logf("received http response for %q", testURL)
@@ -700,7 +687,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 		}
 		t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-		if err := waitForContourStatusConditions(ctx, kclient, test.name, operatorNs, expectedContourConditions...); err != nil {
+		if err := WaitForContourAvailable(kclient, test.name, operatorNs); err != nil {
 			t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, test.name, err)
 		}
 		t.Logf("observed expected status conditions for contour %s/%s", operatorNs, test.name)
@@ -723,22 +710,22 @@ func TestMultipleContoursGateway(t *testing.T) {
 		t.Logf("created gateway %s/%s", test.cfg.SpecNs, test.gwName)
 
 		// Create a sample workload for e2e testing.
-		if err := newDeployment(ctx, kclient, appName, test.cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+		if err := NewDeployment(kclient, appName, test.cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 			t.Fatalf("failed to create deployment %s/%s: %v", test.cfg.SpecNs, appName, err)
 		}
 		t.Logf("created deployment %s/%s", test.cfg.SpecNs, appName)
 
-		if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, test.cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+		if err := WaitForDeploymentAvailable(kclient, appName, test.cfg.SpecNs); err != nil {
 			t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", test.cfg.SpecNs, appName, err)
 		}
 		t.Logf("observed expected status conditions for deployment %s/%s", test.cfg.SpecNs, appName)
 
-		if err := newClusterIPService(ctx, kclient, appName, test.cfg.SpecNs, 80, 8080); err != nil {
+		if err := NewClusterIPService(kclient, appName, test.cfg.SpecNs, 80, 8080); err != nil {
 			t.Fatalf("failed to create service %s/%s: %v", test.cfg.SpecNs, appName, err)
 		}
 		t.Logf("created service %s/%s", test.cfg.SpecNs, appName)
 
-		if err := newHTTPRouteToSvc(ctx, kclient, appName, test.cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+		if err := NewHTTPRoute(kclient, appName, test.cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
 			t.Fatalf("failed to create httproute %s/%s: %v", test.cfg.SpecNs, appName, err)
 		}
 		t.Logf("created httproute %s/%s", test.cfg.SpecNs, appName)
@@ -748,7 +735,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 		// Check routability to route in each Gateway.
 		testURL := fmt.Sprintf("http://local.projectcontour.io:%d", 80+i)
 		if isKind {
-			if err := waitForHTTPResponse(testURL, timeout); err != nil {
+			if err := WaitForHTTPResponse(testURL, timeout); err != nil {
 				t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 			}
 			t.Logf("received http response for %q", testURL)
@@ -808,7 +795,7 @@ func TestGatewayClusterIP(t *testing.T) {
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, contourName, operatorNs, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, contourName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", operatorNs, testName)
@@ -834,22 +821,22 @@ func TestGatewayClusterIP(t *testing.T) {
 	t.Logf("created gateway %s/%s", cfg.SpecNs, gwName)
 
 	// Create a sample workload for e2e testing.
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newHTTPRouteToSvc(ctx, kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
+	if err := NewHTTPRoute(kclient, appName, cfg.SpecNs, appName, "app", appName, "local.projectcontour.io", int32(80)); err != nil {
 		t.Fatalf("failed to create httproute %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
@@ -926,7 +913,7 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("observed image %s for deployment %s/%s", latest, operatorNs, operatorName)
 
 	// Ensure the operator's deployment becomes available before proceeding.
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, operatorName, operatorNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, operatorName, operatorNs); err != nil {
 		t.Fatalf("failed to observe expected conditions for deployment %s/%s: %v", operatorNs, operatorName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", operatorNs, operatorName)
@@ -948,30 +935,30 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, cfg.Name, cfg.Namespace); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)
 
 	// Create a sample workload for e2e testing.
 	appName := fmt.Sprintf("%s-%s", testAppName, testName)
-	if err := newDeployment(ctx, kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
+	if err := NewDeployment(kclient, appName, cfg.SpecNs, testAppImage, testAppReplicas); err != nil {
 		t.Fatalf("failed to create deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created deployment %s/%s", cfg.SpecNs, appName)
 
 	// Wait for the sample workload to become available.
-	if err := waitForDeploymentStatusConditions(ctx, kclient, timeout, appName, cfg.SpecNs, expectedDeploymentConditions...); err != nil {
+	if err := WaitForDeploymentAvailable(kclient, appName, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to observe expected status conditions for deployment %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("observed expected status conditions for deployment %s/%s", cfg.SpecNs, appName)
 
-	if err := newClusterIPService(ctx, kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
+	if err := NewClusterIPService(kclient, appName, cfg.SpecNs, 80, 8080); err != nil {
 		t.Fatalf("failed to create service %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created service %s/%s", cfg.SpecNs, appName)
 
-	if err := newIngress(ctx, kclient, appName, cfg.SpecNs, appName, 80); err != nil {
+	if err := NewIngress(kclient, appName, cfg.SpecNs, appName, 80); err != nil {
 		t.Fatalf("failed to create ingress %s/%s: %v", cfg.SpecNs, appName, err)
 	}
 	t.Logf("created ingress %s/%s", cfg.SpecNs, appName)
@@ -1011,7 +998,7 @@ func TestOperatorUpgrade(t *testing.T) {
 	t.Logf("observed image %s for deployment %s/contour", wantContourImage, cfg.SpecNs)
 
 	// The contour should now report available.
-	if err := waitForContourStatusConditions(ctx, kclient, cfg.Name, cfg.Namespace, expectedContourConditions...); err != nil {
+	if err := WaitForContourAvailable(kclient, cfg.Name, cfg.Namespace); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", cfg.Namespace, cfg.Name, err)
 	}
 	t.Logf("observed expected status conditions for contour %s/%s", cfg.Namespace, cfg.Name)

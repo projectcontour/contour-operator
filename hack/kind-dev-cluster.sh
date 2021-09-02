@@ -70,6 +70,12 @@ kind::cluster::create() {
         --wait 5m
 }
 
+kind::cluster::load() {
+    ${KIND} load docker-image \
+        --name "${CLUSTER}" \
+        "$@"
+}
+
 kubectl::do() {
     ${KUBECTL} "$@"
 }
@@ -80,3 +86,7 @@ kubectl::apply() {
 
 kind::cluster::create
 kubectl::do get nodes
+
+# Load kuard image into cluster so it is pulled once.
+docker pull "gcr.io/kuar-demo/kuard-amd64:1"
+kind::cluster::load "gcr.io/kuar-demo/kuard-amd64:1"

@@ -133,7 +133,7 @@ example:
 test-example: ## Test the example Contour.
 .PHONY: test-example
 test-example:
-	./hack/test-example.sh
+	go test -mod=readonly -timeout 20m -count 1 -v -tags e2e -run "$(TEST)" ./test/e2e/example
 
 verify-image: ## Verifies operator image references and pull policy.
 .PHONY: verify-image
