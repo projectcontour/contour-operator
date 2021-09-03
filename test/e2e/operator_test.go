@@ -174,7 +174,7 @@ func TestDefaultContour(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, timeout, cfg.SpecNs); err != nil {
+	if err := DeleteNamespace(kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
@@ -326,7 +326,7 @@ func TestContourNodePortService(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, timeout, cfg.SpecNs); err != nil {
+	if err := DeleteNamespace(kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
@@ -403,7 +403,7 @@ func TestContourClusterIPService(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, timeout, cfg.SpecNs); err != nil {
+	if err := DeleteNamespace(kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
@@ -654,7 +654,7 @@ func TestGateway(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, timeout, cfg.SpecNs); err != nil {
+	if err := DeleteNamespace(kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)
@@ -770,7 +770,7 @@ func TestMultipleContoursGateway(t *testing.T) {
 			t.Fatalf("failed to delete gatewayclass %s: %v", *test.cfg.GatewayControllerName, err)
 		}
 
-		if err := deleteNamespace(ctx, kclient, timeout, test.cfg.SpecNs); err != nil {
+		if err := DeleteNamespace(kclient, test.cfg.SpecNs); err != nil {
 			t.Fatalf("failed to delete namespace %s: %v", test.cfg.SpecNs, err)
 		}
 		t.Logf("observed the deletion of namespace %s", test.cfg.SpecNs)
@@ -879,7 +879,7 @@ func TestGatewayClusterIP(t *testing.T) {
 
 	// Delete the operand namespace since contour.spec.namespace.removeOnDeletion
 	// defaults to false.
-	if err := deleteNamespace(ctx, kclient, timeout, cfg.SpecNs); err != nil {
+	if err := DeleteNamespace(kclient, cfg.SpecNs); err != nil {
 		t.Fatalf("failed to delete namespace %s: %v", cfg.SpecNs, err)
 	}
 	t.Logf("observed the deletion of namespace %s", cfg.SpecNs)

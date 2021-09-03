@@ -475,13 +475,13 @@ func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd [
 	return p, nil
 }
 
-func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
+func DeleteNamespace(cl client.Client, name string) error {
 	ns := &core_v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	if err := cl.Delete(ctx, ns); err != nil {
+	if err := cl.Delete(context.TODO(), ns); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete namespace %s: %v", ns.Name, err)
 		}
@@ -491,8 +491,8 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 		Name: ns.Name,
 	}
 
-	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		if err := cl.Get(ctx, key, ns); err != nil {
+	err := wait.PollImmediate(1*time.Second, time.Minute*3, func() (bool, error) {
+		if err := cl.Get(context.TODO(), key, ns); err != nil {
 			if errors.IsNotFound(err) {
 				return true, nil
 			}

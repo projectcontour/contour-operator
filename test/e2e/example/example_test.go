@@ -142,11 +142,7 @@ func testGatewayExample(t *testing.T, c client.Client) {
 	testNS.Name = "test-gateway-example"
 	require.NoError(t, c.Create(context.TODO(), testNS))
 	defer func() {
-		require.NoError(t, c.Delete(context.TODO(), testNS))
-		// Wait for namespace to be deleted.
-		require.Eventually(t, func() bool {
-			return c.Get(context.TODO(), client.ObjectKeyFromObject(testNS), testNS) != nil
-		}, time.Minute*3, time.Second)
+		require.NoError(t, e2e.DeleteNamespace(c, testNS.Name))
 		t.Log("deleted namespace:", testNS.Name)
 	}()
 
@@ -205,11 +201,7 @@ func testBasicIngressExample(t *testing.T, c client.Client) {
 	}
 	require.NoError(t, c.Create(context.TODO(), testNS))
 	defer func() {
-		require.NoError(t, c.Delete(context.TODO(), testNS))
-		// Wait for namespace to be deleted.
-		require.Eventually(t, func() bool {
-			return c.Get(context.TODO(), client.ObjectKeyFromObject(testNS), testNS) != nil
-		}, time.Minute*3, time.Second)
+		require.NoError(t, e2e.DeleteNamespace(c, testNS.Name))
 		t.Log("deleted namespace:", testNS.Name)
 	}()
 
