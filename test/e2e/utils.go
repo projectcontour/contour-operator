@@ -28,9 +28,11 @@ import (
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	apps_v1 "k8s.io/api/apps/v1"
+	core_v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbac_v1 "k8s.io/api/rbac/v1"
+	apiextensions_v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,8 +49,8 @@ import (
 var (
 	scheme = runtime.NewScheme()
 	// expectedPodConditions are the expected status conditions of a pod.
-	expectedPodConditions = []corev1.PodCondition{
-		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	expectedPodConditions = []core_v1.PodCondition{
+		{Type: core_v1.PodReady, Status: core_v1.ConditionTrue},
 	}
 )
 
@@ -56,9 +58,12 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
 	_ = gatewayv1alpha1.AddToScheme(scheme)
+	_ = apiextensions_v1.AddToScheme(scheme)
+	_ = rbac_v1.AddToScheme(scheme)
+	_ = apps_v1.AddToScheme(scheme)
 }
 
-func newClient() (client.Client, error) {
+func NewK8sClient() (client.Client, error) {
 	opts := client.Options{
 		Scheme: scheme,
 	}
@@ -174,63 +179,63 @@ func deleteGatewayClass(ctx context.Context, cl client.Client, timeout time.Dura
 	return nil
 }
 
-func newDeployment(ctx context.Context, cl client.Client, name, ns, image string, replicas int) error {
+func NewDeployment(cl client.Client, name, ns, image string, replicas int) error {
 	replInt32 := int32(replicas)
-	container := corev1.Container{
+	container := core_v1.Container{
 		Name:  name,
 		Image: image,
 	}
-	deploy := &appsv1.Deployment{
+	deploy := &apps_v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 			Labels:    map[string]string{"app": name},
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: apps_v1.DeploymentSpec{
 			Replicas: &replInt32,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": name},
 			},
-			Template: corev1.PodTemplateSpec{
+			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": name},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{container},
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{container},
 				},
 			},
 		},
 	}
-	if err := cl.Create(ctx, deploy); err != nil {
+	if err := cl.Create(context.TODO(), deploy); err != nil {
 		return fmt.Errorf("failed to create deployment %s/%s: %v", deploy.Namespace, deploy.Name, err)
 	}
 	return nil
 }
 
-func newClusterIPService(ctx context.Context, cl client.Client, name, ns string, port, targetPort int) error {
-	svcPort := corev1.ServicePort{
+func NewClusterIPService(cl client.Client, name, ns string, port, targetPort int) error {
+	svcPort := core_v1.ServicePort{
 		Port:       int32(port),
 		TargetPort: intstr.IntOrString{IntVal: int32(targetPort)},
 	}
-	svc := &corev1.Service{
+	svc := &core_v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 			Labels:    map[string]string{"app": name},
 		},
-		Spec: corev1.ServiceSpec{
-			Ports:    []corev1.ServicePort{svcPort},
+		Spec: core_v1.ServiceSpec{
+			Ports:    []core_v1.ServicePort{svcPort},
 			Selector: map[string]string{"app": name},
-			Type:     corev1.ServiceTypeClusterIP,
+			Type:     core_v1.ServiceTypeClusterIP,
 		},
 	}
-	if err := cl.Create(ctx, svc); err != nil {
+	if err := cl.Create(context.TODO(), svc); err != nil {
 		return fmt.Errorf("failed to create service %s/%s: %v", svc.Namespace, svc.Name, err)
 	}
 	return nil
 }
 
-func newIngress(ctx context.Context, cl client.Client, name, ns, backendName string, backendPort int) error {
+func NewIngress(cl client.Client, name, ns, backendName string, backendPort int) error {
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -248,13 +253,13 @@ func newIngress(ctx context.Context, cl client.Client, name, ns, backendName str
 			},
 		},
 	}
-	if err := cl.Create(ctx, ing); err != nil {
+	if err := cl.Create(context.TODO(), ing); err != nil {
 		return fmt.Errorf("failed to create ingress %s/%s: %v", ing.Namespace, ing.Name, err)
 	}
 	return nil
 }
 
-func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
+func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
 	rootPrefix := &gatewayv1alpha1.HTTPPathMatch{
 		Type:  pathMatchTypePtr(gatewayv1alpha1.PathMatchPrefix),
 		Value: pointer.StringPtr("/"),
@@ -283,20 +288,20 @@ func newHTTPRouteToSvc(ctx context.Context, cl client.Client, name, ns, svc, k, 
 			Rules:     []gatewayv1alpha1.HTTPRouteRule{httpRule},
 		},
 	}
-	if err := cl.Create(ctx, route); err != nil {
+	if err := cl.Create(context.TODO(), route); err != nil {
 		return fmt.Errorf("failed to create httproute %s/%s: %v", ns, name, err)
 	}
 	return nil
 }
 
-func waitForContourStatusConditions(ctx context.Context, cl client.Client, name, ns string, conditions ...metav1.Condition) error {
+func WaitForContourAvailable(cl client.Client, name, ns string) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
 	}
 	return wait.PollImmediate(1*time.Second, time.Minute*5, func() (bool, error) {
 		cntr := &operatorv1alpha1.Contour{}
-		if err := cl.Get(ctx, nsName, cntr); err != nil {
+		if err := cl.Get(context.TODO(), nsName, cntr); err != nil {
 			return false, nil
 		}
 
@@ -304,40 +309,47 @@ func waitForContourStatusConditions(ctx context.Context, cl client.Client, name,
 			return false, nil
 		}
 
-		envoyReplicas, err := envoyReplicas(ctx, cl, cntr.Spec.Namespace.Name)
+		envoyReplicas, err := envoyReplicas(context.TODO(), cl, cntr.Spec.Namespace.Name)
 		if err != nil || cntr.Status.AvailableEnvoys != envoyReplicas {
 			return false, nil
 		}
 
-		expected := conditionMap(conditions...)
-		current := conditionMap(cntr.Status.Conditions...)
-		return conditionsMatchExpected(expected, current), nil
+		for _, c := range cntr.Status.Conditions {
+			if c.Type == operatorv1alpha1.ContourAvailableConditionType && c.Status == metav1.ConditionTrue {
+				return true, nil
+			}
+		}
+
+		return false, nil
 	})
 }
 
-func waitForDeploymentStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string, conditions ...appsv1.DeploymentCondition) error {
+func WaitForDeploymentAvailable(cl client.Client, name, ns string) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
 	}
-	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		deploy := &appsv1.Deployment{}
-		if err := cl.Get(ctx, nsName, deploy); err != nil {
+	return wait.PollImmediate(1*time.Second, time.Minute*3, func() (bool, error) {
+		deploy := &apps_v1.Deployment{}
+		if err := cl.Get(context.TODO(), nsName, deploy); err != nil {
 			return false, nil
 		}
-		expected := deploymentConditionMap(conditions...)
-		current := deploymentConditionMap(deploy.Status.Conditions...)
-		return deploymentConditionsMatchExpected(expected, current), nil
+		for _, c := range deploy.Status.Conditions {
+			if c.Type == apps_v1.DeploymentAvailable && c.Status == core_v1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
 
-func waitForPodStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string, conditions ...corev1.PodCondition) error {
+func waitForPodStatusConditions(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string, conditions ...core_v1.PodCondition) error {
 	nsName := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
 	}
 	return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
-		pod := &corev1.Pod{}
+		pod := &core_v1.Pod{}
 		if err := cl.Get(ctx, nsName, pod); err != nil {
 			return false, nil
 		}
@@ -347,32 +359,16 @@ func waitForPodStatusConditions(ctx context.Context, cl client.Client, timeout t
 	})
 }
 
-func conditionMap(conditions ...metav1.Condition) map[string]string {
-	conds := map[string]string{}
-	for _, cond := range conditions {
-		conds[cond.Type] = string(cond.Status)
-	}
-	return conds
-}
-
-func deploymentConditionMap(conditions ...appsv1.DeploymentCondition) map[appsv1.DeploymentConditionType]corev1.ConditionStatus {
-	conds := map[appsv1.DeploymentConditionType]corev1.ConditionStatus{}
+func podConditionMap(conditions ...core_v1.PodCondition) map[core_v1.PodConditionType]core_v1.ConditionStatus {
+	conds := map[core_v1.PodConditionType]core_v1.ConditionStatus{}
 	for _, cond := range conditions {
 		conds[cond.Type] = cond.Status
 	}
 	return conds
 }
 
-func podConditionMap(conditions ...corev1.PodCondition) map[corev1.PodConditionType]corev1.ConditionStatus {
-	conds := map[corev1.PodConditionType]corev1.ConditionStatus{}
-	for _, cond := range conditions {
-		conds[cond.Type] = cond.Status
-	}
-	return conds
-}
-
-func conditionsMatchExpected(expected, actual map[string]string) bool {
-	filtered := map[string]string{}
+func podConditionsMatchExpected(expected, actual map[core_v1.PodConditionType]core_v1.ConditionStatus) bool {
+	filtered := map[core_v1.PodConditionType]core_v1.ConditionStatus{}
 	for k := range actual {
 		if _, comparable := expected[k]; comparable {
 			filtered[k] = actual[k]
@@ -381,27 +377,7 @@ func conditionsMatchExpected(expected, actual map[string]string) bool {
 	return reflect.DeepEqual(expected, filtered)
 }
 
-func deploymentConditionsMatchExpected(expected, actual map[appsv1.DeploymentConditionType]corev1.ConditionStatus) bool {
-	filtered := map[appsv1.DeploymentConditionType]corev1.ConditionStatus{}
-	for k := range actual {
-		if _, comparable := expected[k]; comparable {
-			filtered[k] = actual[k]
-		}
-	}
-	return reflect.DeepEqual(expected, filtered)
-}
-
-func podConditionsMatchExpected(expected, actual map[corev1.PodConditionType]corev1.ConditionStatus) bool {
-	filtered := map[corev1.PodConditionType]corev1.ConditionStatus{}
-	for k := range actual {
-		if _, comparable := expected[k]; comparable {
-			filtered[k] = actual[k]
-		}
-	}
-	return reflect.DeepEqual(expected, filtered)
-}
-
-func waitForHTTPResponse(url string, timeout time.Duration) error {
+func WaitForHTTPResponse(url string, timeout time.Duration) error {
 	var resp http.Response
 	method := "GET"
 	client := http.DefaultClient
@@ -460,7 +436,7 @@ func podWaitForHTTPResponse(ctx context.Context, cl client.Client, ns, name, url
 
 // newNs creates a Namespace object using the provided name for the object's name.
 func newNs(ctx context.Context, cl client.Client, name string) error {
-	ns := &corev1.Namespace{
+	ns := &core_v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -476,19 +452,19 @@ func newNs(ctx context.Context, cl client.Client, name string) error {
 // newPod creates a Pod resource using name as the Pod's name, ns as
 // the Pod's namespace, image as the Pod container's image and cmd as the
 // Pod container's command.
-func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd []string) (*corev1.Pod, error) {
-	c := corev1.Container{
+func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd []string) (*core_v1.Pod, error) {
+	c := core_v1.Container{
 		Name:    name,
 		Image:   image,
 		Command: cmd,
 	}
-	p := &corev1.Pod{
+	p := &core_v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{c},
+		Spec: core_v1.PodSpec{
+			Containers: []core_v1.Container{c},
 			// Kill the pod immediately so it exits quickly on deletion.
 			TerminationGracePeriodSeconds: pointer.Int64Ptr(0),
 		},
@@ -500,7 +476,7 @@ func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd [
 }
 
 func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := &corev1.Namespace{
+	ns := &core_v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -523,7 +499,7 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 			return false, nil
 		}
 		// Consider the namespace deleted if status is terminating.
-		if ns.Status.Phase == corev1.NamespaceTerminating {
+		if ns.Status.Phase == core_v1.NamespaceTerminating {
 			return true, nil
 		}
 		// The namespace is still "Active"
@@ -536,7 +512,7 @@ func deleteNamespace(ctx context.Context, cl client.Client, timeout time.Duratio
 }
 
 func deletePod(ctx context.Context, cl client.Client, ns, name string) error {
-	p := &corev1.Pod{
+	p := &core_v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -552,7 +528,7 @@ func deletePod(ctx context.Context, cl client.Client, ns, name string) error {
 }
 
 func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	ns := &corev1.Namespace{
+	ns := &core_v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -570,7 +546,7 @@ func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.D
 			return false, nil
 		}
 		// Consider the namespace deleted if status is terminating.
-		if ns.Status.Phase == corev1.NamespaceTerminating {
+		if ns.Status.Phase == core_v1.NamespaceTerminating {
 			return true, nil
 		}
 		// The namespace is still "Active"
@@ -582,12 +558,12 @@ func waitForSpecNsDeletion(ctx context.Context, cl client.Client, timeout time.D
 	return nil
 }
 
-func waitForService(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) (*corev1.Service, error) {
+func waitForService(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) (*core_v1.Service, error) {
 	nsName := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
 	}
-	svc := &corev1.Service{}
+	svc := &core_v1.Service{}
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		if err := cl.Get(ctx, nsName, svc); err != nil {
 			return false, nil
@@ -605,7 +581,7 @@ func waitForServiceDeletion(ctx context.Context, cl client.Client, timeout time.
 		Namespace: ns,
 		Name:      name,
 	}
-	svc := &corev1.Service{}
+	svc := &core_v1.Service{}
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		err := cl.Get(ctx, nsName, svc)
 		return errors.IsNotFound(err), nil
@@ -623,16 +599,13 @@ func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 	if err != nil {
 		return fmt.Errorf("failed to observe service %s/%s: %v", ns, name, err)
 	}
-	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
+	if svc.Spec.Type != core_v1.ServiceTypeLoadBalancer {
 		return fmt.Errorf("invalid type %s for service %s/%s", svc.Spec.Type, ns, name)
 	}
 	svc.Spec.LoadBalancerIP = "127.0.0.1"
 	svc.Spec.Ports[0].NodePort = objsvc.EnvoyNodePortHTTPPort
 	svc.Spec.Ports[1].NodePort = objsvc.EnvoyNodePortHTTPSPort
-	if err := cl.Update(ctx, svc); err != nil {
-		return err
-	}
-	return nil
+	return cl.Update(ctx, svc)
 }
 
 // newGatewayClass creates a GatewayClass object using the provided name as
@@ -685,7 +658,7 @@ func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string
 
 // envoyClusterIP returns the clusterIP for a service that matches the provided ns/name.
 func envoyClusterIP(ctx context.Context, cl client.Client, ns, name string) (string, error) {
-	svc := &corev1.Service{}
+	svc := &core_v1.Service{}
 	key := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
@@ -701,7 +674,7 @@ func envoyClusterIP(ctx context.Context, cl client.Client, ns, name string) (str
 
 // envoyReplicas returns the number of envoy pods running by numberReady in daemonset status.
 func envoyReplicas(ctx context.Context, cl client.Client, ns string) (int32, error) {
-	ds := &appsv1.DaemonSet{}
+	ds := &apps_v1.DaemonSet{}
 	key := types.NamespacedName{
 		Namespace: ns,
 		Name:      "envoy",
@@ -713,8 +686,8 @@ func envoyReplicas(ctx context.Context, cl client.Client, ns string) (int32, err
 	return ds.Status.NumberReady, nil
 }
 
-func getDeployment(ctx context.Context, cl client.Client, name, ns string) (*appsv1.Deployment, error) {
-	deploy := &appsv1.Deployment{}
+func getDeployment(ctx context.Context, cl client.Client, name, ns string) (*apps_v1.Deployment, error) {
+	deploy := &apps_v1.Deployment{}
 	key := types.NamespacedName{
 		Namespace: ns,
 		Name:      name,
@@ -759,7 +732,7 @@ func setDeploymentImage(ctx context.Context, cl client.Client, name, ns, contain
 // waitForImage waits for all pods identified by key/val labels in namespace ns to contain
 // the expected image for the provided container until timeout is reached.
 func waitForImage(ctx context.Context, cl client.Client, timeout time.Duration, ns, key, val, container, expected string) error {
-	pods := &corev1.PodList{}
+	pods := &core_v1.PodList{}
 	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		if err := cl.List(ctx, pods, client.MatchingLabels{key: val}, client.InNamespace(ns)); err != nil {
 			return false, nil
@@ -811,7 +784,7 @@ func waitForIngressLB(ctx context.Context, cl client.Client, timeout time.Durati
 
 // isKindCluster returns true if the cluster under test was provisioned using kind.
 func isKindCluster(ctx context.Context, cl client.Client) (bool, error) {
-	ds := &appsv1.DaemonSet{}
+	ds := &apps_v1.DaemonSet{}
 	key := types.NamespacedName{
 		Namespace: "kube-system",
 		Name:      "kindnet",
@@ -827,19 +800,19 @@ func isKindCluster(ctx context.Context, cl client.Client) (bool, error) {
 
 // getWorkerNodeIP returns the ip address of a worker node.
 func getWorkerNodeIP(ctx context.Context, cl client.Client) (string, error) {
-	nodes := &corev1.NodeList{}
+	nodes := &core_v1.NodeList{}
 	if err := cl.List(ctx, nodes, client.MatchingLabels{"node-role.kubernetes.io/worker": ""}); err != nil {
 		return "", fmt.Errorf("failed to list worker nodes: %v", err)
 	}
 	for _, node := range nodes.Items {
 		for _, c := range node.Status.Conditions {
-			if c.Type == corev1.NodeReady && c.Status == corev1.ConditionTrue {
+			if c.Type == core_v1.NodeReady && c.Status == core_v1.ConditionTrue {
 				for _, a := range node.Status.Addresses {
 					switch {
 					// Prefer external IP over internal IP
-					case a.Type == corev1.NodeExternalIP:
+					case a.Type == core_v1.NodeExternalIP:
 						return a.Address, nil
-					case a.Type == corev1.NodeInternalIP:
+					case a.Type == core_v1.NodeInternalIP:
 						return a.Address, nil
 						// Consider adding support for other address types.
 					}
@@ -853,11 +826,11 @@ func getWorkerNodeIP(ctx context.Context, cl client.Client) (string, error) {
 // labelWorkerNodes applies the node role label to nodes that are not labeled as control-plane
 // and do not contain the worker node label.
 func labelWorkerNodes(ctx context.Context, cl client.Client) error {
-	nodes := &corev1.NodeList{}
+	nodes := &core_v1.NodeList{}
 	if err := cl.List(ctx, nodes); err != nil {
 		return fmt.Errorf("failed to list nodes: %v", err)
 	}
-	var workers []corev1.Node
+	var workers []core_v1.Node
 	for _, node := range nodes.Items {
 		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
 			continue
