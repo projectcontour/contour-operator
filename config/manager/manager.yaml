@@ -20,7 +20,7 @@ spec:
         - /contour-operator
         args:
         - --enable-leader-election
-        image: docker.io/projectcontour/contour-operator:main
+        image: ghcr.io/projectcontour/contour-operator:main
         imagePullPolicy: Always
         name: contour-operator
         resources:

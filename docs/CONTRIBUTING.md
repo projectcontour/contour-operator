@@ -153,22 +153,22 @@ appsv1 "k8s.io/api/apps/v1"
 Before submitting a change it should pass all the pre commit CI jobs. If there are unrelated test failures
 the change can be merged so long as a reference to an issue that tracks the test failures is provided.
 
-Once a change lands in main it will be built and available at `docker.io/projectcontour/contour-operator:main`.
+Once a change lands in main it will be built and available at `ghcr.io/projectcontour/contour-operator:main`.
 The Contour Operator image follows Contour's [tagging][7] policy.
 
 ### Build an image
 
 Build and push a Contour Operator container image that includes your changes
-(replacing <MY_DOCKER_USERNAME> with your own Docker Hub username):
+(replacing <MY_GITHUB_USERNAME> with your own GitHub username):
 
 ```
-REGISTRY=docker.io/<MY_DOCKER_USERNAME> make push
+REGISTRY=ghcr.io/<MY_GITHUB_USERNAME> make push
 ```
 
 Run the e2e tests for the project using your image:
 
 ```
-REGISTRY=docker.io/<MY_DOCKER_USERNAME> make test-e2e
+REGISTRY=docker.io/<MY_GITHUB_USERNAME> make test-e2e
 ```
 
 If you're running a local kind cluster with `make local-cluster`, you can load
