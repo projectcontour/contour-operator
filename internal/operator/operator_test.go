@@ -218,16 +218,16 @@ func testNamespaceRemoveOnDelete(t *testing.T, k8sClient client.Client) {
 			},
 		},
 	}
-	nsKey := client.ObjectKey{Name: "no-delete"}
+	noDeleteNSKey := client.ObjectKey{Name: "no-delete"}
 	require.NoError(t, k8sClient.Create(context.Background(), noDeleteNS))
 	require.Eventually(t, func() bool {
-		return k8sClient.Get(context.Background(), nsKey, &corev1.Namespace{}) == nil
+		return k8sClient.Get(context.Background(), noDeleteNSKey, &corev1.Namespace{}) == nil
 	}, defaultWait, defaultTick)
 
 	require.NoError(t, k8sClient.Delete(context.Background(), noDeleteNS))
 	assert.Never(t, func() bool {
 		ns := &corev1.Namespace{}
-		if err := k8sClient.Get(context.Background(), nsKey, ns); err != nil {
+		if err := k8sClient.Get(context.Background(), noDeleteNSKey, ns); err != nil {
 			return true
 		}
 		return !ns.DeletionTimestamp.IsZero()
@@ -245,16 +245,16 @@ func testNamespaceRemoveOnDelete(t *testing.T, k8sClient client.Client) {
 			},
 		},
 	}
-	nsKey = client.ObjectKey{Name: "delete"}
+	deleteNSKey := client.ObjectKey{Name: "delete"}
 	require.NoError(t, k8sClient.Create(context.Background(), deleteNS))
 	require.Eventually(t, func() bool {
-		return k8sClient.Get(context.Background(), nsKey, &corev1.Namespace{}) == nil
+		return k8sClient.Get(context.Background(), deleteNSKey, &corev1.Namespace{}) == nil
 	}, defaultWait, defaultTick)
 
 	require.NoError(t, k8sClient.Delete(context.Background(), deleteNS))
 	assert.Eventually(t, func() bool {
 		ns := &corev1.Namespace{}
-		if err := k8sClient.Get(context.Background(), nsKey, ns); err != nil {
+		if err := k8sClient.Get(context.Background(), deleteNSKey, ns); err != nil {
 			return true
 		}
 		return !ns.DeletionTimestamp.IsZero()
