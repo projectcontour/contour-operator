@@ -180,7 +180,7 @@ multiarch-build-push: ## Build and push a multi-arch contour-operator container 
 		.
 
 container: ## Build the contour-operator container image
-container: test
+container:
 	docker build \
 		--build-arg "BUILD_VERSION=$(BUILD_VERSION)" \
 		--build-arg "BUILD_BRANCH=$(BUILD_BRANCH)" \
