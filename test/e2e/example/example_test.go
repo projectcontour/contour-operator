@@ -57,6 +57,8 @@ func installOperatorFromExample(t *testing.T, c client.Client) func(*testing.T, 
 	}{
 		{name: "operator namespace", obj: new(v1.Namespace)},
 		{name: "backend policy crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
+		{name: "contour configuration crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
+		{name: "contour deployment crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "contour crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "extensionservice crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "gatewayclass crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
