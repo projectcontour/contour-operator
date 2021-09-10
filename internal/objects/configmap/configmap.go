@@ -83,6 +83,14 @@ tls:
 # leaderelection:
 #   configmap-name: leader-elect
 #   configmap-namespace: projectcontour
+####
+# ExternalName Services are disabled by default due to CVE-2021-XXXXX
+# You can re-enable them by setting this setting to "true".
+# This is not recommended without understanding the security implications.
+# Please see the advisory at https://github.com/projectcontour/contour/security/advisories/GHSA-5ph6-qq5x-7jwc for the details.{{if .EnableExternalNameService }}
+enableExternalNameService: {{.EnableExternalNameService}}{{else}}
+# enableExternalNameService: false{{end}}
+##
 ### Logging options
 # Default setting
 accesslog-format: envoy
@@ -158,6 +166,10 @@ type contourConfig struct {
 	// GatewayControllerName is the name of the controller that should
 	// reconcile GatewayClasses and associated Gateways.
 	GatewayControllerName string
+
+	// EnableExternalNameService sets whether ExternalName Services are
+	// allowed.
+	EnableExternalNameService bool
 }
 
 // configForContour returns a configMapParams with default fields set for contour.
@@ -170,6 +182,9 @@ func configForContour(contour *operatorv1alpha1.Contour) *configMapParams {
 		cfg.Contour = contourConfig{
 			GatewayControllerName: *contour.Spec.GatewayControllerName,
 		}
+	}
+	if contour.Spec.EnableExternalNameService != nil {
+		cfg.Contour.EnableExternalNameService = *contour.Spec.EnableExternalNameService
 	}
 	return cfg
 }
