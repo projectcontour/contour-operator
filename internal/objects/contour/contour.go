@@ -27,14 +27,15 @@ import (
 
 // Config is the configuration of a Contour.
 type Config struct {
-	Name                  string
-	Namespace             string
-	SpecNs                string
-	RemoveNs              bool
-	Replicas              int32
-	NetworkType           operatorv1alpha1.NetworkPublishingType
-	NodePorts             []operatorv1alpha1.NodePort
-	GatewayControllerName *string
+	Name                      string
+	Namespace                 string
+	SpecNs                    string
+	RemoveNs                  bool
+	Replicas                  int32
+	NetworkType               operatorv1alpha1.NetworkPublishingType
+	NodePorts                 []operatorv1alpha1.NodePort
+	GatewayControllerName     *string
+	EnableExternalNameService *bool
 }
 
 // New makes a Contour object using the provided ns/name for the object's
@@ -74,6 +75,9 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 	}
 	if cfg.GatewayControllerName != nil {
 		cntr.Spec.GatewayControllerName = cfg.GatewayControllerName
+	}
+	if cfg.EnableExternalNameService != nil {
+		cntr.Spec.EnableExternalNameService = cfg.EnableExternalNameService
 	}
 	return cntr
 }

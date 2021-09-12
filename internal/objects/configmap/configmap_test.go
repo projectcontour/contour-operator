@@ -67,6 +67,13 @@ tls:
 # leaderelection:
 #   configmap-name: leader-elect
 #   configmap-namespace: projectcontour
+####
+# ExternalName Services are disabled by default due to CVE-2021-XXXXX
+# You can re-enable them by setting this setting to "true".
+# This is not recommended without understanding the security implications.
+# Please see the advisory at https://github.com/projectcontour/contour/security/advisories/GHSA-5ph6-qq5x-7jwc for the details.
+# enableExternalNameService: false
+##
 ### Logging options
 # Default setting
 accesslog-format: envoy
@@ -144,7 +151,7 @@ accesslog-format: envoy
 	assert.Equal(t, expected, cm.Data["contour.yaml"])
 }
 
-func TestDesiredGatewayControllerConfigmap(t *testing.T) {
+func TestDesiredConfigmapWithConfigurations(t *testing.T) {
 	expected := `#
 # server:
 #   determine which XDS Server implementation to utilize in Contour.
@@ -188,6 +195,13 @@ tls:
 # leaderelection:
 #   configmap-name: leader-elect
 #   configmap-namespace: projectcontour
+####
+# ExternalName Services are disabled by default due to CVE-2021-XXXXX
+# You can re-enable them by setting this setting to "true".
+# This is not recommended without understanding the security implications.
+# Please see the advisory at https://github.com/projectcontour/contour/security/advisories/GHSA-5ph6-qq5x-7jwc for the details.
+enableExternalNameService: true
+##
 ### Logging options
 # Default setting
 accesslog-format: envoy
@@ -254,7 +268,8 @@ accesslog-format: envoy
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name: "some-ns",
 			},
-			GatewayControllerName: pointer.String("some-controller-name"),
+			GatewayControllerName:     pointer.String("some-controller-name"),
+			EnableExternalNameService: pointer.Bool(true),
 		},
 	}
 	cm, err := desired(configForContour(c))

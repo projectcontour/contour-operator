@@ -117,6 +117,15 @@ type ContourSpec struct {
 	//
 	// +optional
 	NodePlacement *NodePlacement `json:"nodePlacement,omitempty"`
+
+	// EnableExternalNameService enables ExternalName Services.
+	// ExternalName Services are disabled by default due to CVE-2021-XXXXX
+	// You can re-enable them by setting this setting to "true".
+	// This is not recommended without understanding the security implications.
+	// Please see the advisory at https://github.com/projectcontour/contour/security/advisories/GHSA-5ph6-qq5x-7jwc for the details.
+	//
+	// +optional
+	EnableExternalNameService *bool `json:"enableExternalNameService,omitempty"`
 }
 
 // NodePlacement describes node scheduling configuration of Contour and Envoy pods.
