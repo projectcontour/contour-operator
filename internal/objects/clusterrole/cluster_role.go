@@ -135,12 +135,12 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	cntr := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupContour,
-		Resources: []string{"httpproxies", "tlscertificatedelegations", "extensionservices"},
+		Resources: []string{"httpproxies", "tlscertificatedelegations", "extensionservices", "contourconfigurations"},
 	}
 	cntrStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
 		APIGroups: groupContour,
-		Resources: []string{"httpproxies/status", "extensionservices/status"},
+		Resources: []string{"httpproxies/status", "extensionservices/status", "contourconfigurations/status"},
 	}
 
 	cr := &rbacv1.ClusterRole{
