@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 const (
@@ -64,7 +64,7 @@ func EnsureClusterRole(ctx context.Context, cli client.Client, name string, cont
 func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.ClusterRole {
 	groupAll := []string{corev1.GroupName}
 	groupNet := []string{networkingv1.GroupName}
-	groupGateway := []string{gatewayv1alpha1.GroupName}
+	groupGateway := []string{gatewayv1alpha2.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{contourV1GroupName}
 	verbCGU := []string{"create", "get", "update"}

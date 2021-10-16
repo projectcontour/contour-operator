@@ -6,6 +6,9 @@ VERSION ?= $(GIT_REF)
 OLD_VERSION ?= main
 NEW_VERSION ?= $(OLD_VERSION)
 
+# Used for syncing Gateway API CRDs
+GATEWAY_API_VERSION = $(shell grep "sigs.k8s.io/gateway-api" go.mod | awk '{print $$2}')
+
 # Used as a go test argument for running e2e tests.
 TEST ?= .*
 
@@ -151,8 +154,13 @@ reset-image:
 generate-contour-crds:
 	@./hack/generate-contour-crds.sh $(NEW_VERSION)
 
+.PHONY: generate-gateway-crds
+generate-gateway-crds:
+	@echo "Generating Gateway API CRD YAML documents..."
+	@kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=${GATEWAY_API_VERSION}" > config/crd/gateway/01-crds.yaml
+
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
-manifests: generate-contour-crds
+manifests: generate-contour-crds generate-gateway-crds
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=contour-operator webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code

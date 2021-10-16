@@ -35,7 +35,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 // Install operator from example manifest.
@@ -167,12 +167,12 @@ func testGatewayExample(t *testing.T, c client.Client) {
 	require.NoError(t, e2e.WaitForContourAvailable(c, contourInstance.Name, contourInstance.Namespace))
 	t.Log("contour available")
 
-	gc := &gatewayv1alpha1.GatewayClass{}
+	gc := &gatewayv1alpha2.GatewayClass{}
 	require.NoError(t, decoder.Decode(gc))
 	require.NoError(t, c.Create(context.TODO(), gc))
 	t.Log("created gatewayclass:", gc.Name)
 
-	gw := &gatewayv1alpha1.Gateway{}
+	gw := &gatewayv1alpha2.Gateway{}
 	require.NoError(t, decoder.Decode(gw))
 	gw.Namespace = testNS.Name
 	require.NoError(t, c.Create(context.TODO(), gw))
@@ -188,7 +188,7 @@ func testGatewayExample(t *testing.T, c client.Client) {
 	require.NoError(t, e2e.NewDeployment(c, "kuard", testNS.Name, "gcr.io/kuar-demo/kuard-amd64:1", 1))
 	require.NoError(t, e2e.WaitForDeploymentAvailable(c, "kuard", testNS.Name))
 	require.NoError(t, e2e.NewClusterIPService(c, "kuard", testNS.Name, 80, 8080))
-	require.NoError(t, e2e.NewHTTPRoute(c, "kuard", testNS.Name, "kuard", "app", "kuard", "local.projectcontour.io", int32(80)))
+	require.NoError(t, e2e.NewHTTPRoute(c, "kuard", testNS.Name, "kuard", "app", "kuard", "local.projectcontour.io", gw.Name, gw.Namespace, int32(80)))
 	t.Log("deployed test app and HTTPRoute")
 
 	assert.NoError(t, e2e.WaitForHTTPResponse("http://local.projectcontour.io/", time.Minute))

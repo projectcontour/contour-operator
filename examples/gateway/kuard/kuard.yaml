@@ -37,13 +37,13 @@ spec:
   type: ClusterIP
 ---
 kind: HTTPRoute
-apiVersion: networking.x-k8s.io/v1alpha1
+apiVersion: gateway.networking.k8s.io/v1alpha2
 metadata:
   name: kuard
   namespace: projectcontour
-  labels:
-    app: kuard
 spec:
+  parentRefs:
+    - name: contour
   hostnames:
     - "local.projectcontour.io"
   rules:
@@ -51,6 +51,6 @@ spec:
         - path:
             type: Prefix
             value: /
-      forwardTo:
-        - serviceName: kuard
+      backendRefs:
+        - name: kuard
           port: 80
