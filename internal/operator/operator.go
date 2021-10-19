@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 const (
@@ -60,11 +60,11 @@ type Operator struct {
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses;gateways;backendpolicies;httproutes;tlsroutes,verbs=get;list;watch;update
-// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=gatewayclasses/status;gateways/status;backendpolicies/status;httproutes/status;tlsroutes/status,verbs=create;get;update
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tlsroutes,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status;gateways/status;httproutes/status;tlsroutes/status,verbs=create;get;update
 // Required for Contour to set "unsupported" status
-// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=udproutes;tcproutes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=networking.x-k8s.io,resources=udproutes/status;tcproutes/status,verbs=update
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes;tcproutes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes/status;tcproutes/status,verbs=update
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies;tlscertificatedelegations;extensionservices;contourconfigurations,verbs=get;list;watch
@@ -78,8 +78,8 @@ type Operator struct {
 
 // New creates a new operator from cliCfg and opCfg.
 func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
-	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha1.GatewayClass{},
-		&gatewayv1alpha1.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha2.GatewayClass{},
+		&gatewayv1alpha2.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
 	mgrOpts := manager.Options{
 		Scheme:                GetOperatorScheme(),
 		LeaderElection:        opCfg.LeaderElection,
@@ -134,20 +134,20 @@ func (o *Operator) Start(ctx context.Context) error {
 // The list omits TCP and UDP routes since they're unsupported by operator.
 func GatewayAPIResources() []schema.GroupVersionResource {
 	return []schema.GroupVersionResource{{
-		Group:    gatewayv1alpha1.GroupVersion.Group,
-		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Group:    gatewayv1alpha2.GroupVersion.Group,
+		Version:  gatewayv1alpha2.GroupVersion.Version,
 		Resource: "gatewayclasses",
 	}, {
-		Group:    gatewayv1alpha1.GroupVersion.Group,
-		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Group:    gatewayv1alpha2.GroupVersion.Group,
+		Version:  gatewayv1alpha2.GroupVersion.Version,
 		Resource: "gateways",
 	}, {
-		Group:    gatewayv1alpha1.GroupVersion.Group,
-		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Group:    gatewayv1alpha2.GroupVersion.Group,
+		Version:  gatewayv1alpha2.GroupVersion.Version,
 		Resource: "httproutes",
 	}, {
-		Group:    gatewayv1alpha1.GroupVersion.Group,
-		Version:  gatewayv1alpha1.GroupVersion.Version,
+		Group:    gatewayv1alpha2.GroupVersion.Group,
+		Version:  gatewayv1alpha2.GroupVersion.Version,
 		Resource: "tlsroutes",
 	}}
 }

@@ -21,7 +21,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // DaemonsetConfigChanged checks if current and expected DaemonSet match,
@@ -441,16 +440,4 @@ func RoleBindingConfigChanged(current, expected *rbacv1.RoleBinding) (*rbacv1.Ro
 	}
 
 	return updated, true
-}
-
-// GatewayClassStatusChanged checks if current and expected match and if not,
-// returns true.
-func GatewayClassStatusChanged(current, expected gatewayv1alpha1.GatewayClassStatus) bool {
-	return !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions)
-}
-
-// GatewayStatusChanged checks if current and expected match and if not,
-// returns true.
-func GatewayStatusChanged(current, expected gatewayv1alpha1.GatewayStatus) bool {
-	return !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions)
 }

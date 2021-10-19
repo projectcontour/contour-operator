@@ -204,7 +204,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
       - name: generate
         run: |
-          make generate generate-contour-crds example manifests
+          make generate generate-contour-crds generate-gateway-crds manifests example
           ./hack/actions/check-uncommitted-codegen.sh
       - uses: act10ns/slack@v1
         with:

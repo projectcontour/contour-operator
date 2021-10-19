@@ -19,7 +19,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 var (
@@ -39,7 +39,7 @@ func init() {
 	if err := operatorv1alpha1.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
-	if err := gatewayv1alpha1.AddToScheme(scheme); err != nil {
+	if err := gatewayv1alpha2.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
 	if err := apiextensionsv1.AddToScheme(scheme); err != nil {

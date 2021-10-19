@@ -43,7 +43,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 var (
@@ -57,7 +57,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
-	_ = gatewayv1alpha1.AddToScheme(scheme)
+	_ = gatewayv1alpha2.AddToScheme(scheme)
 	_ = apiextensions_v1.AddToScheme(scheme)
 	_ = rbac_v1.AddToScheme(scheme)
 	_ = apps_v1.AddToScheme(scheme)
@@ -130,7 +130,7 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
-	gw := &gatewayv1alpha1.Gateway{
+	gw := &gatewayv1alpha2.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -158,7 +158,7 @@ func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func deleteGatewayClass(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	gc := &gatewayv1alpha1.GatewayClass{
+	gc := &gatewayv1alpha2.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
 	if err := cl.Delete(ctx, gc); err != nil {
@@ -259,33 +259,46 @@ func NewIngress(cl client.Client, name, ns, backendName string, backendPort int)
 	return nil
 }
 
-func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname string, svcPort int32) error {
-	rootPrefix := &gatewayv1alpha1.HTTPPathMatch{
-		Type:  pathMatchTypePtr(gatewayv1alpha1.PathMatchPrefix),
+func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname, gwName, gwNS string, svcPort int32) error {
+	rootPrefix := &gatewayv1alpha2.HTTPPathMatch{
+		Type:  pathMatchTypePtr(gatewayv1alpha2.PathMatchPathPrefix),
 		Value: pointer.StringPtr("/"),
 	}
-	fwdPort := gatewayv1alpha1.PortNumber(svcPort)
-	svcFwd := gatewayv1alpha1.HTTPRouteForwardTo{
-		ServiceName: &svc,
-		Port:        &fwdPort,
+	backendPort := gatewayv1alpha2.PortNumber(svcPort)
+	svcBackend := gatewayv1alpha2.HTTPBackendRef{
+		BackendRef: gatewayv1alpha2.BackendRef{
+			BackendObjectReference: gatewayv1alpha2.BackendObjectReference{
+				Name: gatewayv1alpha2.ObjectName(svc),
+				Port: &backendPort,
+			},
+		},
 	}
-	match := gatewayv1alpha1.HTTPRouteMatch{
+	match := gatewayv1alpha2.HTTPRouteMatch{
 		Path: rootPrefix,
 	}
-	httpRule := gatewayv1alpha1.HTTPRouteRule{
-		Matches:   []gatewayv1alpha1.HTTPRouteMatch{match},
-		ForwardTo: []gatewayv1alpha1.HTTPRouteForwardTo{svcFwd},
+	httpRule := gatewayv1alpha2.HTTPRouteRule{
+		Matches:     []gatewayv1alpha2.HTTPRouteMatch{match},
+		BackendRefs: []gatewayv1alpha2.HTTPBackendRef{svcBackend},
 	}
-	h := gatewayv1alpha1.Hostname(hostname)
-	route := &gatewayv1alpha1.HTTPRoute{
+	h := gatewayv1alpha2.Hostname(hostname)
+	gatewayNS := gatewayv1alpha2.Namespace(gwNS)
+	route := &gatewayv1alpha2.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 			Labels:    map[string]string{k: v},
 		},
-		Spec: gatewayv1alpha1.HTTPRouteSpec{
-			Hostnames: []gatewayv1alpha1.Hostname{h},
-			Rules:     []gatewayv1alpha1.HTTPRouteRule{httpRule},
+		Spec: gatewayv1alpha2.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayv1alpha2.ParentRef{
+					{
+						Namespace: &gatewayNS,
+						Name:      gatewayv1alpha2.ObjectName(gwName),
+					},
+				},
+			},
+			Hostnames: []gatewayv1alpha2.Hostname{h},
+			Rules:     []gatewayv1alpha2.HTTPRouteRule{httpRule},
 		},
 	}
 	if err := cl.Create(context.TODO(), route); err != nil {
@@ -608,15 +621,14 @@ func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 	return cl.Update(ctx, svc)
 }
 
-// newGatewayClass creates a GatewayClass object using the provided name as
-// the name of the GatewayClass and controller string.
-func newGatewayClass(ctx context.Context, cl client.Client, name string) error {
-	gc := &gatewayv1alpha1.GatewayClass{
+// newGatewayClass creates a GatewayClass object.
+func newGatewayClass(ctx context.Context, cl client.Client, name, controllerName string) error {
+	gc := &gatewayv1alpha2.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller: name,
+		Spec: gatewayv1alpha2.GatewayClassSpec{
+			ControllerName: gatewayv1alpha2.GatewayController(controllerName),
 		},
 	}
 	if err := cl.Create(ctx, gc); err != nil {
@@ -626,28 +638,22 @@ func newGatewayClass(ctx context.Context, cl client.Client, name string) error {
 }
 
 // newGateway creates a Gateway object using the provided ns/name for the object's
-// ns/name, gc for the gatewayClassName, and k/v for the key-value pair used for
-// route selection. The Gateway will contain an HTTP listener on port 80.
-func newGateway(ctx context.Context, cl client.Client, ns, name, gc, k, v string) error {
-	routes := &metav1.LabelSelector{
-		MatchLabels: map[string]string{k: v},
+// ns/name, gc for the gatewayClassName. The Gateway will contain an HTTP listener
+// on port 80.
+func newGateway(ctx context.Context, cl client.Client, ns, name, gc string) error {
+	http := gatewayv1alpha2.Listener{
+		Name:     gatewayv1alpha2.SectionName("http"),
+		Port:     gatewayv1alpha2.PortNumber(int32(80)),
+		Protocol: gatewayv1alpha2.HTTPProtocolType,
 	}
-	http := gatewayv1alpha1.Listener{
-		Port:     gatewayv1alpha1.PortNumber(int32(80)),
-		Protocol: gatewayv1alpha1.HTTPProtocolType,
-		Routes: gatewayv1alpha1.RouteBindingSelector{
-			Kind:     "HTTPRoute",
-			Selector: routes,
-		},
-	}
-	gw := &gatewayv1alpha1.Gateway{
+	gw := &gatewayv1alpha2.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
-		Spec: gatewayv1alpha1.GatewaySpec{
-			GatewayClassName: gc,
-			Listeners:        []gatewayv1alpha1.Listener{http},
+		Spec: gatewayv1alpha2.GatewaySpec{
+			GatewayClassName: gatewayv1alpha2.ObjectName(gc),
+			Listeners:        []gatewayv1alpha2.Listener{http},
 		},
 	}
 	if err := cl.Create(ctx, gw); err != nil {
@@ -848,6 +854,6 @@ func labelWorkerNodes(ctx context.Context, cl client.Client) error {
 	return nil
 }
 
-func pathMatchTypePtr(t gatewayv1alpha1.PathMatchType) *gatewayv1alpha1.PathMatchType {
+func pathMatchTypePtr(t gatewayv1alpha2.PathMatchType) *gatewayv1alpha2.PathMatchType {
 	return &t
 }
