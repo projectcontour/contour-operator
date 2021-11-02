@@ -104,8 +104,9 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	gateway := rbacv1.PolicyRule{
 		Verbs:     verbGLWU,
 		APIGroups: groupGateway,
-		Resources: []string{"gatewayclasses", "gateways", "httproutes", "tlsroutes"},
+		Resources: []string{"gatewayclasses", "gateways", "httproutes", "tlsroutes", "referencepolicies"},
 	}
+	// Note, ReferencePolicy does not currently have a .status field so it's omitted from the below.
 	gatewayStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
 		APIGroups: groupGateway,

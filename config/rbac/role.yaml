@@ -95,6 +95,7 @@ rules:
   - gatewayclasses
   - gateways
   - httproutes
+  - referencepolicies
   - tlsroutes
   verbs:
   - get

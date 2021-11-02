@@ -2525,6 +2525,12 @@ spec:
                       description: RequestHashPolicy contains configuration for an
                         individual hash policy on a request attribute.
                       properties:
+                        hashSourceIP:
+                          description: HashSourceIP should be set to true when request
+                            source IP hash based load balancing is desired. It must
+                            be the only hash option field set, otherwise this request
+                            hash policy object will be ignored.
+                          type: boolean
                         headerHashOptions:
                           description: HeaderHashOptions should be set when request
                             header hash based load balancing is desired. It must be
@@ -4143,6 +4149,12 @@ spec:
                             description: RequestHashPolicy contains configuration
                               for an individual hash policy on a request attribute.
                             properties:
+                              hashSourceIP:
+                                description: HashSourceIP should be set to true when
+                                  request source IP hash based load balancing is desired.
+                                  It must be the only hash option field set, otherwise
+                                  this request hash policy object will be ignored.
+                                type: boolean
                               headerHashOptions:
                                 description: HeaderHashOptions should be set when
                                   request header hash based load balancing is desired.
@@ -4847,6 +4859,12 @@ spec:
                           description: RequestHashPolicy contains configuration for
                             an individual hash policy on a request attribute.
                           properties:
+                            hashSourceIP:
+                              description: HashSourceIP should be set to true when
+                                request source IP hash based load balancing is desired.
+                                It must be the only hash option field set, otherwise
+                                this request hash policy object will be ignored.
+                              type: boolean
                             headerHashOptions:
                               description: HeaderHashOptions should be set when request
                                 header hash based load balancing is desired. It must
@@ -5194,7 +5212,7 @@ spec:
                     description: The fully qualified domain name of the root of the
                       ingress tree all leaves of the DAG rooted at this object relate
                       to the fqdn.
-                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                   rateLimitPolicy:
                     description: The policy for rate limiting on the virtual host.
@@ -8967,6 +8985,7 @@ rules:
   - gatewayclasses
   - gateways
   - httproutes
+  - referencepolicies
   - tlsroutes
   verbs:
   - get

@@ -23,7 +23,6 @@ import (
 	"github.com/projectcontour/contour-operator/internal/controller"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	controller_runtime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +59,8 @@ type Operator struct {
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tlsroutes,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tlsroutes;referencepolicies,verbs=get;list;watch;update
+// Note, ReferencePolicy does not currently have a .status field so it's omitted from the below.
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status;gateways/status;httproutes/status;tlsroutes/status,verbs=create;get;update
 // Required for Contour to set "unsupported" status
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes;tcproutes,verbs=get;list;watch
@@ -128,26 +128,4 @@ func (o *Operator) Start(ctx context.Context) error {
 	case err := <-errChan:
 		return err
 	}
-}
-
-// GatewayAPIResources for Operator.
-// The list omits TCP and UDP routes since they're unsupported by operator.
-func GatewayAPIResources() []schema.GroupVersionResource {
-	return []schema.GroupVersionResource{{
-		Group:    gatewayv1alpha2.GroupVersion.Group,
-		Version:  gatewayv1alpha2.GroupVersion.Version,
-		Resource: "gatewayclasses",
-	}, {
-		Group:    gatewayv1alpha2.GroupVersion.Group,
-		Version:  gatewayv1alpha2.GroupVersion.Version,
-		Resource: "gateways",
-	}, {
-		Group:    gatewayv1alpha2.GroupVersion.Group,
-		Version:  gatewayv1alpha2.GroupVersion.Version,
-		Resource: "httproutes",
-	}, {
-		Group:    gatewayv1alpha2.GroupVersion.Group,
-		Version:  gatewayv1alpha2.GroupVersion.Version,
-		Resource: "tlsroutes",
-	}}
 }
