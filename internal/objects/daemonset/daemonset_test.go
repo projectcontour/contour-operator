@@ -136,6 +136,23 @@ func checkDaemonSetHasTolerations(t *testing.T, ds *appsv1.DaemonSet, expected [
 	t.Errorf("deployment has unexpected tolerations %v", expected)
 }
 
+func checkDaemonSecurityContext(t *testing.T, ds *appsv1.DaemonSet) {
+	t.Helper()
+
+	user := int64(65534)
+	group := int64(65534)
+	nonRoot := true
+	expected := &corev1.PodSecurityContext{
+		RunAsUser:    &user,
+		RunAsGroup:   &group,
+		RunAsNonRoot: &nonRoot,
+	}
+	if apiequality.Semantic.DeepEqual(ds.Spec.Template.Spec.SecurityContext, expected) {
+		return
+	}
+	t.Errorf("deployment has unexpected SecurityContext %v", expected)
+}
+
 func TestDesiredDaemonSet(t *testing.T) {
 	name := "ds-test"
 	cfg := objcontour.Config{
@@ -164,6 +181,7 @@ func TestDesiredDaemonSet(t *testing.T) {
 	}
 	checkDaemonSetHasNodeSelector(t, ds, nil)
 	checkDaemonSetHasTolerations(t, ds, nil)
+	checkDaemonSecurityContext(t, ds)
 }
 
 func TestNodePlacementDaemonSet(t *testing.T) {
