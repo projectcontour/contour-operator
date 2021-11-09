@@ -113,16 +113,6 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		Resources: []string{"gatewayclasses/status", "gateways/status", "httproutes/status",
 			"tlsroutes/status"},
 	}
-	unsupported := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupGateway,
-		Resources: []string{"tcproutes", "udproutes"},
-	}
-	unsupportedStatus := rbacv1.PolicyRule{
-		Verbs:     []string{"update"},
-		APIGroups: groupGateway,
-		Resources: []string{"tcproutes/status", "udproutes/status"},
-	}
 	ing := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupNet,
@@ -156,8 +146,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus,
-		crd, ns, unsupported, unsupportedStatus}
+	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd, ns}
 	return cr
 }
 
