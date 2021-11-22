@@ -28,7 +28,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.0'
+          go-version: '1.17.3'
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -80,7 +80,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.0'
+          go-version: '1.17.3'
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -129,7 +129,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.0'
+          go-version: '1.17.3'
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -197,7 +197,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.0'
+          go-version: '1.17.3'
       - name: add deps to path
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
