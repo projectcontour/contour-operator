@@ -8947,6 +8947,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
   - namespaces
   - secrets
   - serviceaccounts
