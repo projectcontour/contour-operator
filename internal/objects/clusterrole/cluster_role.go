@@ -21,7 +21,7 @@ import (
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/pkg/labels"
-
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -67,14 +67,20 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	groupGateway := []string{gatewayv1alpha2.GroupName}
 	groupExt := []string{apiextensionsv1.GroupName}
 	groupContour := []string{contourV1GroupName}
+	groupCoordination := []string{coordinationv1.GroupName}
 	verbCGU := []string{"create", "get", "update"}
 	verbGLW := []string{"get", "list", "watch"}
 	verbGLWU := []string{"get", "list", "watch", "update"}
 
-	cfgMap := rbacv1.PolicyRule{
+	leaderElectionCore := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
 		APIGroups: groupAll,
-		Resources: []string{"configmaps"},
+		Resources: []string{"configmaps", "events"},
+	}
+	leaderElectionCoordination := rbacv1.PolicyRule{
+		Verbs:     verbCGU,
+		APIGroups: groupCoordination,
+		Resources: []string{"leases"},
 	}
 	endPt := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
@@ -146,7 +152,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
-	cr.Rules = []rbacv1.PolicyRule{cfgMap, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd, ns}
+	cr.Rules = []rbacv1.PolicyRule{leaderElectionCore, leaderElectionCoordination, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd, ns}
 	return cr
 }
 
