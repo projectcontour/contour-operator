@@ -9,7 +9,7 @@
 readonly KIND=${KIND:-kind}
 readonly KUBECTL=${KUBECTL:-kubectl}
 
-readonly NODEIMAGE=${NODEIMAGE:-"docker.io/kindest/node:v1.21.1"}
+readonly NODEIMAGE=${NODEIMAGE:-"docker.io/kindest/node:v1.23.0"}
 readonly CLUSTER=${CLUSTER:-contour}
 
 readonly HERE=$(cd $(dirname $0) && pwd)
