@@ -150,7 +150,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			},
 			LivenessProbe: &corev1.Probe{
 				FailureThreshold: int32(3),
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Scheme: corev1.URISchemeHTTP,
 						Path:   "/healthz",
@@ -163,7 +163,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				TimeoutSeconds:      int32(1),
 			},
 			Lifecycle: &corev1.Lifecycle{
-				PreStop: &corev1.Handler{
+				PreStop: &corev1.LifecycleHandler{
 					Exec: &corev1.ExecAction{
 						Command: []string{"/bin/contour", "envoy", "shutdown"},
 					},
@@ -214,7 +214,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			},
 			ReadinessProbe: &corev1.Probe{
 				FailureThreshold: int32(3),
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Scheme: corev1.URISchemeHTTP,
 						Path:   "/ready",
@@ -244,7 +244,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 				},
 			},
 			Lifecycle: &corev1.Lifecycle{
-				PreStop: &corev1.Handler{
+				PreStop: &corev1.LifecycleHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path:   "/shutdown",
 						Port:   intstr.FromInt(8090),

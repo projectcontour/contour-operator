@@ -180,7 +180,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			},
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Scheme: corev1.URISchemeHTTP,
 					Path:   "/healthz",
@@ -193,7 +193,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			FailureThreshold: int32(3),
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.IntOrString{
 						IntVal: xdsPort,
