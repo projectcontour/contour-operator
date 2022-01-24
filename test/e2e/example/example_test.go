@@ -217,6 +217,10 @@ func testBasicIngressExample(t *testing.T, c client.Client) {
 
 	contourInstance := &operatorv1alpha1.Contour{}
 	require.NoError(t, decoder.Decode(contourInstance))
+	if contourInstance.Namespace == "" {
+		contourInstance.Namespace = "default"
+	}
+
 	contourInstance.Spec.Namespace = operatorv1alpha1.NamespaceSpec{
 		Name: testNS.Name,
 	}
