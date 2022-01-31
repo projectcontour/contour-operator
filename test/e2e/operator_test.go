@@ -894,16 +894,6 @@ func TestGatewayClusterIP(t *testing.T) {
 // TestOperatorUpgrade tests an instance of the Contour custom resource while
 // upgrading the operator from release "latest" to the current version/branch.
 func TestOperatorUpgrade(t *testing.T) {
-	// Skip this test until the v1.20 release is out, since it does not
-	// properly handle the v1alpha1->v1alpha2 changes to Gateway API CRDs & RBAC.
-	// TODO(1.20) delete the following 5 lines that are being used to disable
-	// the test while keeping the linter happy.
-	_ = setDeploymentImage
-	_ = waitForImage
-	_ = getDeploymentImage
-	_ = getDeployment
-	t.SkipNow()
-
 	// Get the current image to use for upgrade testing.
 	current, err := getDeploymentImage(ctx, kclient, operatorName, operatorNs, operatorName)
 	if err != nil {
