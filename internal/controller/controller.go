@@ -236,7 +236,7 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	handleResult("service", objsvc.EnsureContourServiceDeleted(ctx, cli, contour))
 	handleResult("daemonset", objds.EnsureDaemonSetDeleted(ctx, cli, contour))
 	handleResult("deployment", objdeploy.EnsureDeploymentDeleted(ctx, cli, contour))
-	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour))
+	handleResult("job", objjob.EnsureJobDeleted(ctx, cli, contour, r.config.ContourImage))
 	handleResult("configmap", objcm.EnsureConfigMapDeleted(ctx, cli, contour))
 	handleResult("rbac", objutil.EnsureRBACDeleted(ctx, cli, contour))
 	if deleteExpected, err := objns.EnsureNamespaceDeleted(ctx, cli, contour); deleteExpected {

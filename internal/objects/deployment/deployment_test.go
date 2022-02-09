@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/config"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
 
@@ -131,7 +130,7 @@ func TestDesiredDeployment(t *testing.T) {
 		}
 	}
 
-	testContourImage := config.DefaultContourImage
+	testContourImage := "ghcr.io/projectcontour/contour:test"
 	deploy := DesiredDeployment(cntr, testContourImage)
 
 	container := checkDeploymentHasContainer(t, deploy, contourContainerName, true)
@@ -183,8 +182,7 @@ func TestNodePlacementDeployment(t *testing.T) {
 		},
 	}
 
-	testContourImage := config.DefaultContourImage
-	deploy := DesiredDeployment(cntr, testContourImage)
+	deploy := DesiredDeployment(cntr, "ghcr.io/projectcontour/contour:test")
 
 	checkDeploymentHasNodeSelector(t, deploy, selectors)
 	checkDeploymentHasTolerations(t, deploy, tolerations)

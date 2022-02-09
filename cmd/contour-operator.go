@@ -17,7 +17,6 @@ import (
 	"flag"
 	"os"
 
-	"github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/operator"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
@@ -26,28 +25,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var (
-	opCfg config.Config
-)
-
 func main() {
-	flag.StringVar(&opCfg.ContourImage, "contour-image", config.DefaultContourImage,
-		"The container image used for the managed Contour.")
-	flag.StringVar(&opCfg.EnvoyImage, "envoy-image", config.DefaultEnvoyImage,
-		"The container image used for the managed Envoy.")
-	flag.StringVar(&opCfg.MetricsBindAddress, "metrics-addr", config.DefaultMetricsAddr, "The "+
-		"address the metric endpoint binds to. It can be set to \"0\" to disable serving metrics.")
-	flag.BoolVar(&opCfg.LeaderElection, "enable-leader-election", config.DefaultEnableLeaderElection,
-		"Enable leader election for the operator. Enabling this will ensure there is only one active operator.")
-	flag.Parse()
+	config := operator.DefaultConfig()
 
-	opCfg.LeaderElectionID = config.DefaultEnableLeaderElectionID
+	flag.StringVar(&config.ContourImage, "contour-image", config.ContourImage,
+		"The container image used for the managed Contour.")
+	flag.StringVar(&config.EnvoyImage, "envoy-image", config.EnvoyImage,
+		"The container image used for the managed Envoy.")
+	flag.StringVar(&config.MetricsBindAddress, "metrics-addr", config.MetricsBindAddress, "The "+
+		"address the metric endpoint binds to. It can be set to \"0\" to disable serving metrics.")
+	flag.BoolVar(&config.LeaderElection, "enable-leader-election", config.LeaderElection,
+		"Enable leader election for the operator. Enabling this will ensure there is only one active operator.")
+
+	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog := ctrl.Log.WithName("setup")
 
-	images := []string{opCfg.ContourImage, opCfg.EnvoyImage}
-	for _, image := range images {
+	for _, image := range []string{config.ContourImage, config.EnvoyImage} {
 		// Parse will not handle short digests.
 		if err := parse.Image(image); err != nil {
 			setupLog.Error(err, "invalid image reference", "value", image)
@@ -55,10 +50,10 @@ func main() {
 		}
 	}
 
-	setupLog.Info("using contour", "image", opCfg.ContourImage)
-	setupLog.Info("using envoy", "image", opCfg.EnvoyImage)
+	setupLog.Info("using contour", "image", config.ContourImage)
+	setupLog.Info("using envoy", "image", config.EnvoyImage)
 
-	op, err := operator.New(ctrl.GetConfigOrDie(), &opCfg)
+	op, err := operator.New(ctrl.GetConfigOrDie(), config)
 	if err != nil {
 		setupLog.Error(err, "failed to create contour operator")
 		os.Exit(1)

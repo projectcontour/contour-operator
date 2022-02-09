@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/config"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -163,8 +162,8 @@ func TestDesiredDaemonSet(t *testing.T) {
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	testContourImage := config.DefaultContourImage
-	testEnvoyImage := config.DefaultEnvoyImage
+	testContourImage := "ghcr.io/projectcontour/contour:test"
+	testEnvoyImage := "docker.io/envoyproxy/envoy:test"
 	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
 	container := checkDaemonSetHasContainer(t, ds, EnvoyContainerName, true)
 	checkContainerHasImage(t, container, testEnvoyImage)
@@ -210,8 +209,8 @@ func TestNodePlacementDaemonSet(t *testing.T) {
 		},
 	}
 
-	testContourImage := config.DefaultContourImage
-	testEnvoyImage := config.DefaultEnvoyImage
+	testContourImage := "ghcr.io/projectcontour/contour:test"
+	testEnvoyImage := "docker.io/envoyproxy/envoy:test"
 	ds := DesiredDaemonSet(cntr, testContourImage, testEnvoyImage)
 	checkDaemonSetHasNodeSelector(t, ds, selectors)
 	checkDaemonSetHasTolerations(t, ds, tolerations)

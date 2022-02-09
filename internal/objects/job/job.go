@@ -19,7 +19,6 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
@@ -40,12 +39,11 @@ const (
 	jobNsEnvVar      = "CONTOUR_NAMESPACE"
 )
 
-var (
-	// certgenJobName is the name of Certgen's Job resource.
+func certgenJobName(contourImage string) string {
 	// [TODO] danehans: Remove and use contour.Name + "-certgen" when
 	// https://github.com/projectcontour/contour/issues/2122 is fixed.
-	certgenJobName = "contour-certgen-" + objutil.TagFromImage(config.DefaultContourImage)
-)
+	return "contour-certgen-" + objutil.TagFromImage(contourImage)
+}
 
 // EnsureJob ensures that a Job exists for the given contour.
 // TODO [danehans]: The real dependency is whether the TLS secrets are present.
@@ -53,7 +51,7 @@ var (
 // generating strategy.
 func EnsureJob(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, image string) error {
 	desired := DesiredJob(contour, image)
-	current, err := currentJob(ctx, cli, contour)
+	current, err := currentJob(ctx, cli, contour, image)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return createJob(ctx, cli, desired)
@@ -68,8 +66,8 @@ func EnsureJob(ctx context.Context, cli client.Client, contour *operatorv1alpha1
 
 // EnsureJobDeleted ensures the Job for the provided contour is deleted if
 // Contour owner labels exist.
-func EnsureJobDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	job, err := currentJob(ctx, cli, contour)
+func EnsureJobDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, image string) error {
+	job, err := currentJob(ctx, cli, contour, image)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -88,11 +86,11 @@ func EnsureJobDeleted(ctx context.Context, cli client.Client, contour *operatorv
 }
 
 // currentJob returns the current Job resource named name for the provided contour.
-func currentJob(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*batchv1.Job, error) {
+func currentJob(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour, image string) (*batchv1.Job, error) {
 	current := &batchv1.Job{}
 	key := types.NamespacedName{
 		Namespace: contour.Spec.Namespace.Name,
-		Name:      certgenJobName,
+		Name:      certgenJobName(image),
 	}
 	err := cli.Get(ctx, key, current)
 	if err != nil {
@@ -153,7 +151,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      certgenJobName,
+			Name:      certgenJobName(image),
 			Namespace: contour.Spec.Namespace.Name,
 			Labels:    labels,
 		},
