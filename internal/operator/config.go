@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package operator
 
 const (
 	DefaultContourImage           = "ghcr.io/projectcontour/contour:main"
@@ -44,8 +44,8 @@ type Config struct {
 	LeaderElectionID string
 }
 
-// New returns an operator config using default values.
-func New() *Config {
+// DefaultConfig returns an operator config using default values.
+func DefaultConfig() *Config {
 	return &Config{
 		ContourImage:       DefaultContourImage,
 		EnvoyImage:         DefaultEnvoyImage,

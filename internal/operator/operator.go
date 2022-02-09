@@ -19,7 +19,6 @@ import (
 
 	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/controller"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -49,7 +48,7 @@ type Operator struct {
 	client  Client
 	manager manager.Manager
 	log     logr.Logger
-	config  *config.Config
+	config  *Config
 }
 
 // +kubebuilder:rbac:groups=operator.projectcontour.io,resources=contours,verbs=get;list;watch;update
@@ -73,15 +72,15 @@ type Operator struct {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete;create;update
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 
-// New creates a new operator from cliCfg and opCfg.
-func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
+// New creates a new operator from cliCfg and operatorConfig.
+func New(cliCfg *rest.Config, operatorConfig *Config) (*Operator, error) {
 	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha2.GatewayClass{},
 		&gatewayv1alpha2.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
 	mgrOpts := manager.Options{
 		Scheme:                GetOperatorScheme(),
-		LeaderElection:        opCfg.LeaderElection,
-		LeaderElectionID:      opCfg.LeaderElectionID,
-		MetricsBindAddress:    opCfg.MetricsBindAddress,
+		LeaderElection:        operatorConfig.LeaderElection,
+		LeaderElectionID:      operatorConfig.LeaderElectionID,
+		MetricsBindAddress:    operatorConfig.MetricsBindAddress,
 		ClientDisableCacheFor: nonCached,
 	}
 	mgr, err := controller_runtime.NewManager(cliCfg, mgrOpts)
@@ -91,8 +90,8 @@ func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
 
 	// Create and register the contour controller with the operator manager.
 	if _, err := controller.New(mgr, controller.Config{
-		ContourImage: opCfg.ContourImage,
-		EnvoyImage:   opCfg.EnvoyImage,
+		ContourImage: operatorConfig.ContourImage,
+		EnvoyImage:   operatorConfig.EnvoyImage,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to create contour controller: %w", err)
 	}
@@ -106,7 +105,7 @@ func New(cliCfg *rest.Config, opCfg *config.Config) (*Operator, error) {
 		manager: mgr,
 		client:  Client{mgr.GetClient(), restMapper},
 		log:     controller_runtime.Log.WithName(operatorName),
-		config:  opCfg,
+		config:  operatorConfig,
 	}, nil
 }
 

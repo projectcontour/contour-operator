@@ -21,7 +21,6 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/config"
 	"github.com/projectcontour/contour-operator/internal/operator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,7 +59,7 @@ func TestOperator(t *testing.T) {
 	k8sClient, err := client.New(clientConfig, client.Options{Scheme: operator.GetOperatorScheme()})
 	require.NoError(t, err)
 
-	operator, err := operator.New(clientConfig, operatorconfig.New())
+	operator, err := operator.New(clientConfig, operator.DefaultConfig())
 	require.NoError(t, err)
 	operatorCtx, stopOperator := context.WithCancel(controller_runtime.SetupSignalHandler())
 	go func() {

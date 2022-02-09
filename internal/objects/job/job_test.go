@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	operatorconfig "github.com/projectcontour/contour-operator/internal/config"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -67,8 +66,9 @@ func TestDesiredJob(t *testing.T) {
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	job := DesiredJob(cntr, operatorconfig.DefaultContourImage)
+	testContourImage := "ghcr.io/projectcontour/contour:test"
+	job := DesiredJob(cntr, testContourImage)
 	container := checkJobHasContainer(t, job, jobContainerName)
-	checkContainerHasImage(t, container, operatorconfig.DefaultContourImage)
+	checkContainerHasImage(t, container, testContourImage)
 	checkJobHasEnvVar(t, job, jobNsEnvVar)
 }

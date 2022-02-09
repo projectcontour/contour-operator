@@ -58,7 +58,7 @@ done
 run::sed \
   "-es|ghcr.io/projectcontour/contour:main|$CONTOUR_IMG|" \
   "-es|ghcr.io/projectcontour/contour:$OLDVERS|$CONTOUR_IMG|" \
-  "internal/config/config.go"
+  "internal/operator/config.go"
 
 # Update the operator's image pull policy. Set the pull policy with kustomize when
 # https://github.com/kubernetes-sigs/kustomize/issues/1493 is fixed.
@@ -90,7 +90,7 @@ if $cfg_changed  || $example_changed ; then
   git commit -s -m "Update Contour Docker image to $NEWVERS." \
     config/manager/manager.yaml \
     examples/operator/operator.yaml \
-    internal/config/config.go \
+    internal/operator/config.go \
     README.md
 fi
 
