@@ -87,7 +87,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		},
 		Rules: []rbacv1.PolicyRule{
 			// Leader election resources.
-			policyRuleFor(corev1.GroupName, createGetUpdate, "configmaps", "events"),
+			policyRuleFor(corev1.GroupName, createGetUpdate, "events"),
 			policyRuleFor(coordinationv1.GroupName, createGetUpdate, "leases"),
 
 			// Core Contour-watched resources.
