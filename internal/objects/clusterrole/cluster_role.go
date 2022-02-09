@@ -122,7 +122,7 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 	ing := rbacv1.PolicyRule{
 		Verbs:     verbGLW,
 		APIGroups: groupNet,
-		Resources: []string{"ingresses", "ingressclasses"},
+		Resources: []string{"ingresses"},
 	}
 	ingStatus := rbacv1.PolicyRule{
 		Verbs:     verbCGU,
