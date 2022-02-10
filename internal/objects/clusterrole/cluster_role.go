@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,98 +61,52 @@ func EnsureClusterRole(ctx context.Context, cli client.Client, name string, cont
 // desiredClusterRole constructs an instance of the desired ClusterRole resource with
 // the provided name and contour namespace/name for the owning contour labels.
 func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.ClusterRole {
-	groupAll := []string{corev1.GroupName}
-	groupNet := []string{networkingv1.GroupName}
-	groupGateway := []string{gatewayv1alpha2.GroupName}
-	groupExt := []string{apiextensionsv1.GroupName}
-	groupContour := []string{contourV1GroupName}
-	groupCoordination := []string{coordinationv1.GroupName}
-	verbCGU := []string{"create", "get", "update"}
-	verbGLW := []string{"get", "list", "watch"}
-	verbGLWU := []string{"get", "list", "watch", "update"}
+	var (
+		createGetUpdate = []string{"create", "get", "update"}
+		getListWatch    = []string{"get", "list", "watch"}
+	)
 
-	leaderElectionCore := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupAll,
-		Resources: []string{"configmaps", "events"},
-	}
-	leaderElectionCoordination := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupCoordination,
-		Resources: []string{"leases"},
-	}
-	endPt := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"endpoints"},
-	}
-	ns := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"namespaces"},
-	}
-	secret := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"secrets"},
-	}
-	svc := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupAll,
-		Resources: []string{"services"},
-	}
-	crd := rbacv1.PolicyRule{
-		Verbs:     []string{"list"},
-		APIGroups: groupExt,
-		Resources: []string{"customresourcedefinitions"},
-	}
-	gateway := rbacv1.PolicyRule{
-		Verbs:     verbGLWU,
-		APIGroups: groupGateway,
-		Resources: []string{"gatewayclasses", "gateways", "httproutes", "tlsroutes", "referencepolicies"},
-	}
-	// Note, ReferencePolicy does not currently have a .status field so it's omitted from the below.
-	gatewayStatus := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupGateway,
-		Resources: []string{"gatewayclasses/status", "gateways/status", "httproutes/status",
-			"tlsroutes/status"},
-	}
-	ing := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupNet,
-		Resources: []string{"ingresses", "ingressclasses"},
-	}
-	ingStatus := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupNet,
-		Resources: []string{"ingresses/status"},
-	}
-	cntr := rbacv1.PolicyRule{
-		Verbs:     verbGLW,
-		APIGroups: groupContour,
-		Resources: []string{"httpproxies", "tlscertificatedelegations", "extensionservices", "contourconfigurations"},
-	}
-	cntrStatus := rbacv1.PolicyRule{
-		Verbs:     verbCGU,
-		APIGroups: groupContour,
-		Resources: []string{"httpproxies/status", "extensionservices/status", "contourconfigurations/status"},
+	policyRuleFor := func(apiGroup string, verbs []string, resources ...string) rbacv1.PolicyRule {
+		return rbacv1.PolicyRule{
+			Verbs:     verbs,
+			APIGroups: []string{apiGroup},
+			Resources: resources,
+		}
 	}
 
-	cr := &rbacv1.ClusterRole{
+	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Labels: map[string]string{
+				operatorv1alpha1.OwningContourNameLabel: contour.Name,
+				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			// Leader election resources.
+			policyRuleFor(corev1.GroupName, createGetUpdate, "events"),
+			policyRuleFor(coordinationv1.GroupName, createGetUpdate, "leases"),
+
+			// Core Contour-watched resources.
+			policyRuleFor(corev1.GroupName, getListWatch, "secrets", "endpoints", "services", "namespaces"),
+
+			// Gateway API resources.
+			// Note, ReferencePolicy does not currently have a .status field so it's omitted from the status rule.
+			policyRuleFor(gatewayv1alpha2.GroupName, getListWatch, "gatewayclasses", "gateways", "httproutes", "tlsroutes", "referencepolicies"),
+			policyRuleFor(gatewayv1alpha2.GroupName, createGetUpdate, "gatewayclasses/status", "gateways/status", "httproutes/status", "tlsroutes/status"),
+
+			// Ingress resources.
+			policyRuleFor(networkingv1.GroupName, getListWatch, "ingresses"),
+			policyRuleFor(networkingv1.GroupName, createGetUpdate, "ingresses/status"),
+
+			// Contour CRDs.
+			policyRuleFor(contourV1GroupName, getListWatch, "httpproxies", "tlscertificatedelegations", "extensionservices", "contourconfigurations"),
+			policyRuleFor(contourV1GroupName, createGetUpdate, "httpproxies/status", "extensionservices/status", "contourconfigurations/status"),
 		},
 	}
-	cr.Labels = map[string]string{
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-	}
-	cr.Rules = []rbacv1.PolicyRule{leaderElectionCore, leaderElectionCoordination, endPt, secret, svc, gateway, gatewayStatus, ing, ingStatus, cntr, cntrStatus, crd, ns}
-	return cr
 }
 
 // CurrentClusterRole returns the current ClusterRole for the provided name.
