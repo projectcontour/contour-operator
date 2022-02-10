@@ -44,7 +44,7 @@ func checkRoleLabels(t *testing.T, role *rbacv1.Role, expected map[string]string
 	t.Errorf("role has unexpected %q labels", role.Labels)
 }
 
-func TestDesiredRole(t *testing.T) {
+func TestDesiredCertgenRole(t *testing.T) {
 	name := "role-test"
 	cfg := objcontour.Config{
 		Name:        name,
@@ -54,7 +54,26 @@ func TestDesiredRole(t *testing.T) {
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	role := desiredRole(name, cntr)
+	role := desiredCertgenRole(name, cntr)
+	checkRoleName(t, role, name)
+	ownerLabels := map[string]string{
+		operatorv1alpha1.OwningContourNameLabel: cntr.Name,
+		operatorv1alpha1.OwningContourNsLabel:   cntr.Namespace,
+	}
+	checkRoleLabels(t, role, ownerLabels)
+}
+
+func TestDesiredControllerRole(t *testing.T) {
+	name := "role-test"
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	role := desiredControllerRole(name, cntr)
 	checkRoleName(t, role, name)
 	ownerLabels := map[string]string{
 		operatorv1alpha1.OwningContourNameLabel: cntr.Name,

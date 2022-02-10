@@ -21,7 +21,6 @@ import (
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/pkg/labels"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -86,10 +85,6 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 			},
 		},
 		Rules: []rbacv1.PolicyRule{
-			// Leader election resources.
-			policyRuleFor(corev1.GroupName, createGetUpdate, "events"),
-			policyRuleFor(coordinationv1.GroupName, createGetUpdate, "leases"),
-
 			// Core Contour-watched resources.
 			policyRuleFor(corev1.GroupName, getListWatch, "secrets", "endpoints", "services", "namespaces"),
 

@@ -21,7 +21,8 @@ import (
 	equality "github.com/projectcontour/contour-operator/internal/equality"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/pkg/labels"
-
+	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,10 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// EnsureRole ensures a Role resource exists with the provided name/ns
-// and contour namespace/name for the owning contour labels.
-func EnsureRole(ctx context.Context, cli client.Client, name string, contour *operatorv1alpha1.Contour) (*rbacv1.Role, error) {
-	desired := desiredRole(name, contour)
+func ensureRole(ctx context.Context, cli client.Client, name string, contour *operatorv1alpha1.Contour, desired *rbacv1.Role) (*rbacv1.Role, error) {
 	current, err := CurrentRole(ctx, cli, contour.Spec.Namespace.Name, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -51,9 +49,16 @@ func EnsureRole(ctx context.Context, cli client.Client, name string, contour *op
 	return updated, nil
 }
 
-// desiredRole constructs an instance of the desired ClusterRole resource with the
-// provided ns/name and contour namespace/name for the owning contour labels.
-func desiredRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.Role {
+// EnsureControllerRole ensures a Role resource exists with the for the Contour
+// controller.
+func EnsureControllerRole(ctx context.Context, cli client.Client, name string, contour *operatorv1alpha1.Contour) (*rbacv1.Role, error) {
+	return ensureRole(ctx, cli, name, contour, desiredControllerRole(name, contour))
+}
+
+// desiredControllerRole constructs an instance of the desired Role resource with the
+// provided ns/name and contour namespace/name for the owning contour labels for
+// the Contour controller.
+func desiredControllerRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.Role {
 	role := &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Role",
@@ -63,14 +68,52 @@ func desiredRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.Role {
 			Name:      name,
 		},
 	}
-	groupAll := []string{""}
-	verbCU := []string{"create", "update"}
-	secret := rbacv1.PolicyRule{
-		Verbs:     verbCU,
-		APIGroups: groupAll,
-		Resources: []string{"secrets"},
+	verbCGU := []string{"create", "get", "update"}
+	role.Rules = []rbacv1.PolicyRule{
+		{
+			Verbs:     verbCGU,
+			APIGroups: []string{corev1.GroupName},
+			Resources: []string{"events"},
+		},
+		{
+			Verbs:     verbCGU,
+			APIGroups: []string{coordinationv1.GroupName},
+			Resources: []string{"leases"},
+		},
 	}
-	role.Rules = []rbacv1.PolicyRule{secret}
+	role.Labels = map[string]string{
+		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+	}
+	return role
+}
+
+// EnsureCertgenRole ensures a Role resource exists for the certgen
+// job.
+func EnsureCertgenRole(ctx context.Context, cli client.Client, name string, contour *operatorv1alpha1.Contour) (*rbacv1.Role, error) {
+	return ensureRole(ctx, cli, name, contour, desiredCertgenRole(name, contour))
+}
+
+// desiredCertgenRole constructs an instance of the desired Role resource with the
+// provided ns/name and contour namespace/name for the owning contour labels for
+// the certgen job.
+func desiredCertgenRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.Role {
+	role := &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Role",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: contour.Spec.Namespace.Name,
+			Name:      name,
+		},
+	}
+	role.Rules = []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{"create", "update"},
+			APIGroups: []string{corev1.GroupName},
+			Resources: []string{"secrets"},
+		},
+	}
 	role.Labels = map[string]string{
 		operatorv1alpha1.OwningContourNameLabel: contour.Name,
 		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
