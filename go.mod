@@ -3,7 +3,7 @@ module github.com/projectcontour/contour-operator
 go 1.15
 
 require (
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.0+incompatible
 	github.com/go-logr/logr v1.2.0
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/stretchr/testify v1.7.0
