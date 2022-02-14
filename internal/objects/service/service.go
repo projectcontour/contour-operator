@@ -223,29 +223,35 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 // DesiredEnvoyService generates the desired Envoy Service for the given contour.
 func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 	var ports []corev1.ServicePort
+	var httpFound, httpsFound bool
+
 	for _, port := range contour.Spec.NetworkPublishing.Envoy.ContainerPorts {
-		var p corev1.ServicePort
-		httpFound := false
-		httpsFound := false
-		switch {
-		case httpsFound && httpFound:
-			break
-		case port.Name == "http":
+		switch port.Name {
+		case "http":
 			httpFound = true
-			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPPort
-			p.Protocol = corev1.ProtocolTCP
-			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
-			ports = append(ports, p)
-		case port.Name == "https":
+
+			ports = append(ports, corev1.ServicePort{
+				Name:       port.Name,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       EnvoyServiceHTTPPort,
+				TargetPort: intstr.IntOrString{IntVal: port.PortNumber},
+			})
+		case "https":
 			httpsFound = true
-			p.Name = port.Name
-			p.Port = EnvoyServiceHTTPSPort
-			p.Protocol = corev1.ProtocolTCP
-			p.TargetPort = intstr.IntOrString{IntVal: port.PortNumber}
-			ports = append(ports, p)
+
+			ports = append(ports, corev1.ServicePort{
+				Name:       port.Name,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       EnvoyServiceHTTPSPort,
+				TargetPort: intstr.IntOrString{IntVal: port.PortNumber},
+			})
+		}
+
+		if httpFound && httpsFound {
+			break
 		}
 	}
+
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   contour.Spec.Namespace.Name,
