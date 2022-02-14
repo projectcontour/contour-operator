@@ -66,6 +66,7 @@ func desiredControllerRole(name string, contour *operatorv1alpha1.Contour) *rbac
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      name,
+			Labels:    objcontour.OwnerLabels(contour),
 		},
 	}
 	verbCGU := []string{"create", "get", "update"}
@@ -80,10 +81,6 @@ func desiredControllerRole(name string, contour *operatorv1alpha1.Contour) *rbac
 			APIGroups: []string{coordinationv1.GroupName},
 			Resources: []string{"leases"},
 		},
-	}
-	role.Labels = map[string]string{
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
 	return role
 }
@@ -105,6 +102,7 @@ func desiredCertgenRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      name,
+			Labels:    objcontour.OwnerLabels(contour),
 		},
 	}
 	role.Rules = []rbacv1.PolicyRule{
@@ -113,10 +111,6 @@ func desiredCertgenRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 			APIGroups: []string{corev1.GroupName},
 			Resources: []string{"secrets"},
 		},
-	}
-	role.Labels = map[string]string{
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
 	return role
 }

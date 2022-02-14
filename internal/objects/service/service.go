@@ -198,10 +198,7 @@ func DesiredContourService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      contourSvcName,
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Labels:    objcontour.OwnerLabels(contour),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -257,10 +254,7 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 			Namespace:   contour.Spec.Namespace.Name,
 			Name:        envoySvcName,
 			Annotations: map[string]string{},
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Labels:      objcontour.OwnerLabels(contour),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports:           ports,

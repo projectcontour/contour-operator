@@ -55,20 +55,16 @@ func EnsureServiceAccount(ctx context.Context, cli client.Client, name string, c
 // DesiredServiceAccount generates the desired ServiceAccount resource for the
 // given contour.
 func DesiredServiceAccount(name string, contour *operatorv1alpha1.Contour) *corev1.ServiceAccount {
-	sa := &corev1.ServiceAccount{
+	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			Kind: rbacv1.ServiceAccountKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      name,
+			Labels:    objcontour.OwnerLabels(contour),
 		},
 	}
-	sa.Labels = map[string]string{
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-	}
-	return sa
 }
 
 // CurrentServiceAccount returns the current ServiceAccount for the provided ns/name.

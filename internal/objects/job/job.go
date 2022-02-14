@@ -145,10 +145,12 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/part-of":    "project-contour",
 		"app.kubernetes.io/managed-by": "contour-operator",
-		// associate the job with the provided contour.
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
+	// Add owner labels
+	for k, v := range objcontour.OwnerLabels(contour) {
+		labels[k] = v
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certgenJobName(image),

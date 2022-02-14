@@ -65,11 +65,8 @@ func desiredRoleBinding(name, svcAcctRef, roleRef string, contour *operatorv1alp
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: contour.Spec.Namespace.Name,
 			Name:      name,
+			Labels:    objcontour.OwnerLabels(contour),
 		},
-	}
-	rb.Labels = map[string]string{
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
 	rb.Subjects = []rbacv1.Subject{{
 		Kind:      "ServiceAccount",
