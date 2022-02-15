@@ -359,15 +359,19 @@ func updateDeploymentIfNeeded(ctx context.Context, cli client.Client, contour *o
 
 // makeDeploymentLabels returns labels for a Contour deployment.
 func makeDeploymentLabels(contour *operatorv1alpha1.Contour) map[string]string {
-	return map[string]string{
+	labels := map[string]string{
 		"app.kubernetes.io/name":       "contour",
 		"app.kubernetes.io/instance":   contour.Name,
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
-		// Associate the deployment with the provided contour.
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 	}
+
+	// Add owner labels
+	for k, v := range objcontour.OwnerLabels(contour) {
+		labels[k] = v
+	}
+
+	return labels
 }
 
 // ContourDeploymentPodSelector returns a label selector using "app: contour" as the

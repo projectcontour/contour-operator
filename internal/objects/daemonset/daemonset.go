@@ -121,9 +121,10 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 		"app.kubernetes.io/instance":   contour.Name,
 		"app.kubernetes.io/component":  "ingress-controller",
 		"app.kubernetes.io/managed-by": "contour-operator",
-		// Associate the daemonset with the provided contour.
-		operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-		operatorv1alpha1.OwningContourNameLabel: contour.Name,
+	}
+	// Add owner labels
+	for k, v := range objcontour.OwnerLabels(contour) {
+		labels[k] = v
 	}
 
 	var ports []corev1.ContainerPort

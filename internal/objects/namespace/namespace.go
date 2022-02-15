@@ -95,11 +95,8 @@ func EnsureNamespaceDeleted(ctx context.Context, cli client.Client, contour *ope
 func DesiredNamespace(contour *operatorv1alpha1.Contour) *corev1.Namespace {
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: contour.Spec.Namespace.Name,
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Name:   contour.Spec.Namespace.Name,
+			Labels: objcontour.OwnerLabels(contour),
 		},
 	}
 }

@@ -78,11 +78,8 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 			Kind: "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
-			},
+			Name:   name,
+			Labels: objcontour.OwnerLabels(contour),
 		},
 		Rules: []rbacv1.PolicyRule{
 			// Core Contour-watched resources.
