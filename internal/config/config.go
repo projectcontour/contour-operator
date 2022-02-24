@@ -14,7 +14,7 @@
 package config
 
 const (
-	DefaultContourImage           = "ghcr.io/projectcontour/contour:v1.20.0"
+	DefaultContourImage           = "ghcr.io/projectcontour/contour:v1.20.1"
 	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.21.1"
 	DefaultMetricsAddr            = ":8080"
 	DefaultEnableLeaderElection   = false
