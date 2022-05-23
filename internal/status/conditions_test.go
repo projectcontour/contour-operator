@@ -24,7 +24,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
+	realclock "k8s.io/utils/clock"
+	fakeclock "k8s.io/utils/clock/testing"
 )
 
 func newCondition(t string, status metav1.ConditionStatus, reason, msg string, lt time.Time) metav1.Condition {
@@ -196,10 +197,10 @@ func TestContourConditionChanged(t *testing.T) {
 
 func TestMergeConditions(t *testing.T) {
 	// Inject a fake clock and don't forget to reset it
-	fakeClock := utilclock.NewFakeClock(time.Time{})
+	fakeClock := fakeclock.NewFakeClock(time.Time{})
 	clock = fakeClock
 	defer func() {
-		clock = utilclock.RealClock{}
+		clock = realclock.RealClock{}
 	}()
 
 	start := fakeClock.Now()
