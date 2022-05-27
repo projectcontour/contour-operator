@@ -8,6 +8,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.24.0
 	k8s.io/apiextensions-apiserver v0.23.1
 	k8s.io/apimachinery v0.24.0
