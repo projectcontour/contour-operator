@@ -72,3 +72,21 @@ func TestDesiredJob(t *testing.T) {
 	checkContainerHasImage(t, container, testContourImage)
 	checkJobHasEnvVar(t, job, jobNsEnvVar)
 }
+
+func TestJobNameLength(t *testing.T) {
+	name := "job-test"
+	cfg := objcontour.Config{
+		Name:        name,
+		Namespace:   fmt.Sprintf("%s-ns", name),
+		SpecNs:      "projectcontour",
+		RemoveNs:    false,
+		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+	}
+	cntr := objcontour.New(cfg)
+	testContourImage := "ghcr.io/projectcontour/contour:d76d8b5da2ab549cee82cd99fcf8d747dba564863ccc459cae5a91f50bf9c5d3"
+	job := DesiredJob(cntr, testContourImage)
+	jobName := job.ObjectMeta.Name
+	if len(jobName) > 63 {
+		t.Errorf("job has name %q that has a length above 63 characters", name)
+	}
+}
