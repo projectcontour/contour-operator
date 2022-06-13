@@ -43,8 +43,11 @@ func certgenJobName(contourImage string) string {
 	// [TODO] danehans: Remove and use contour.Name + "-certgen" when
 	// https://github.com/projectcontour/contour/issues/2122 is fixed.
 	res := "contour-certgen-" + objutil.TagFromImage(contourImage)
-	// Truncate to avoid issues with long tags and K8s character limit
-	return res[0:63]
+	if len(res) > 63 {
+		// Truncate to avoid issues with long tags and K8s character limit
+		res = res[0:63]
+	}
+	return res
 }
 
 // EnsureJob ensures that a Job exists for the given contour.
