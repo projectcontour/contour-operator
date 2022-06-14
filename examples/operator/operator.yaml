@@ -9294,7 +9294,7 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        image: ghcr.io/projectcontour/contour-operator:v1.20.1
+        image: ghcr.io/projectcontour/contour-operator:v1.20.2
         imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
