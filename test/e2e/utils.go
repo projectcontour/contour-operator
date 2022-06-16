@@ -290,7 +290,7 @@ func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname, gwName, gwNS 
 		},
 		Spec: gatewayv1alpha2.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1alpha2.CommonRouteSpec{
-				ParentRefs: []gatewayv1alpha2.ParentRef{
+				ParentRefs: []gatewayv1alpha2.ParentReference{
 					{
 						Namespace: &gatewayNS,
 						Name:      gatewayv1alpha2.ObjectName(gwName),
