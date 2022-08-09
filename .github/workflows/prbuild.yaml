@@ -174,7 +174,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.48.0
-          args: --build-tags=e2e
+          args: --build-tags=e2e,tools
       - uses: act10ns/slack@v1
         with:
           status: ${{ job.status }}
