@@ -56,6 +56,7 @@ func EnsureNamespace(ctx context.Context, cli client.Client, contour *operatorv1
 //   - Another contour exists in the same namespace.
 //   - The namespace of contour matches a name in namespaceCoreList.
 //   - The namespace does not contain the Contour owner labels.
+//
 // Returns a boolean indicating if the delete was expected to occur and an error.
 func EnsureNamespaceDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (bool, error) {
 	name := contour.Spec.Namespace.Name

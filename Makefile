@@ -90,7 +90,7 @@ test: generate fmt vet manifests
 
 lint-golint:
 	@echo Running Go linter ...
-	@./hack/golangci-lint.sh run --build-tags=e2e
+	@./hack/golangci-lint.sh run --build-tags=e2e,tools
 
 .PHONY: lint-codespell
 lint-codespell: CODESPELL_SKIP := $(shell cat .codespell.skip | tr \\n ',')

@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 /*
@@ -22,5 +23,6 @@ limitations under the License.
 package tools
 
 import (
+	// nolint:typecheck
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 )
