@@ -11,6 +11,7 @@ on:
 env:
   GOPROXY: https://proxy.golang.org/
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  GO_VERSION: 1.19.0
 jobs:
   test-linux:
     runs-on: ubuntu-latest
@@ -28,7 +29,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.1'
+          go-version: ${{ env.GO_VERSION }}
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -80,7 +81,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.1'
+          go-version: ${{ env.GO_VERSION }}
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -129,7 +130,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.1'
+          go-version: ${{ env.GO_VERSION }}
       - name: deps
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
@@ -172,7 +173,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.45.2
+          version: v1.48.0
           args: --build-tags=e2e
       - uses: act10ns/slack@v1
         with:
@@ -196,7 +197,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.1'
+          go-version: ${{ env.GO_VERSION }}
       - name: add deps to path
         run: |
           ./hack/actions/install-kubernetes-toolchain.sh $GITHUB_WORKSPACE/bin
