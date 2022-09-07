@@ -12270,7 +12270,7 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        image: ghcr.io/projectcontour/contour-operator:v1.22.0
+        image: ghcr.io/projectcontour/contour-operator:v1.22.1
         imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:

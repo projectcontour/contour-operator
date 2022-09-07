@@ -20,7 +20,7 @@ spec:
         - /contour-operator
         args:
         - --enable-leader-election
-        image: ghcr.io/projectcontour/contour-operator:v1.22.0
+        image: ghcr.io/projectcontour/contour-operator:v1.22.1
         imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
