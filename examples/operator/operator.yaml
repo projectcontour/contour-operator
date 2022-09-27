@@ -2763,7 +2763,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: gatewayclasses.gateway.networking.k8s.io
@@ -3194,7 +3194,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: gateways.gateway.networking.k8s.io
@@ -3271,7 +3271,7 @@ spec:
                       description: Type of the address.
                       maxLength: 253
                       minLength: 1
-                      pattern: ^Hostname|IPAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
+                      pattern: ^Hostname|IPAddress|NamedAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
                       type: string
                     value:
                       description: "Value of the address. The validity of the values
@@ -3568,11 +3568,12 @@ spec:
                               namespace:
                                 description: "Namespace is the namespace of the backend.
                                   When unspecified, the local namespace is inferred.
-                                  \n Note that when a namespace is specified, a ReferenceGrant
-                                  object is required in the referent namespace to
-                                  allow that namespace's owner to accept the reference.
-                                  See the ReferenceGrant documentation for details.
-                                  \n Support: Core"
+                                  \n Note that when a different namespace is specified,
+                                  a ReferenceGrant object with ReferenceGrantTo.Kind=Secret
+                                  is required in the referent namespace to allow that
+                                  namespace's owner to accept the reference. See the
+                                  ReferenceGrant documentation for details. \n Support:
+                                  Core"
                                 maxLength: 63
                                 minLength: 1
                                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -3659,7 +3660,7 @@ spec:
                       description: Type of the address.
                       maxLength: 253
                       minLength: 1
-                      pattern: ^Hostname|IPAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
+                      pattern: ^Hostname|IPAddress|NamedAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
                       type: string
                     value:
                       description: "Value of the address. The validity of the values
@@ -3965,7 +3966,7 @@ spec:
                       description: Type of the address.
                       maxLength: 253
                       minLength: 1
-                      pattern: ^Hostname|IPAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
+                      pattern: ^Hostname|IPAddress|NamedAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
                       type: string
                     value:
                       description: "Value of the address. The validity of the values
@@ -4353,7 +4354,7 @@ spec:
                       description: Type of the address.
                       maxLength: 253
                       minLength: 1
-                      pattern: ^Hostname|IPAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
+                      pattern: ^Hostname|IPAddress|NamedAddress|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$
                       type: string
                     value:
                       description: "Value of the address. The validity of the values
@@ -6833,7 +6834,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: httproutes.gateway.networking.k8s.io
@@ -6961,7 +6962,7 @@ spec:
                     kind:
                       default: Gateway
                       description: "Kind is kind of the referent. \n Support: Core
-                        (Gateway) Support: Custom (Other Resources)"
+                        (Gateway) \n Support: Custom (Other Resources)"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -7048,21 +7049,22 @@ spec:
                   properties:
                     backendRefs:
                       description: "BackendRefs defines the backend(s) where matching
-                        requests should be sent. \n A 500 status code MUST be returned
-                        if there are no BackendRefs or filters specified that would
-                        result in a response being sent. \n A BackendRef is considered
-                        invalid when it refers to: \n * an unknown or unsupported
-                        kind of resource * a resource that does not exist * a resource
-                        in another namespace when the reference has not been   explicitly
-                        allowed by a ReferenceGrant (or equivalent concept). \n When
-                        a BackendRef is invalid, 500 status codes MUST be returned
-                        for requests that would have otherwise been routed to an invalid
-                        backend. If multiple backends are specified, and some are
-                        invalid, the proportion of requests that would otherwise have
-                        been routed to an invalid backend MUST receive a 500 status
-                        code. \n When a BackendRef refers to a Service that has no
-                        ready endpoints, it is recommended to return a 503 status
-                        code. \n Support: Core for Kubernetes Service Support: Custom
+                        requests should be sent. \n Failure behavior here depends
+                        on how many BackendRefs are specified and how many are invalid.
+                        \n If *all* entries in BackendRefs are invalid, and there
+                        are also no filters specified in this route rule, *all* traffic
+                        which matches this rule MUST receive a 500 status code. \n
+                        See the HTTPBackendRef definition for the rules about what
+                        makes a single HTTPBackendRef invalid. \n When a HTTPBackendRef
+                        is invalid, 500 status codes MUST be returned for requests
+                        that would have otherwise been routed to an invalid backend.
+                        If multiple backends are specified, and some are invalid,
+                        the proportion of requests that would otherwise have been
+                        routed to an invalid backend MUST receive a 500 status code.
+                        \n For example, if two backends are specified with equal weights,
+                        and one is invalid, 50 percent of traffic must receive a 500.
+                        Implementations may choose how that 50 percent is determined.
+                        \n Support: Core for Kubernetes Service \n Support: Custom
                         for any other resource \n Support for weight: Core"
                       items:
                         description: HTTPBackendRef defines how a HTTPRoute should
@@ -7250,7 +7252,7 @@ spec:
                                         Message of the `ResolvedRefs` Condition should
                                         be used to provide more detail about the problem.
                                         \n Support: Extended for Kubernetes Service
-                                        Support: Custom for any other resource"
+                                        \n Support: Custom for any other resource"
                                       properties:
                                         group:
                                           default: ""
@@ -7279,8 +7281,9 @@ spec:
                                           description: "Namespace is the namespace
                                             of the backend. When unspecified, the
                                             local namespace is inferred. \n Note that
-                                            when a namespace is specified, a ReferenceGrant
-                                            object is required in the referent namespace
+                                            when a different namespace is specified,
+                                            a ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                                            is required in the referent namespace
                                             to allow that namespace's owner to accept
                                             the reference. See the ReferenceGrant
                                             documentation for details. \n Support:
@@ -7293,7 +7296,9 @@ spec:
                                           description: Port specifies the destination
                                             port number to use for this resource.
                                             Port is required when the referent is
-                                            a Kubernetes Service. For other resources,
+                                            a Kubernetes Service. In this case, the
+                                            port number is the service port number,
+                                            not the target port. For other resources,
                                             destination port might be derived from
                                             the referent resource or this field.
                                           format: int32
@@ -7356,7 +7361,14 @@ spec:
                                         type:
                                           description: "Type defines the type of path
                                             modifier. Additional types may be added
-                                            in a future release of the API. \n <gateway:experimental>"
+                                            in a future release of the API. \n Note
+                                            that values may be added to this enum,
+                                            implementations must ensure that unknown
+                                            values will not cause a crash. \n Unknown
+                                            values here must result in the implementation
+                                            setting the Accepted Condition for the
+                                            Route to `status: False`, with a Reason
+                                            of `UnsupportedValue`. \n <gateway:experimental>"
                                           enum:
                                           - ReplaceFullPath
                                           - ReplacePrefixMatch
@@ -7377,7 +7389,13 @@ spec:
                                       description: "Scheme is the scheme to be used
                                         in the value of the `Location` header in the
                                         response. When empty, the scheme of the request
-                                        is used. \n Support: Extended"
+                                        is used. \n Support: Extended \n Note that
+                                        values may be added to this enum, implementations
+                                        must ensure that unknown values will not cause
+                                        a crash. \n Unknown values here must result
+                                        in the implementation setting the Accepted
+                                        Condition for the Route to `status: False`,
+                                        with a Reason of `UnsupportedValue`."
                                       enum:
                                       - http
                                       - https
@@ -7385,7 +7403,13 @@ spec:
                                     statusCode:
                                       default: 302
                                       description: "StatusCode is the HTTP status
-                                        code to be used in response. \n Support: Core"
+                                        code to be used in response. \n Support: Core
+                                        \n Note that values may be added to this enum,
+                                        implementations must ensure that unknown values
+                                        will not cause a crash. \n Unknown values
+                                        here must result in the implementation setting
+                                        the Accepted Condition for the Route to `status:
+                                        False`, with a Reason of `UnsupportedValue`."
                                       enum:
                                       - 301
                                       - 302
@@ -7416,7 +7440,13 @@ spec:
                                     \n If a reference to a custom filter type cannot
                                     be resolved, the filter MUST NOT be skipped. Instead,
                                     requests that would have been processed by that
-                                    filter MUST receive a HTTP error response. \n "
+                                    filter MUST receive a HTTP error response. \n
+                                    Note that values may be added to this enum, implementations
+                                    must ensure that unknown values will not cause
+                                    a crash. \n Unknown values here must result in
+                                    the implementation setting the Accepted Condition
+                                    for the Route to `status: False`, with a Reason
+                                    of `UnsupportedValue`. \n "
                                   enum:
                                   - RequestHeaderModifier
                                   - RequestMirror
@@ -7427,7 +7457,7 @@ spec:
                                 urlRewrite:
                                   description: "URLRewrite defines a schema for a
                                     filter that modifies a request during forwarding.
-                                    Support: Extended \n <gateway:experimental>"
+                                    \n Support: Extended \n <gateway:experimental>"
                                   properties:
                                     hostname:
                                       description: "Hostname is the value to be used
@@ -7469,7 +7499,14 @@ spec:
                                         type:
                                           description: "Type defines the type of path
                                             modifier. Additional types may be added
-                                            in a future release of the API. \n <gateway:experimental>"
+                                            in a future release of the API. \n Note
+                                            that values may be added to this enum,
+                                            implementations must ensure that unknown
+                                            values will not cause a crash. \n Unknown
+                                            values here must result in the implementation
+                                            setting the Accepted Condition for the
+                                            Route to `status: False`, with a Reason
+                                            of `UnsupportedValue`. \n <gateway:experimental>"
                                           enum:
                                           - ReplaceFullPath
                                           - ReplacePrefixMatch
@@ -7508,11 +7545,11 @@ spec:
                           namespace:
                             description: "Namespace is the namespace of the backend.
                               When unspecified, the local namespace is inferred. \n
-                              Note that when a namespace is specified, a ReferenceGrant
-                              object is required in the referent namespace to allow
-                              that namespace's owner to accept the reference. See
-                              the ReferenceGrant documentation for details. \n Support:
-                              Core"
+                              Note that when a different namespace is specified, a
+                              ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                              is required in the referent namespace to allow that
+                              namespace's owner to accept the reference. See the ReferenceGrant
+                              documentation for details. \n Support: Core"
                             maxLength: 63
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -7520,9 +7557,10 @@ spec:
                           port:
                             description: Port specifies the destination port number
                               to use for this resource. Port is required when the
-                              referent is a Kubernetes Service. For other resources,
-                              destination port might be derived from the referent
-                              resource or this field.
+                              referent is a Kubernetes Service. In this case, the
+                              port number is the service port number, not the target
+                              port. For other resources, destination port might be
+                              derived from the referent resource or this field.
                             format: int32
                             maximum: 65535
                             minimum: 1
@@ -7734,7 +7772,7 @@ spec:
                                   In either error case, the Message of the `ResolvedRefs`
                                   Condition should be used to provide more detail
                                   about the problem. \n Support: Extended for Kubernetes
-                                  Service Support: Custom for any other resource"
+                                  Service \n Support: Custom for any other resource"
                                 properties:
                                   group:
                                     default: ""
@@ -7761,11 +7799,12 @@ spec:
                                   namespace:
                                     description: "Namespace is the namespace of the
                                       backend. When unspecified, the local namespace
-                                      is inferred. \n Note that when a namespace is
-                                      specified, a ReferenceGrant object is required
-                                      in the referent namespace to allow that namespace's
-                                      owner to accept the reference. See the ReferenceGrant
-                                      documentation for details. \n Support: Core"
+                                      is inferred. \n Note that when a different namespace
+                                      is specified, a ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                                      is required in the referent namespace to allow
+                                      that namespace's owner to accept the reference.
+                                      See the ReferenceGrant documentation for details.
+                                      \n Support: Core"
                                     maxLength: 63
                                     minLength: 1
                                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -7773,9 +7812,11 @@ spec:
                                   port:
                                     description: Port specifies the destination port
                                       number to use for this resource. Port is required
-                                      when the referent is a Kubernetes Service. For
-                                      other resources, destination port might be derived
-                                      from the referent resource or this field.
+                                      when the referent is a Kubernetes Service. In
+                                      this case, the port number is the service port
+                                      number, not the target port. For other resources,
+                                      destination port might be derived from the referent
+                                      resource or this field.
                                     format: int32
                                     maximum: 65535
                                     minimum: 1
@@ -7832,7 +7873,13 @@ spec:
                                   type:
                                     description: "Type defines the type of path modifier.
                                       Additional types may be added in a future release
-                                      of the API. \n <gateway:experimental>"
+                                      of the API. \n Note that values may be added
+                                      to this enum, implementations must ensure that
+                                      unknown values will not cause a crash. \n Unknown
+                                      values here must result in the implementation
+                                      setting the Accepted Condition for the Route
+                                      to `status: False`, with a Reason of `UnsupportedValue`.
+                                      \n <gateway:experimental>"
                                     enum:
                                     - ReplaceFullPath
                                     - ReplacePrefixMatch
@@ -7853,7 +7900,12 @@ spec:
                                 description: "Scheme is the scheme to be used in the
                                   value of the `Location` header in the response.
                                   When empty, the scheme of the request is used. \n
-                                  Support: Extended"
+                                  Support: Extended \n Note that values may be added
+                                  to this enum, implementations must ensure that unknown
+                                  values will not cause a crash. \n Unknown values
+                                  here must result in the implementation setting the
+                                  Accepted Condition for the Route to `status: False`,
+                                  with a Reason of `UnsupportedValue`."
                                 enum:
                                 - http
                                 - https
@@ -7861,7 +7913,12 @@ spec:
                               statusCode:
                                 default: 302
                                 description: "StatusCode is the HTTP status code to
-                                  be used in response. \n Support: Core"
+                                  be used in response. \n Support: Core \n Note that
+                                  values may be added to this enum, implementations
+                                  must ensure that unknown values will not cause a
+                                  crash. \n Unknown values here must result in the
+                                  implementation setting the Accepted Condition for
+                                  the Route to `status: False`, with a Reason of `UnsupportedValue`."
                                 enum:
                                 - 301
                                 - 302
@@ -7890,7 +7947,12 @@ spec:
                               behavior. \n If a reference to a custom filter type
                               cannot be resolved, the filter MUST NOT be skipped.
                               Instead, requests that would have been processed by
-                              that filter MUST receive a HTTP error response. \n "
+                              that filter MUST receive a HTTP error response. \n Note
+                              that values may be added to this enum, implementations
+                              must ensure that unknown values will not cause a crash.
+                              \n Unknown values here must result in the implementation
+                              setting the Accepted Condition for the Route to `status:
+                              False`, with a Reason of `UnsupportedValue`. \n "
                             enum:
                             - RequestHeaderModifier
                             - RequestMirror
@@ -7900,7 +7962,7 @@ spec:
                             type: string
                           urlRewrite:
                             description: "URLRewrite defines a schema for a filter
-                              that modifies a request during forwarding. Support:
+                              that modifies a request during forwarding. \n Support:
                               Extended \n <gateway:experimental>"
                             properties:
                               hostname:
@@ -7940,7 +8002,13 @@ spec:
                                   type:
                                     description: "Type defines the type of path modifier.
                                       Additional types may be added in a future release
-                                      of the API. \n <gateway:experimental>"
+                                      of the API. \n Note that values may be added
+                                      to this enum, implementations must ensure that
+                                      unknown values will not cause a crash. \n Unknown
+                                      values here must result in the implementation
+                                      setting the Accepted Condition for the Route
+                                      to `status: False`, with a Reason of `UnsupportedValue`.
+                                      \n <gateway:experimental>"
                                     enum:
                                     - ReplaceFullPath
                                     - ReplacePrefixMatch
@@ -7975,7 +8043,7 @@ spec:
                         every HTTP request. \n Proxy or Load Balancer routing configuration
                         generated from HTTPRoutes MUST prioritize rules based on the
                         following criteria, continuing on ties. Precedence must be
-                        given to the the Rule with the largest number of: \n * Characters
+                        given to the Rule with the largest number of: \n * Characters
                         in a matching non-wildcard hostname. * Characters in a matching
                         hostname. * Characters in a matching path. * Header matches.
                         * Query param matches. \n If ties still exist across multiple
@@ -8105,9 +8173,14 @@ spec:
                                 a HTTP route by matching HTTP query parameters.
                               properties:
                                 name:
-                                  description: Name is the name of the HTTP query
+                                  description: "Name is the name of the HTTP query
                                     param to be matched. This must be an exact string
                                     match. (See https://tools.ietf.org/html/rfc7230#section-2.7.3).
+                                    \n If multiple entries specify equivalent query
+                                    param names, only the first entry with an equivalent
+                                    name MUST be considered for a match. Subsequent
+                                    entries with an equivalent query param name MUST
+                                    be ignored."
                                   maxLength: 256
                                   minLength: 1
                                   type: string
@@ -8182,7 +8255,7 @@ spec:
                         condition may not be set due to lack of controller visibility,
                         that includes when: \n * The Route refers to a non-existent
                         parent. * The Route is of a type that the controller does
-                        not support. * The Route is in a namespace the the controller
+                        not support. * The Route is in a namespace the controller
                         does not have access to."
                       items:
                         description: "Condition contains details for one aspect of
@@ -8290,7 +8363,7 @@ spec:
                         kind:
                           default: Gateway
                           description: "Kind is kind of the referent. \n Support:
-                            Core (Gateway) Support: Custom (Other Resources)"
+                            Core (Gateway) \n Support: Custom (Other Resources)"
                           maxLength: 63
                           minLength: 1
                           pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -8493,7 +8566,7 @@ spec:
                     kind:
                       default: Gateway
                       description: "Kind is kind of the referent. \n Support: Core
-                        (Gateway) Support: Custom (Other Resources)"
+                        (Gateway) \n Support: Custom (Other Resources)"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -8580,21 +8653,22 @@ spec:
                   properties:
                     backendRefs:
                       description: "BackendRefs defines the backend(s) where matching
-                        requests should be sent. \n A 500 status code MUST be returned
-                        if there are no BackendRefs or filters specified that would
-                        result in a response being sent. \n A BackendRef is considered
-                        invalid when it refers to: \n * an unknown or unsupported
-                        kind of resource * a resource that does not exist * a resource
-                        in another namespace when the reference has not been   explicitly
-                        allowed by a ReferenceGrant (or equivalent concept). \n When
-                        a BackendRef is invalid, 500 status codes MUST be returned
-                        for requests that would have otherwise been routed to an invalid
-                        backend. If multiple backends are specified, and some are
-                        invalid, the proportion of requests that would otherwise have
-                        been routed to an invalid backend MUST receive a 500 status
-                        code. \n When a BackendRef refers to a Service that has no
-                        ready endpoints, it is recommended to return a 503 status
-                        code. \n Support: Core for Kubernetes Service Support: Custom
+                        requests should be sent. \n Failure behavior here depends
+                        on how many BackendRefs are specified and how many are invalid.
+                        \n If *all* entries in BackendRefs are invalid, and there
+                        are also no filters specified in this route rule, *all* traffic
+                        which matches this rule MUST receive a 500 status code. \n
+                        See the HTTPBackendRef definition for the rules about what
+                        makes a single HTTPBackendRef invalid. \n When a HTTPBackendRef
+                        is invalid, 500 status codes MUST be returned for requests
+                        that would have otherwise been routed to an invalid backend.
+                        If multiple backends are specified, and some are invalid,
+                        the proportion of requests that would otherwise have been
+                        routed to an invalid backend MUST receive a 500 status code.
+                        \n For example, if two backends are specified with equal weights,
+                        and one is invalid, 50 percent of traffic must receive a 500.
+                        Implementations may choose how that 50 percent is determined.
+                        \n Support: Core for Kubernetes Service \n Support: Custom
                         for any other resource \n Support for weight: Core"
                       items:
                         description: HTTPBackendRef defines how a HTTPRoute should
@@ -8782,7 +8856,7 @@ spec:
                                         Message of the `ResolvedRefs` Condition should
                                         be used to provide more detail about the problem.
                                         \n Support: Extended for Kubernetes Service
-                                        Support: Custom for any other resource"
+                                        \n Support: Custom for any other resource"
                                       properties:
                                         group:
                                           default: ""
@@ -8825,7 +8899,9 @@ spec:
                                           description: Port specifies the destination
                                             port number to use for this resource.
                                             Port is required when the referent is
-                                            a Kubernetes Service. For other resources,
+                                            a Kubernetes Service. In this case, the
+                                            port number is the service port number,
+                                            not the target port. For other resources,
                                             destination port might be derived from
                                             the referent resource or this field.
                                           format: int32
@@ -8888,7 +8964,14 @@ spec:
                                         type:
                                           description: "Type defines the type of path
                                             modifier. Additional types may be added
-                                            in a future release of the API. \n <gateway:experimental>"
+                                            in a future release of the API. \n Note
+                                            that values may be added to this enum,
+                                            implementations must ensure that unknown
+                                            values will not cause a crash. \n Unknown
+                                            values here must result in the implementation
+                                            setting the Accepted Condition for the
+                                            Route to `status: False`, with a Reason
+                                            of `UnsupportedValue`. \n <gateway:experimental>"
                                           enum:
                                           - ReplaceFullPath
                                           - ReplacePrefixMatch
@@ -8909,7 +8992,13 @@ spec:
                                       description: "Scheme is the scheme to be used
                                         in the value of the `Location` header in the
                                         response. When empty, the scheme of the request
-                                        is used. \n Support: Extended"
+                                        is used. \n Support: Extended \n Note that
+                                        values may be added to this enum, implementations
+                                        must ensure that unknown values will not cause
+                                        a crash. \n Unknown values here must result
+                                        in the implementation setting the Accepted
+                                        Condition for the Route to `status: False`,
+                                        with a Reason of `UnsupportedValue`."
                                       enum:
                                       - http
                                       - https
@@ -8917,7 +9006,13 @@ spec:
                                     statusCode:
                                       default: 302
                                       description: "StatusCode is the HTTP status
-                                        code to be used in response. \n Support: Core"
+                                        code to be used in response. \n Support: Core
+                                        \n Note that values may be added to this enum,
+                                        implementations must ensure that unknown values
+                                        will not cause a crash. \n Unknown values
+                                        here must result in the implementation setting
+                                        the Accepted Condition for the Route to `status:
+                                        False`, with a Reason of `UnsupportedValue`."
                                       enum:
                                       - 301
                                       - 302
@@ -8948,7 +9043,13 @@ spec:
                                     \n If a reference to a custom filter type cannot
                                     be resolved, the filter MUST NOT be skipped. Instead,
                                     requests that would have been processed by that
-                                    filter MUST receive a HTTP error response. \n "
+                                    filter MUST receive a HTTP error response. \n
+                                    Note that values may be added to this enum, implementations
+                                    must ensure that unknown values will not cause
+                                    a crash. \n Unknown values here must result in
+                                    the implementation setting the Accepted Condition
+                                    for the Route to `status: False`, with a Reason
+                                    of `UnsupportedValue`. \n "
                                   enum:
                                   - RequestHeaderModifier
                                   - RequestMirror
@@ -8959,7 +9060,7 @@ spec:
                                 urlRewrite:
                                   description: "URLRewrite defines a schema for a
                                     filter that modifies a request during forwarding.
-                                    Support: Extended \n <gateway:experimental>"
+                                    \n Support: Extended \n <gateway:experimental>"
                                   properties:
                                     hostname:
                                       description: "Hostname is the value to be used
@@ -9001,7 +9102,14 @@ spec:
                                         type:
                                           description: "Type defines the type of path
                                             modifier. Additional types may be added
-                                            in a future release of the API. \n <gateway:experimental>"
+                                            in a future release of the API. \n Note
+                                            that values may be added to this enum,
+                                            implementations must ensure that unknown
+                                            values will not cause a crash. \n Unknown
+                                            values here must result in the implementation
+                                            setting the Accepted Condition for the
+                                            Route to `status: False`, with a Reason
+                                            of `UnsupportedValue`. \n <gateway:experimental>"
                                           enum:
                                           - ReplaceFullPath
                                           - ReplacePrefixMatch
@@ -9052,9 +9160,10 @@ spec:
                           port:
                             description: Port specifies the destination port number
                               to use for this resource. Port is required when the
-                              referent is a Kubernetes Service. For other resources,
-                              destination port might be derived from the referent
-                              resource or this field.
+                              referent is a Kubernetes Service. In this case, the
+                              port number is the service port number, not the target
+                              port. For other resources, destination port might be
+                              derived from the referent resource or this field.
                             format: int32
                             maximum: 65535
                             minimum: 1
@@ -9266,7 +9375,7 @@ spec:
                                   In either error case, the Message of the `ResolvedRefs`
                                   Condition should be used to provide more detail
                                   about the problem. \n Support: Extended for Kubernetes
-                                  Service Support: Custom for any other resource"
+                                  Service \n Support: Custom for any other resource"
                                 properties:
                                   group:
                                     default: ""
@@ -9305,9 +9414,11 @@ spec:
                                   port:
                                     description: Port specifies the destination port
                                       number to use for this resource. Port is required
-                                      when the referent is a Kubernetes Service. For
-                                      other resources, destination port might be derived
-                                      from the referent resource or this field.
+                                      when the referent is a Kubernetes Service. In
+                                      this case, the port number is the service port
+                                      number, not the target port. For other resources,
+                                      destination port might be derived from the referent
+                                      resource or this field.
                                     format: int32
                                     maximum: 65535
                                     minimum: 1
@@ -9364,7 +9475,13 @@ spec:
                                   type:
                                     description: "Type defines the type of path modifier.
                                       Additional types may be added in a future release
-                                      of the API. \n <gateway:experimental>"
+                                      of the API. \n Note that values may be added
+                                      to this enum, implementations must ensure that
+                                      unknown values will not cause a crash. \n Unknown
+                                      values here must result in the implementation
+                                      setting the Accepted Condition for the Route
+                                      to `status: False`, with a Reason of `UnsupportedValue`.
+                                      \n <gateway:experimental>"
                                     enum:
                                     - ReplaceFullPath
                                     - ReplacePrefixMatch
@@ -9385,7 +9502,12 @@ spec:
                                 description: "Scheme is the scheme to be used in the
                                   value of the `Location` header in the response.
                                   When empty, the scheme of the request is used. \n
-                                  Support: Extended"
+                                  Support: Extended \n Note that values may be added
+                                  to this enum, implementations must ensure that unknown
+                                  values will not cause a crash. \n Unknown values
+                                  here must result in the implementation setting the
+                                  Accepted Condition for the Route to `status: False`,
+                                  with a Reason of `UnsupportedValue`."
                                 enum:
                                 - http
                                 - https
@@ -9393,7 +9515,12 @@ spec:
                               statusCode:
                                 default: 302
                                 description: "StatusCode is the HTTP status code to
-                                  be used in response. \n Support: Core"
+                                  be used in response. \n Support: Core \n Note that
+                                  values may be added to this enum, implementations
+                                  must ensure that unknown values will not cause a
+                                  crash. \n Unknown values here must result in the
+                                  implementation setting the Accepted Condition for
+                                  the Route to `status: False`, with a Reason of `UnsupportedValue`."
                                 enum:
                                 - 301
                                 - 302
@@ -9422,7 +9549,12 @@ spec:
                               behavior. \n If a reference to a custom filter type
                               cannot be resolved, the filter MUST NOT be skipped.
                               Instead, requests that would have been processed by
-                              that filter MUST receive a HTTP error response. \n "
+                              that filter MUST receive a HTTP error response. \n Note
+                              that values may be added to this enum, implementations
+                              must ensure that unknown values will not cause a crash.
+                              \n Unknown values here must result in the implementation
+                              setting the Accepted Condition for the Route to `status:
+                              False`, with a Reason of `UnsupportedValue`. \n "
                             enum:
                             - RequestHeaderModifier
                             - RequestMirror
@@ -9432,7 +9564,7 @@ spec:
                             type: string
                           urlRewrite:
                             description: "URLRewrite defines a schema for a filter
-                              that modifies a request during forwarding. Support:
+                              that modifies a request during forwarding. \n Support:
                               Extended \n <gateway:experimental>"
                             properties:
                               hostname:
@@ -9472,7 +9604,13 @@ spec:
                                   type:
                                     description: "Type defines the type of path modifier.
                                       Additional types may be added in a future release
-                                      of the API. \n <gateway:experimental>"
+                                      of the API. \n Note that values may be added
+                                      to this enum, implementations must ensure that
+                                      unknown values will not cause a crash. \n Unknown
+                                      values here must result in the implementation
+                                      setting the Accepted Condition for the Route
+                                      to `status: False`, with a Reason of `UnsupportedValue`.
+                                      \n <gateway:experimental>"
                                     enum:
                                     - ReplaceFullPath
                                     - ReplacePrefixMatch
@@ -9507,7 +9645,7 @@ spec:
                         every HTTP request. \n Proxy or Load Balancer routing configuration
                         generated from HTTPRoutes MUST prioritize rules based on the
                         following criteria, continuing on ties. Precedence must be
-                        given to the the Rule with the largest number of: \n * Characters
+                        given to the Rule with the largest number of: \n * Characters
                         in a matching non-wildcard hostname. * Characters in a matching
                         hostname. * Characters in a matching path. * Header matches.
                         * Query param matches. \n If ties still exist across multiple
@@ -9637,9 +9775,14 @@ spec:
                                 a HTTP route by matching HTTP query parameters.
                               properties:
                                 name:
-                                  description: Name is the name of the HTTP query
+                                  description: "Name is the name of the HTTP query
                                     param to be matched. This must be an exact string
                                     match. (See https://tools.ietf.org/html/rfc7230#section-2.7.3).
+                                    \n If multiple entries specify equivalent query
+                                    param names, only the first entry with an equivalent
+                                    name MUST be considered for a match. Subsequent
+                                    entries with an equivalent query param name MUST
+                                    be ignored."
                                   maxLength: 256
                                   minLength: 1
                                   type: string
@@ -9714,7 +9857,7 @@ spec:
                         condition may not be set due to lack of controller visibility,
                         that includes when: \n * The Route refers to a non-existent
                         parent. * The Route is of a type that the controller does
-                        not support. * The Route is in a namespace the the controller
+                        not support. * The Route is in a namespace the controller
                         does not have access to."
                       items:
                         description: "Condition contains details for one aspect of
@@ -9822,7 +9965,7 @@ spec:
                         kind:
                           default: Gateway
                           description: "Kind is kind of the referent. \n Support:
-                            Core (Gateway) Support: Custom (Other Resources)"
+                            Core (Gateway) \n Support: Custom (Other Resources)"
                           maxLength: 63
                           minLength: 1
                           pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -9924,7 +10067,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: referencegrants.gateway.networking.k8s.io
@@ -9990,9 +10133,11 @@ spec:
                       type: string
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
-                        may support additional resources, the following Route types
-                        are part of the \"Core\" support level for this field: \n
-                        * HTTPRoute * TCPRoute * TLSRoute * UDPRoute"
+                        may support additional resources, the following types are
+                        part of the \"Core\" support level for this field. \n When
+                        used to permit a SecretObjectReference: \n * Gateway \n When
+                        used to permit a BackendObjectReference: \n * HTTPRoute *
+                        TCPRoute * TLSRoute * UDPRoute"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -10031,7 +10176,9 @@ spec:
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
                         may support additional resources, the following types are
-                        part of the \"Core\" support level for this field: \n * Service"
+                        part of the \"Core\" support level for this field: \n * Secret
+                        when used to permit a SecretObjectReference * Service when
+                        used to permit a BackendObjectReference"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -10070,7 +10217,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: referencepolicies.gateway.networking.k8s.io
@@ -10141,9 +10288,11 @@ spec:
                       type: string
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
-                        may support additional resources, the following Route types
-                        are part of the \"Core\" support level for this field: \n
-                        * HTTPRoute * TCPRoute * TLSRoute * UDPRoute"
+                        may support additional resources, the following types are
+                        part of the \"Core\" support level for this field. \n When
+                        used to permit a SecretObjectReference: \n * Gateway \n When
+                        used to permit a BackendObjectReference: \n * HTTPRoute *
+                        TCPRoute * TLSRoute * UDPRoute"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -10182,7 +10331,9 @@ spec:
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
                         may support additional resources, the following types are
-                        part of the \"Core\" support level for this field: \n * Service"
+                        part of the \"Core\" support level for this field: \n * Secret
+                        when used to permit a SecretObjectReference * Service when
+                        used to permit a BackendObjectReference"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -10221,7 +10372,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: tcproutes.gateway.networking.k8s.io
@@ -10297,7 +10448,7 @@ spec:
                     kind:
                       default: Gateway
                       description: "Kind is kind of the referent. \n Support: Core
-                        (Gateway) Support: Custom (Other Resources)"
+                        (Gateway) \n Support: Custom (Other Resources)"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -10383,8 +10534,8 @@ spec:
                         attempts to this backend. Connection rejections must respect
                         weight; if an invalid backend is requested to have 80% of
                         connections, then 80% of connections must be rejected instead.
-                        \n Support: Core for Kubernetes Service Support: Custom for
-                        any other resource \n Support for weight: Extended"
+                        \n Support: Core for Kubernetes Service \n Support: Custom
+                        for any other resource \n Support for weight: Extended"
                       items:
                         description: "BackendRef defines how a Route should forward
                           a request to a Kubernetes resource. \n Note that when a
@@ -10418,11 +10569,11 @@ spec:
                           namespace:
                             description: "Namespace is the namespace of the backend.
                               When unspecified, the local namespace is inferred. \n
-                              Note that when a namespace is specified, a ReferenceGrant
-                              object is required in the referent namespace to allow
-                              that namespace's owner to accept the reference. See
-                              the ReferenceGrant documentation for details. \n Support:
-                              Core"
+                              Note that when a different namespace is specified, a
+                              ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                              is required in the referent namespace to allow that
+                              namespace's owner to accept the reference. See the ReferenceGrant
+                              documentation for details. \n Support: Core"
                             maxLength: 63
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -10430,9 +10581,10 @@ spec:
                           port:
                             description: Port specifies the destination port number
                               to use for this resource. Port is required when the
-                              referent is a Kubernetes Service. For other resources,
-                              destination port might be derived from the referent
-                              resource or this field.
+                              referent is a Kubernetes Service. In this case, the
+                              port number is the service port number, not the target
+                              port. For other resources, destination port might be
+                              derived from the referent resource or this field.
                             format: int32
                             maximum: 65535
                             minimum: 1
@@ -10504,7 +10656,7 @@ spec:
                         condition may not be set due to lack of controller visibility,
                         that includes when: \n * The Route refers to a non-existent
                         parent. * The Route is of a type that the controller does
-                        not support. * The Route is in a namespace the the controller
+                        not support. * The Route is in a namespace the controller
                         does not have access to."
                       items:
                         description: "Condition contains details for one aspect of
@@ -10612,7 +10764,7 @@ spec:
                         kind:
                           default: Gateway
                           description: "Kind is kind of the referent. \n Support:
-                            Core (Gateway) Support: Custom (Other Resources)"
+                            Core (Gateway) \n Support: Custom (Other Resources)"
                           maxLength: 63
                           minLength: 1
                           pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -11011,7 +11163,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: tlsroutes.gateway.networking.k8s.io
@@ -11133,7 +11285,7 @@ spec:
                     kind:
                       default: Gateway
                       description: "Kind is kind of the referent. \n Support: Core
-                        (Gateway) Support: Custom (Other Resources)"
+                        (Gateway) \n Support: Custom (Other Resources)"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -11222,7 +11374,7 @@ spec:
                         code. Request rejections must respect weight; if an invalid
                         backend is requested to have 80% of requests, then 80% of
                         requests must be rejected instead. \n Support: Core for Kubernetes
-                        Service Support: Custom for any other resource \n Support
+                        Service \n Support: Custom for any other resource \n Support
                         for weight: Extended"
                       items:
                         description: "BackendRef defines how a Route should forward
@@ -11257,11 +11409,11 @@ spec:
                           namespace:
                             description: "Namespace is the namespace of the backend.
                               When unspecified, the local namespace is inferred. \n
-                              Note that when a namespace is specified, a ReferenceGrant
-                              object is required in the referent namespace to allow
-                              that namespace's owner to accept the reference. See
-                              the ReferenceGrant documentation for details. \n Support:
-                              Core"
+                              Note that when a different namespace is specified, a
+                              ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                              is required in the referent namespace to allow that
+                              namespace's owner to accept the reference. See the ReferenceGrant
+                              documentation for details. \n Support: Core"
                             maxLength: 63
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -11269,9 +11421,10 @@ spec:
                           port:
                             description: Port specifies the destination port number
                               to use for this resource. Port is required when the
-                              referent is a Kubernetes Service. For other resources,
-                              destination port might be derived from the referent
-                              resource or this field.
+                              referent is a Kubernetes Service. In this case, the
+                              port number is the service port number, not the target
+                              port. For other resources, destination port might be
+                              derived from the referent resource or this field.
                             format: int32
                             maximum: 65535
                             minimum: 1
@@ -11343,7 +11496,7 @@ spec:
                         condition may not be set due to lack of controller visibility,
                         that includes when: \n * The Route refers to a non-existent
                         parent. * The Route is of a type that the controller does
-                        not support. * The Route is in a namespace the the controller
+                        not support. * The Route is in a namespace the controller
                         does not have access to."
                       items:
                         description: "Condition contains details for one aspect of
@@ -11451,7 +11604,7 @@ spec:
                         kind:
                           default: Gateway
                           description: "Kind is kind of the referent. \n Support:
-                            Core (Gateway) Support: Custom (Other Resources)"
+                            Core (Gateway) \n Support: Custom (Other Resources)"
                           maxLength: 63
                           minLength: 1
                           pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -11553,7 +11706,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.1
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: udproutes.gateway.networking.k8s.io
@@ -11629,7 +11782,7 @@ spec:
                     kind:
                       default: Gateway
                       description: "Kind is kind of the referent. \n Support: Core
-                        (Gateway) Support: Custom (Other Resources)"
+                        (Gateway) \n Support: Custom (Other Resources)"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -11750,11 +11903,11 @@ spec:
                           namespace:
                             description: "Namespace is the namespace of the backend.
                               When unspecified, the local namespace is inferred. \n
-                              Note that when a namespace is specified, a ReferenceGrant
-                              object is required in the referent namespace to allow
-                              that namespace's owner to accept the reference. See
-                              the ReferenceGrant documentation for details. \n Support:
-                              Core"
+                              Note that when a different namespace is specified, a
+                              ReferenceGrant object with ReferenceGrantTo.Kind=Service
+                              is required in the referent namespace to allow that
+                              namespace's owner to accept the reference. See the ReferenceGrant
+                              documentation for details. \n Support: Core"
                             maxLength: 63
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -11762,9 +11915,10 @@ spec:
                           port:
                             description: Port specifies the destination port number
                               to use for this resource. Port is required when the
-                              referent is a Kubernetes Service. For other resources,
-                              destination port might be derived from the referent
-                              resource or this field.
+                              referent is a Kubernetes Service. In this case, the
+                              port number is the service port number, not the target
+                              port. For other resources, destination port might be
+                              derived from the referent resource or this field.
                             format: int32
                             maximum: 65535
                             minimum: 1
@@ -11836,7 +11990,7 @@ spec:
                         condition may not be set due to lack of controller visibility,
                         that includes when: \n * The Route refers to a non-existent
                         parent. * The Route is of a type that the controller does
-                        not support. * The Route is in a namespace the the controller
+                        not support. * The Route is in a namespace the controller
                         does not have access to."
                       items:
                         description: "Condition contains details for one aspect of
@@ -11944,7 +12098,7 @@ spec:
                         kind:
                           default: Gateway
                           description: "Kind is kind of the referent. \n Support:
-                            Core (Gateway) Support: Custom (Other Resources)"
+                            Core (Gateway) \n Support: Custom (Other Resources)"
                           maxLength: 63
                           minLength: 1
                           pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$

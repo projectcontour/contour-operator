@@ -158,8 +158,6 @@ generate-contour-crds:
 generate-gateway-crds:
 	@echo "Generating Gateway API CRD YAML documents..."
 	@kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=${GATEWAY_API_VERSION}" > config/crd/gateway/01-crds.yaml
-	@echo "---" >> config/crd/gateway/01-crds.yaml
-	@curl -s https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/${GATEWAY_API_VERSION}/config/crd/experimental/gateway.networking.k8s.io_referencepolicies.yaml >> config/crd/gateway/01-crds.yaml
 
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
 manifests: generate-contour-crds generate-gateway-crds
