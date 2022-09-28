@@ -2,9 +2,9 @@ name: Build and Test
 
 # Trigger the workflow on push or pull request
 on:
-  # Run every hour
+  # Run once per day
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 0 * * *'
   push:
   pull_request:
 
