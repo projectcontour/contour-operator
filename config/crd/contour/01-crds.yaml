@@ -3153,6 +3153,43 @@ spec:
                                   type: object
                                 type: array
                             type: object
+                          slowStartPolicy:
+                            description: Slow start will gradually increase amount
+                              of traffic to a newly added endpoint.
+                            properties:
+                              aggression:
+                                default: "1.0"
+                                description: "The speed of traffic increase over the
+                                  slow start window. Defaults to 1.0, so that endpoint
+                                  would get linearly increasing amount of traffic.
+                                  When increasing the value for this parameter, the
+                                  speed of traffic ramp-up increases non-linearly.
+                                  The value of aggression parameter should be greater
+                                  than 0.0. \n More info: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start"
+                                pattern: ^([0-9]+([.][0-9]+)?|[.][0-9]+)$
+                                type: string
+                              minWeightPercent:
+                                default: 10
+                                description: The minimum or starting percentage of
+                                  traffic to send to new endpoints. A non-zero value
+                                  helps avoid a too small initial weight, which may
+                                  cause endpoints in slow start mode to receive no
+                                  traffic in the beginning of the slow start window.
+                                  If not specified, the default is 10%.
+                                format: int32
+                                maximum: 100
+                                minimum: 0
+                                type: integer
+                              window:
+                                description: The duration of slow start window. Duration
+                                  is expressed in the Go [Duration format](https://godoc.org/time#ParseDuration).
+                                  Valid time units are "ns", "us" (or "µs"), "ms",
+                                  "s", "m", "h".
+                                pattern: ^(((\d*(\.\d*)?h)|(\d*(\.\d*)?m)|(\d*(\.\d*)?s)|(\d*(\.\d*)?ms)|(\d*(\.\d*)?us)|(\d*(\.\d*)?µs)|(\d*(\.\d*)?ns))+)$
+                                type: string
+                            required:
+                            - window
+                            type: object
                           validation:
                             description: UpstreamValidation defines how to verify
                               the backend service's certificate
@@ -3495,6 +3532,43 @@ spec:
                                 type: object
                               type: array
                           type: object
+                        slowStartPolicy:
+                          description: Slow start will gradually increase amount of
+                            traffic to a newly added endpoint.
+                          properties:
+                            aggression:
+                              default: "1.0"
+                              description: "The speed of traffic increase over the
+                                slow start window. Defaults to 1.0, so that endpoint
+                                would get linearly increasing amount of traffic. When
+                                increasing the value for this parameter, the speed
+                                of traffic ramp-up increases non-linearly. The value
+                                of aggression parameter should be greater than 0.0.
+                                \n More info: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start"
+                              pattern: ^([0-9]+([.][0-9]+)?|[.][0-9]+)$
+                              type: string
+                            minWeightPercent:
+                              default: 10
+                              description: The minimum or starting percentage of traffic
+                                to send to new endpoints. A non-zero value helps avoid
+                                a too small initial weight, which may cause endpoints
+                                in slow start mode to receive no traffic in the beginning
+                                of the slow start window. If not specified, the default
+                                is 10%.
+                              format: int32
+                              maximum: 100
+                              minimum: 0
+                              type: integer
+                            window:
+                              description: The duration of slow start window. Duration
+                                is expressed in the Go [Duration format](https://godoc.org/time#ParseDuration).
+                                Valid time units are "ns", "us" (or "µs"), "ms", "s",
+                                "m", "h".
+                              pattern: ^(((\d*(\.\d*)?h)|(\d*(\.\d*)?m)|(\d*(\.\d*)?s)|(\d*(\.\d*)?ms)|(\d*(\.\d*)?us)|(\d*(\.\d*)?µs)|(\d*(\.\d*)?ns))+)$
+                              type: string
+                          required:
+                          - window
+                          type: object
                         validation:
                           description: UpstreamValidation defines how to verify the
                             backend service's certificate
@@ -3720,6 +3794,24 @@ spec:
                               description: How long to cache the JWKS locally. If
                                 not specified, Envoy's default of 5m applies.
                               pattern: ^(((\d*(\.\d*)?h)|(\d*(\.\d*)?m)|(\d*(\.\d*)?s)|(\d*(\.\d*)?ms)|(\d*(\.\d*)?us)|(\d*(\.\d*)?µs)|(\d*(\.\d*)?ns))+)$
+                              type: string
+                            dnsLookupFamily:
+                              description: "The DNS IP address resolution policy for
+                                the JWKS URI. When configured as \"v4\", the DNS resolver
+                                will only perform a lookup for addresses in the IPv4
+                                family. If \"v6\" is configured, the DNS resolver
+                                will only perform a lookup for addresses in the IPv6
+                                family. If \"auto\" is configured, the DNS resolver
+                                will first perform a lookup for addresses in the IPv6
+                                family and fallback to a lookup for addresses in the
+                                IPv4 family. If not specified, the Contour-wide setting
+                                defined in the config file or ContourConfiguration
+                                applies (defaults to \"auto\"). \n See https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-enum-config-cluster-v3-cluster-dnslookupfamily
+                                for more information."
+                              enum:
+                              - auto
+                              - v4
+                              - v6
                               type: string
                             timeout:
                               description: How long to wait for a response from the
