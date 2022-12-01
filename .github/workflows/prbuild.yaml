@@ -6,6 +6,8 @@ on:
   schedule:
     - cron: '0 0 * * *'
   push:
+    branches-ignore:
+      - "dependabot/**"
   pull_request:
 
 env:
