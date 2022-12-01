@@ -45,7 +45,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           files: coverage.out
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
@@ -95,7 +95,7 @@ jobs:
           NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image example test-example
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
@@ -144,7 +144,7 @@ jobs:
           NODEIMAGE: ${{ matrix.node_image }}
         run: |
           make local-cluster load-image test-e2e
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
@@ -163,7 +163,7 @@ jobs:
           ignore_words_file: './.codespell.ignorewords'
           check_filenames: true
           check_hidden: true
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
@@ -178,7 +178,7 @@ jobs:
         with:
           version: v1.48.0
           args: --build-tags=e2e,tools
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
@@ -209,7 +209,7 @@ jobs:
         run: |
           make generate generate-contour-crds generate-gateway-crds manifests example
           ./hack/actions/check-uncommitted-codegen.sh
-      - uses: act10ns/slack@v1
+      - uses: act10ns/slack@v2
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
