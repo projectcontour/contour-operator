@@ -312,7 +312,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
-			RevisionHistoryLimit: pointer.Int32Ptr(int32(10)),
+			RevisionHistoryLimit: pointer.Int32(int32(10)),
 			// Ensure the deamonset adopts only its own pods.
 			Selector: EnvoyDaemonSetPodSelector(),
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
@@ -340,7 +340,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 							Name: envoyCertsVolName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32Ptr(int32(420)),
+									DefaultMode: pointer.Int32(int32(420)),
 									SecretName:  envoyCertsSecretName,
 								},
 							},
@@ -360,8 +360,8 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					},
 					ServiceAccountName:            objutil.EnvoyRbacName,
 					DeprecatedServiceAccount:      EnvoyContainerName,
-					AutomountServiceAccountToken:  pointer.BoolPtr(false),
-					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(300)),
+					AutomountServiceAccountToken:  pointer.Bool(false),
+					TerminationGracePeriodSeconds: pointer.Int64(int64(300)),
 					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,

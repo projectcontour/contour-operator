@@ -228,9 +228,9 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			Labels:    makeDeploymentLabels(contour),
 		},
 		Spec: appsv1.DeploymentSpec{
-			ProgressDeadlineSeconds: pointer.Int32Ptr(int32(600)),
+			ProgressDeadlineSeconds: pointer.Int32(int32(600)),
 			Replicas:                &contour.Spec.Replicas,
-			RevisionHistoryLimit:    pointer.Int32Ptr(int32(10)),
+			RevisionHistoryLimit:    pointer.Int32(int32(10)),
 			// Ensure the deployment adopts only its own pods.
 			Selector: ContourDeploymentPodSelector(),
 			Strategy: appsv1.DeploymentStrategy{
@@ -274,7 +274,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 							Name: contourCertsVolName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32Ptr(int32(420)),
+									DefaultMode: pointer.Int32(int32(420)),
 									SecretName:  contourCertsSecretName,
 								},
 							},
@@ -294,7 +294,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 											Path: contourCfgFileName,
 										},
 									},
-									DefaultMode: pointer.Int32Ptr(int32(420)),
+									DefaultMode: pointer.Int32(int32(420)),
 								},
 							},
 						},
@@ -305,7 +305,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
 					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
-					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
+					TerminationGracePeriodSeconds: pointer.Int64(int64(30)),
 				},
 			},
 		},

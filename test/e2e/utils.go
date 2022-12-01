@@ -262,7 +262,7 @@ func NewIngress(cl client.Client, name, ns, backendName string, backendPort int)
 func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname, gwName, gwNS string, svcPort int32) error {
 	rootPrefix := &gatewayv1alpha2.HTTPPathMatch{
 		Type:  pathMatchTypePtr(gatewayv1alpha2.PathMatchPathPrefix),
-		Value: pointer.StringPtr("/"),
+		Value: pointer.String("/"),
 	}
 	backendPort := gatewayv1alpha2.PortNumber(svcPort)
 	svcBackend := gatewayv1alpha2.HTTPBackendRef{
@@ -479,7 +479,7 @@ func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd [
 		Spec: core_v1.PodSpec{
 			Containers: []core_v1.Container{c},
 			// Kill the pod immediately so it exits quickly on deletion.
-			TerminationGracePeriodSeconds: pointer.Int64Ptr(0),
+			TerminationGracePeriodSeconds: pointer.Int64(0),
 		},
 	}
 	if err := cl.Create(ctx, p); err != nil {

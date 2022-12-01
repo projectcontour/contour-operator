@@ -155,7 +155,7 @@ func MakeNodePorts(ports map[string]int) []operatorv1alpha1.NodePort {
 	for k, v := range ports {
 		p := operatorv1alpha1.NodePort{
 			Name:       k,
-			PortNumber: pointer.Int32Ptr(int32(v)),
+			PortNumber: pointer.Int32(int32(v)),
 		}
 		nodePorts = append(nodePorts, p)
 	}

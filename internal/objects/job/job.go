@@ -140,7 +140,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 		RestartPolicy:                 corev1.RestartPolicyNever,
 		DNSPolicy:                     corev1.DNSClusterFirst,
 		SchedulerName:                 "default-scheduler",
-		TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(30)),
+		TerminationGracePeriodSeconds: pointer.Int64(int64(30)),
 	}
 	// TODO [danehans] certgen needs to be updated to match these labels.
 	// See https://github.com/projectcontour/contour/issues/1821 for details.
@@ -163,11 +163,11 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:  pointer.Int32Ptr(int32(1)),
-			Completions:  pointer.Int32Ptr(int32(1)),
-			BackoffLimit: pointer.Int32Ptr(int32(1)),
+			Parallelism:  pointer.Int32(int32(1)),
+			Completions:  pointer.Int32(int32(1)),
+			BackoffLimit: pointer.Int32(int32(1)),
 			// Make job eligible to for immediate deletion (feature gate dependent).
-			TTLSecondsAfterFinished: pointer.Int32Ptr(int32(0)),
+			TTLSecondsAfterFinished: pointer.Int32(int32(0)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: objcontour.OwningSelector(contour).MatchLabels,
