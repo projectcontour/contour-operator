@@ -20,11 +20,11 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
-	opintstr "github.com/projectcontour/contour-operator/internal/intstr"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcm "github.com/projectcontour/contour-operator/internal/objects/configmap"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
+	"github.com/projectcontour/contour-operator/internal/ref"
 	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -228,16 +227,16 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 			Labels:    makeDeploymentLabels(contour),
 		},
 		Spec: appsv1.DeploymentSpec{
-			ProgressDeadlineSeconds: pointer.Int32(int32(600)),
+			ProgressDeadlineSeconds: ref.To(int32(600)),
 			Replicas:                &contour.Spec.Replicas,
-			RevisionHistoryLimit:    pointer.Int32(int32(10)),
+			RevisionHistoryLimit:    ref.To(int32(10)),
 			// Ensure the deployment adopts only its own pods.
 			Selector: ContourDeploymentPodSelector(),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxSurge:       opintstr.PointerTo(intstr.FromString("50%")),
-					MaxUnavailable: opintstr.PointerTo(intstr.FromString("25%")),
+					MaxSurge:       ref.To(intstr.FromString("50%")),
+					MaxUnavailable: ref.To(intstr.FromString("25%")),
 				},
 			},
 			Template: corev1.PodTemplateSpec{
@@ -274,7 +273,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 							Name: contourCertsVolName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(int32(420)),
+									DefaultMode: ref.To(int32(420)),
 									SecretName:  contourCertsSecretName,
 								},
 							},
@@ -294,7 +293,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 											Path: contourCfgFileName,
 										},
 									},
-									DefaultMode: pointer.Int32(int32(420)),
+									DefaultMode: ref.To(int32(420)),
 								},
 							},
 						},
@@ -305,7 +304,7 @@ func DesiredDeployment(contour *operatorv1alpha1.Contour, image string) *appsv1.
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					SchedulerName:                 "default-scheduler",
 					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
-					TerminationGracePeriodSeconds: pointer.Int64(int64(30)),
+					TerminationGracePeriodSeconds: ref.To(int64(30)),
 				},
 			},
 		},

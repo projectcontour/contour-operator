@@ -20,19 +20,17 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/equality"
-	opintstr "github.com/projectcontour/contour-operator/internal/intstr"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
+	"github.com/projectcontour/contour-operator/internal/ref"
 	"github.com/projectcontour/contour-operator/pkg/labels"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -312,13 +310,13 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
-			RevisionHistoryLimit: pointer.Int32(int32(10)),
+			RevisionHistoryLimit: ref.To(int32(10)),
 			// Ensure the deamonset adopts only its own pods.
 			Selector: EnvoyDaemonSetPodSelector(),
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
 				Type: appsv1.RollingUpdateDaemonSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDaemonSet{
-					MaxUnavailable: opintstr.PointerTo(intstr.FromString("10%")),
+					MaxUnavailable: ref.To(intstr.FromString("10%")),
 				},
 			},
 			Template: corev1.PodTemplateSpec{
@@ -340,7 +338,7 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 							Name: envoyCertsVolName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(int32(420)),
+									DefaultMode: ref.To(int32(420)),
 									SecretName:  envoyCertsSecretName,
 								},
 							},
@@ -360,8 +358,8 @@ func DesiredDaemonSet(contour *operatorv1alpha1.Contour, contourImage, envoyImag
 					},
 					ServiceAccountName:            objutil.EnvoyRbacName,
 					DeprecatedServiceAccount:      EnvoyContainerName,
-					AutomountServiceAccountToken:  pointer.Bool(false),
-					TerminationGracePeriodSeconds: pointer.Int64(int64(300)),
+					AutomountServiceAccountToken:  ref.To(false),
+					TerminationGracePeriodSeconds: ref.To(int64(300)),
 					SecurityContext:               objutil.NewUnprivilegedPodSecurity(),
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					RestartPolicy:                 corev1.RestartPolicyAlways,

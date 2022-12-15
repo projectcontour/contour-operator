@@ -19,13 +19,11 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	realclock "k8s.io/utils/clock"
-	fakeclock "k8s.io/utils/clock/testing"
 )
 
 func newCondition(t string, status metav1.ConditionStatus, reason, msg string, lt time.Time) metav1.Condition {
@@ -196,15 +194,7 @@ func TestContourConditionChanged(t *testing.T) {
 }
 
 func TestMergeConditions(t *testing.T) {
-	// Inject a fake clock and don't forget to reset it
-	fakeClock := fakeclock.NewFakeClock(time.Time{})
-	clock = fakeClock
-	defer func() {
-		clock = realclock.RealClock{}
-	}()
-
-	start := fakeClock.Now()
-	middle := start.Add(1 * time.Minute)
+	start := time.Now()
 	later := start.Add(2 * time.Minute)
 
 	testCases := []struct {
@@ -219,7 +209,7 @@ func TestMergeConditions(t *testing.T) {
 				newCondition("available", "false", "Reason", "Message", start),
 			},
 			updates: []metav1.Condition{
-				newCondition("available", "true", "Reason", "Message", middle),
+				newCondition("available", "true", "Reason", "Message", later),
 			},
 			expected: []metav1.Condition{
 				newCondition("available", "true", "Reason", "Message", later),
@@ -231,7 +221,7 @@ func TestMergeConditions(t *testing.T) {
 				newCondition("available", "false", "Reason", "Message", start),
 			},
 			updates: []metav1.Condition{
-				newCondition("available", "false", "New Reason", "Message", middle),
+				newCondition("available", "false", "New Reason", "Message", later),
 			},
 			expected: []metav1.Condition{
 				newCondition("available", "false", "New Reason", "Message", start),
@@ -243,22 +233,26 @@ func TestMergeConditions(t *testing.T) {
 				newCondition("available", "false", "Reason", "Message", start),
 			},
 			updates: []metav1.Condition{
-				newCondition("available", "false", "Reason", "New Message", middle),
+				newCondition("available", "false", "Reason", "New Message", later),
 			},
 			expected: []metav1.Condition{
 				newCondition("available", "false", "Reason", "New Message", start),
 			},
 		},
+		{
+			description: "new status",
+			current:     []metav1.Condition{},
+			updates: []metav1.Condition{
+				newCondition("available", "false", "Reason", "New Message", later),
+			},
+			expected: []metav1.Condition{
+				newCondition("available", "false", "Reason", "New Message", later),
+			},
+		},
 	}
-
-	// Simulate the passage of time between original condition creation
-	// and update processing
-	fakeClock.SetTime(later)
 
 	for _, tc := range testCases {
 		actual := mergeConditions(tc.current, tc.updates...)
-		if conditionChanged(tc.expected[0], actual[0]) {
-			t.Errorf("expected:\n%v\nactual:\n%v", tc.expected, actual)
-		}
+		assert.Equal(t, tc.expected, actual)
 	}
 }

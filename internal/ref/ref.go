@@ -11,10 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package intstr
+package ref
 
-import (
-	"k8s.io/apimachinery/pkg/util/intstr"
-)
-
-var PointerTo = func(ios intstr.IntOrString) *intstr.IntOrString { return &ios }
+func To[T any](v T) *T {
+	return &v
+}

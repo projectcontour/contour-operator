@@ -22,6 +22,7 @@ import (
 	"github.com/projectcontour/contour-operator/internal/equality"
 	objutil "github.com/projectcontour/contour-operator/internal/objects"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+	"github.com/projectcontour/contour-operator/internal/ref"
 	labels "github.com/projectcontour/contour-operator/pkg/labels"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -140,7 +140,7 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 		RestartPolicy:                 corev1.RestartPolicyNever,
 		DNSPolicy:                     corev1.DNSClusterFirst,
 		SchedulerName:                 "default-scheduler",
-		TerminationGracePeriodSeconds: pointer.Int64(int64(30)),
+		TerminationGracePeriodSeconds: ref.To(int64(30)),
 	}
 	// TODO [danehans] certgen needs to be updated to match these labels.
 	// See https://github.com/projectcontour/contour/issues/1821 for details.
@@ -163,11 +163,11 @@ func DesiredJob(contour *operatorv1alpha1.Contour, image string) *batchv1.Job {
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:  pointer.Int32(int32(1)),
-			Completions:  pointer.Int32(int32(1)),
-			BackoffLimit: pointer.Int32(int32(1)),
+			Parallelism:  ref.To(int32(1)),
+			Completions:  ref.To(int32(1)),
+			BackoffLimit: ref.To(int32(1)),
 			// Make job eligible to for immediate deletion (feature gate dependent).
-			TTLSecondsAfterFinished: pointer.Int32(int32(0)),
+			TTLSecondsAfterFinished: ref.To(int32(0)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: objcontour.OwningSelector(contour).MatchLabels,

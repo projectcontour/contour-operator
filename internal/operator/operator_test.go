@@ -22,6 +22,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	"github.com/projectcontour/contour-operator/internal/operator"
+	"github.com/projectcontour/contour-operator/internal/ref"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -29,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	controller_runtime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -297,7 +297,7 @@ func testIngressClassName(t *testing.T, k8sClient client.Client) {
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name: "ingress",
 			},
-			IngressClassName: pointer.String("some-class"),
+			IngressClassName: ref.To("some-class"),
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), ingress))
@@ -324,7 +324,7 @@ func testGatewayControllerName(t *testing.T, k8sClient client.Client) {
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name: operatorNSName,
 			},
-			GatewayControllerName: pointer.String("somecontrollername"),
+			GatewayControllerName: ref.To("somecontrollername"),
 		},
 	}
 	require.NoError(t, k8sClient.Create(context.Background(), gatewayContour))

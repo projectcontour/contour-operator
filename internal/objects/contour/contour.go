@@ -18,10 +18,10 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/internal/ref"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -155,7 +155,7 @@ func MakeNodePorts(ports map[string]int) []operatorv1alpha1.NodePort {
 	for k, v := range ports {
 		p := operatorv1alpha1.NodePort{
 			Name:       k,
-			PortNumber: pointer.Int32(int32(v)),
+			PortNumber: ref.To(int32(v)),
 		}
 		nodePorts = append(nodePorts, p)
 	}
