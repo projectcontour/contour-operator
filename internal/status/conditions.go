@@ -16,17 +16,13 @@ package status
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilclock "k8s.io/utils/clock"
 )
-
-// clock is to enable unit testing
-var clock utilclock.Clock = utilclock.RealClock{}
 
 // computeContourAvailableCondition computes the contour Available status condition
 // type based on deployment, ds, set, exists and admitted.
@@ -109,7 +105,7 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 // the transition time if details of a condition have changed. Returns
 // the updated condition array.
 func mergeConditions(conditions []metav1.Condition, updates ...metav1.Condition) []metav1.Condition {
-	now := metav1.NewTime(clock.Now())
+	now := metav1.NewTime(time.Now())
 	var additions []metav1.Condition
 	for i, update := range updates {
 		add := true
