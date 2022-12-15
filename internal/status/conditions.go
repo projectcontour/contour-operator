@@ -27,22 +27,25 @@ import (
 // computeContourAvailableCondition computes the contour Available status condition
 // type based on deployment, ds, set, exists and admitted.
 func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.DaemonSet) metav1.Condition {
+	now := metav1.NewTime(time.Now())
 	switch {
 	default:
 		if deployment == nil {
 			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "ContourUnavailable",
-				Message: "Contour deployment does not exist.",
+				Type:               operatorv1alpha1.ContourAvailableConditionType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "ContourUnavailable",
+				Message:            "Contour deployment does not exist.",
+				LastTransitionTime: now,
 			}
 		}
 		if ds == nil {
 			return metav1.Condition{
-				Type:    operatorv1alpha1.ContourAvailableConditionType,
-				Status:  metav1.ConditionFalse,
-				Reason:  "ContourUnavailable",
-				Message: "Envoy daemonset does not exist.",
+				Type:               operatorv1alpha1.ContourAvailableConditionType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "ContourUnavailable",
+				Message:            "Envoy daemonset does not exist.",
+				LastTransitionTime: now,
 			}
 		}
 		dsAvailable := ds.Status.NumberAvailable > 0
@@ -54,25 +57,28 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 			case cond.Status == corev1.ConditionTrue:
 				if dsAvailable {
 					return metav1.Condition{
-						Type:    operatorv1alpha1.ContourAvailableConditionType,
-						Status:  metav1.ConditionTrue,
-						Reason:  "ContourAvailable",
-						Message: "Contour has minimum availability.",
+						Type:               operatorv1alpha1.ContourAvailableConditionType,
+						Status:             metav1.ConditionTrue,
+						Reason:             "ContourAvailable",
+						Message:            "Contour has minimum availability.",
+						LastTransitionTime: now,
 					}
 				}
 				return metav1.Condition{
-					Type:    operatorv1alpha1.ContourAvailableConditionType,
-					Status:  metav1.ConditionFalse,
-					Reason:  "ContourUnavailable",
-					Message: "Envoy daemonset does not have minimum availability.",
+					Type:               operatorv1alpha1.ContourAvailableConditionType,
+					Status:             metav1.ConditionFalse,
+					Reason:             "ContourUnavailable",
+					Message:            "Envoy daemonset does not have minimum availability.",
+					LastTransitionTime: now,
 				}
 			case cond.Status == corev1.ConditionFalse:
 				if dsAvailable {
 					return metav1.Condition{
-						Type:    operatorv1alpha1.ContourAvailableConditionType,
-						Status:  metav1.ConditionFalse,
-						Reason:  "ContourUnavailable",
-						Message: fmt.Sprintf("Contour %s", strings.ToLower(cond.Message)),
+						Type:               operatorv1alpha1.ContourAvailableConditionType,
+						Status:             metav1.ConditionFalse,
+						Reason:             "ContourUnavailable",
+						Message:            fmt.Sprintf("Contour %s", strings.ToLower(cond.Message)),
+						LastTransitionTime: now,
 					}
 				}
 				return metav1.Condition{
@@ -81,23 +87,26 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 					Reason: "ContourUnavailable",
 					Message: fmt.Sprintf("Envoy daemonset does not have minimum availability. Contour %s",
 						strings.ToLower(cond.Message)),
+					LastTransitionTime: now,
 				}
 			case cond.Status == corev1.ConditionUnknown:
 				return metav1.Condition{
-					Type:    operatorv1alpha1.ContourAvailableConditionType,
-					Status:  metav1.ConditionUnknown,
-					Reason:  fmt.Sprintf("ContourUnknown: %s", cond.Message),
-					Message: fmt.Sprintf("Contour status unknown. %s", cond.Message),
+					Type:               operatorv1alpha1.ContourAvailableConditionType,
+					Status:             metav1.ConditionUnknown,
+					Reason:             fmt.Sprintf("ContourUnknown: %s", cond.Message),
+					Message:            fmt.Sprintf("Contour status unknown. %s", cond.Message),
+					LastTransitionTime: now,
 				}
 			}
 		}
 	}
 
 	return metav1.Condition{
-		Type:    operatorv1alpha1.ContourAvailableConditionType,
-		Status:  metav1.ConditionUnknown,
-		Reason:  "ContourUnknown",
-		Message: "Contour status unknown.",
+		Type:               operatorv1alpha1.ContourAvailableConditionType,
+		Status:             metav1.ConditionUnknown,
+		Reason:             "ContourUnknown",
+		Message:            "Contour status unknown.",
+		LastTransitionTime: now,
 	}
 }
 
@@ -105,7 +114,6 @@ func computeContourAvailableCondition(deployment *appsv1.Deployment, ds *appsv1.
 // the transition time if details of a condition have changed. Returns
 // the updated condition array.
 func mergeConditions(conditions []metav1.Condition, updates ...metav1.Condition) []metav1.Condition {
-	now := metav1.NewTime(time.Now())
 	var additions []metav1.Condition
 	for i, update := range updates {
 		add := true
@@ -116,15 +124,16 @@ func mergeConditions(conditions []metav1.Condition, updates ...metav1.Condition)
 					conditions[j].Status = update.Status
 					conditions[j].Reason = update.Reason
 					conditions[j].Message = update.Message
+					conditions[j].ObservedGeneration = update.ObservedGeneration
+					// Only update the transition time if Status changes.
 					if cond.Status != update.Status {
-						conditions[j].LastTransitionTime = now
+						conditions[j].LastTransitionTime = update.LastTransitionTime
 					}
 					break
 				}
 			}
 		}
 		if add {
-			updates[i].LastTransitionTime = now
 			additions = append(additions, updates[i])
 		}
 	}
