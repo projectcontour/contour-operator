@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -86,9 +87,11 @@ func desiredClusterRole(name string, contour *operatorv1alpha1.Contour) *rbacv1.
 			policyRuleFor(corev1.GroupName, getListWatch, "secrets", "endpoints", "services", "namespaces"),
 
 			// Gateway API resources.
-			// Note, ReferenceGrant & ReferencePolicy do not currently have a .status field so they're omitted from the status rule.
-			policyRuleFor(gatewayv1alpha2.GroupName, getListWatch, "gatewayclasses", "gateways", "httproutes", "tlsroutes", "referencegrants", "referencepolicies"),
-			policyRuleFor(gatewayv1alpha2.GroupName, createGetUpdate, "gatewayclasses/status", "gateways/status", "httproutes/status", "tlsroutes/status"),
+			// Note, ReferenceGrant does not currently have a .status field so it is omitted from the status rule.
+			policyRuleFor(gatewayv1beta1.GroupName, getListWatch, "gatewayclasses", "gateways", "httproutes", "referencegrants"),
+			policyRuleFor(gatewayv1beta1.GroupName, createGetUpdate, "gatewayclasses/status", "gateways/status", "httproutes/status"),
+			policyRuleFor(gatewayv1alpha2.GroupName, getListWatch, "tlsroutes"),
+			policyRuleFor(gatewayv1alpha2.GroupName, createGetUpdate, "tlsroutes/status"),
 
 			// Ingress resources.
 			policyRuleFor(networkingv1.GroupName, getListWatch, "ingresses"),
