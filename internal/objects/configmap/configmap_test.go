@@ -17,10 +17,10 @@ import (
 	"testing"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	"github.com/projectcontour/contour-operator/internal/ref"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 )
 
 func TestDesiredContourConfigmap(t *testing.T) {
@@ -268,8 +268,8 @@ accesslog-format: envoy
 			Namespace: operatorv1alpha1.NamespaceSpec{
 				Name: "some-ns",
 			},
-			GatewayControllerName:     pointer.String("some-controller-name"),
-			EnableExternalNameService: pointer.Bool(true),
+			GatewayControllerName:     ref.To("some-controller-name"),
+			EnableExternalNameService: ref.To(true),
 		},
 	}
 	cm, err := desired(configForContour(c))

@@ -27,7 +27,7 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 	"github.com/projectcontour/contour-operator/internal/parse"
-
+	"github.com/projectcontour/contour-operator/internal/ref"
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -261,8 +260,8 @@ func NewIngress(cl client.Client, name, ns, backendName string, backendPort int)
 
 func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname, gwName, gwNS string, svcPort int32) error {
 	rootPrefix := &gatewayv1alpha2.HTTPPathMatch{
-		Type:  pathMatchTypePtr(gatewayv1alpha2.PathMatchPathPrefix),
-		Value: pointer.String("/"),
+		Type:  ref.To(gatewayv1alpha2.PathMatchPathPrefix),
+		Value: ref.To("/"),
 	}
 	backendPort := gatewayv1alpha2.PortNumber(svcPort)
 	svcBackend := gatewayv1alpha2.HTTPBackendRef{
@@ -479,7 +478,7 @@ func newPod(ctx context.Context, cl client.Client, ns, name, image string, cmd [
 		Spec: core_v1.PodSpec{
 			Containers: []core_v1.Container{c},
 			// Kill the pod immediately so it exits quickly on deletion.
-			TerminationGracePeriodSeconds: pointer.Int64(0),
+			TerminationGracePeriodSeconds: ref.To(int64(0)),
 		},
 	}
 	if err := cl.Create(ctx, p); err != nil {
@@ -852,8 +851,4 @@ func labelWorkerNodes(ctx context.Context, cl client.Client) error {
 		}
 	}
 	return nil
-}
-
-func pathMatchTypePtr(t gatewayv1alpha2.PathMatchType) *gatewayv1alpha2.PathMatchType {
-	return &t
 }
