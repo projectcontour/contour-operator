@@ -35,7 +35,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 // Install operator from example manifest.
@@ -62,10 +62,10 @@ func installOperatorFromExample(t *testing.T, c client.Client) func(*testing.T, 
 		{name: "extensionservice crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "gatewayclass crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "gateway crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
+		{name: "grpcroute crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "httpproxy crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "httproute crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "referencegrant crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
-		{name: "referencepolicy crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "tcproute crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "tlscertificatedelegation crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
 		{name: "tlsroute crd", obj: new(apiextensions_v1.CustomResourceDefinition)},
@@ -168,12 +168,12 @@ func testGatewayExample(t *testing.T, c client.Client) {
 	require.NoError(t, e2e.WaitForContourAvailable(c, contourInstance.Name, contourInstance.Namespace))
 	t.Log("contour available")
 
-	gc := &gatewayv1alpha2.GatewayClass{}
+	gc := &gatewayv1beta1.GatewayClass{}
 	require.NoError(t, decoder.Decode(gc))
 	require.NoError(t, c.Create(context.TODO(), gc))
 	t.Log("created gatewayclass:", gc.Name)
 
-	gw := &gatewayv1alpha2.Gateway{}
+	gw := &gatewayv1beta1.Gateway{}
 	require.NoError(t, decoder.Decode(gw))
 	gw.Namespace = testNS.Name
 	require.NoError(t, c.Create(context.TODO(), gw))
