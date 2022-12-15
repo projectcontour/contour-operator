@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -59,8 +59,8 @@ type Operator struct {
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;create;update
 // +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tlsroutes;referencegrants;referencepolicies,verbs=get;list;watch;update
-// Note, ReferenceGrant and ReferencePolicy do not currently have a .status field so they're omitted from the below.
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses;gateways;httproutes;tlsroutes;referencegrants,verbs=get;list;watch;update
+// Note, ReferenceGrant does not currently have a .status field so it is omitted from the below.
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status;gateways/status;httproutes/status;tlsroutes/status,verbs=create;get;update
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=create;get;update
@@ -74,8 +74,8 @@ type Operator struct {
 
 // New creates a new operator from cliCfg and operatorConfig.
 func New(cliCfg *rest.Config, operatorConfig *Config) (*Operator, error) {
-	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha2.GatewayClass{},
-		&gatewayv1alpha2.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1beta1.GatewayClass{},
+		&gatewayv1beta1.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
 	mgrOpts := manager.Options{
 		Scheme:                GetOperatorScheme(),
 		LeaderElection:        operatorConfig.LeaderElection,

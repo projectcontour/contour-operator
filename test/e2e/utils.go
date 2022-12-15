@@ -42,7 +42,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 var (
@@ -56,7 +56,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
-	_ = gatewayv1alpha2.AddToScheme(scheme)
+	_ = gatewayv1beta1.AddToScheme(scheme)
 	_ = apiextensions_v1.AddToScheme(scheme)
 	_ = rbac_v1.AddToScheme(scheme)
 	_ = apps_v1.AddToScheme(scheme)
@@ -129,7 +129,7 @@ func deleteContour(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration, name, ns string) error {
-	gw := &gatewayv1alpha2.Gateway{
+	gw := &gatewayv1beta1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -157,7 +157,7 @@ func deleteGateway(ctx context.Context, cl client.Client, timeout time.Duration,
 }
 
 func deleteGatewayClass(ctx context.Context, cl client.Client, timeout time.Duration, name string) error {
-	gc := &gatewayv1alpha2.GatewayClass{
+	gc := &gatewayv1beta1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
 	if err := cl.Delete(ctx, gc); err != nil {
@@ -259,45 +259,45 @@ func NewIngress(cl client.Client, name, ns, backendName string, backendPort int)
 }
 
 func NewHTTPRoute(cl client.Client, name, ns, svc, k, v, hostname, gwName, gwNS string, svcPort int32) error {
-	rootPrefix := &gatewayv1alpha2.HTTPPathMatch{
-		Type:  ref.To(gatewayv1alpha2.PathMatchPathPrefix),
+	rootPrefix := &gatewayv1beta1.HTTPPathMatch{
+		Type:  ref.To(gatewayv1beta1.PathMatchPathPrefix),
 		Value: ref.To("/"),
 	}
-	backendPort := gatewayv1alpha2.PortNumber(svcPort)
-	svcBackend := gatewayv1alpha2.HTTPBackendRef{
-		BackendRef: gatewayv1alpha2.BackendRef{
-			BackendObjectReference: gatewayv1alpha2.BackendObjectReference{
-				Name: gatewayv1alpha2.ObjectName(svc),
+	backendPort := gatewayv1beta1.PortNumber(svcPort)
+	svcBackend := gatewayv1beta1.HTTPBackendRef{
+		BackendRef: gatewayv1beta1.BackendRef{
+			BackendObjectReference: gatewayv1beta1.BackendObjectReference{
+				Name: gatewayv1beta1.ObjectName(svc),
 				Port: &backendPort,
 			},
 		},
 	}
-	match := gatewayv1alpha2.HTTPRouteMatch{
+	match := gatewayv1beta1.HTTPRouteMatch{
 		Path: rootPrefix,
 	}
-	httpRule := gatewayv1alpha2.HTTPRouteRule{
-		Matches:     []gatewayv1alpha2.HTTPRouteMatch{match},
-		BackendRefs: []gatewayv1alpha2.HTTPBackendRef{svcBackend},
+	httpRule := gatewayv1beta1.HTTPRouteRule{
+		Matches:     []gatewayv1beta1.HTTPRouteMatch{match},
+		BackendRefs: []gatewayv1beta1.HTTPBackendRef{svcBackend},
 	}
-	h := gatewayv1alpha2.Hostname(hostname)
-	gatewayNS := gatewayv1alpha2.Namespace(gwNS)
-	route := &gatewayv1alpha2.HTTPRoute{
+	h := gatewayv1beta1.Hostname(hostname)
+	gatewayNS := gatewayv1beta1.Namespace(gwNS)
+	route := &gatewayv1beta1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 			Labels:    map[string]string{k: v},
 		},
-		Spec: gatewayv1alpha2.HTTPRouteSpec{
-			CommonRouteSpec: gatewayv1alpha2.CommonRouteSpec{
-				ParentRefs: []gatewayv1alpha2.ParentReference{
+		Spec: gatewayv1beta1.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1beta1.CommonRouteSpec{
+				ParentRefs: []gatewayv1beta1.ParentReference{
 					{
 						Namespace: &gatewayNS,
-						Name:      gatewayv1alpha2.ObjectName(gwName),
+						Name:      gatewayv1beta1.ObjectName(gwName),
 					},
 				},
 			},
-			Hostnames: []gatewayv1alpha2.Hostname{h},
-			Rules:     []gatewayv1alpha2.HTTPRouteRule{httpRule},
+			Hostnames: []gatewayv1beta1.Hostname{h},
+			Rules:     []gatewayv1beta1.HTTPRouteRule{httpRule},
 		},
 	}
 	if err := cl.Create(context.TODO(), route); err != nil {
@@ -622,12 +622,12 @@ func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 
 // newGatewayClass creates a GatewayClass object.
 func newGatewayClass(ctx context.Context, cl client.Client, name, controllerName string) error {
-	gc := &gatewayv1alpha2.GatewayClass{
+	gc := &gatewayv1beta1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: gatewayv1alpha2.GatewayClassSpec{
-			ControllerName: gatewayv1alpha2.GatewayController(controllerName),
+		Spec: gatewayv1beta1.GatewayClassSpec{
+			ControllerName: gatewayv1beta1.GatewayController(controllerName),
 		},
 	}
 	if err := cl.Create(ctx, gc); err != nil {
@@ -640,19 +640,19 @@ func newGatewayClass(ctx context.Context, cl client.Client, name, controllerName
 // ns/name, gc for the gatewayClassName. The Gateway will contain an HTTP listener
 // on port 80.
 func newGateway(ctx context.Context, cl client.Client, ns, name, gc string) error {
-	http := gatewayv1alpha2.Listener{
-		Name:     gatewayv1alpha2.SectionName("http"),
-		Port:     gatewayv1alpha2.PortNumber(int32(80)),
-		Protocol: gatewayv1alpha2.HTTPProtocolType,
+	http := gatewayv1beta1.Listener{
+		Name:     gatewayv1beta1.SectionName("http"),
+		Port:     gatewayv1beta1.PortNumber(int32(80)),
+		Protocol: gatewayv1beta1.HTTPProtocolType,
 	}
-	gw := &gatewayv1alpha2.Gateway{
+	gw := &gatewayv1beta1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
-		Spec: gatewayv1alpha2.GatewaySpec{
-			GatewayClassName: gatewayv1alpha2.ObjectName(gc),
-			Listeners:        []gatewayv1alpha2.Listener{http},
+		Spec: gatewayv1beta1.GatewaySpec{
+			GatewayClassName: gatewayv1beta1.ObjectName(gc),
+			Listeners:        []gatewayv1beta1.Listener{http},
 		},
 	}
 	if err := cl.Create(ctx, gw); err != nil {
