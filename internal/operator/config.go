@@ -14,7 +14,7 @@
 package operator
 
 const (
-	DefaultContourImage           = "ghcr.io/projectcontour/contour:main"
+	DefaultContourImage           = "ghcr.io/projectcontour/contour:v1.24.0"
 	DefaultEnvoyImage             = "docker.io/envoyproxy/envoy:v1.25.0"
 	DefaultMetricsAddr            = ":8080"
 	DefaultEnableLeaderElection   = false
