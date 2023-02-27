@@ -1,6 +1,6 @@
 ## Deprecation Notice
 
-This repository has been deprecared and archived as read-only. The code here is no longer maintained but is preserved for reference.
+This repository has been deprecated and archived as read-only. The code here is no longer maintained but is preserved for reference.
 
 # contour-operator
 Contour Operator provides a method for packaging, deploying, and managing [Contour][1]. The operator extends the
